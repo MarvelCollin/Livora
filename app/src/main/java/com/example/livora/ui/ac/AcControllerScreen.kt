@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.BrightnessHigh
+import androidx.compose.material.icons.filled.SettingsRemote
 import androidx.compose.material.icons.filled.EnergySavingsLeaf
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Remove
@@ -105,6 +106,10 @@ fun AcControllerScreen(
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Spacer(modifier = Modifier.height(12.dp))
+
+            IrStatusBadge(isAvailable = viewModel.isIrAvailable)
+
             Spacer(modifier = Modifier.height(12.dp))
 
             PowerAndTemperatureSection(
@@ -636,6 +641,42 @@ private fun ToggleChip(
                 MaterialTheme.colorScheme.onPrimaryContainer
             else
                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+        )
+    }
+}
+
+@Composable
+private fun IrStatusBadge(isAvailable: Boolean) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(
+                if (isAvailable)
+                    MaterialTheme.colorScheme.primaryContainer
+                else
+                    MaterialTheme.colorScheme.errorContainer
+            )
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.SettingsRemote,
+            contentDescription = null,
+            modifier = Modifier.size(16.dp),
+            tint = if (isAvailable)
+                MaterialTheme.colorScheme.primary
+            else
+                MaterialTheme.colorScheme.error
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = if (isAvailable) "IR Blaster Ready" else "IR Blaster Unavailable — controls are simulated only",
+            fontSize = 12.sp,
+            color = if (isAvailable)
+                MaterialTheme.colorScheme.onPrimaryContainer
+            else
+                MaterialTheme.colorScheme.onErrorContainer
         )
     }
 }
