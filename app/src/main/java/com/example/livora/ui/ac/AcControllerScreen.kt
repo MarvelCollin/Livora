@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,7 +28,6 @@ import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.BrightnessHigh
-import androidx.compose.material.icons.filled.SettingsRemote
 import androidx.compose.material.icons.filled.EnergySavingsLeaf
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Remove
@@ -106,11 +106,7 @@ fun AcControllerScreen(
                 .padding(horizontal = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(12.dp))
-
-            IrStatusBadge(isAvailable = viewModel.isIrAvailable)
-
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             PowerAndTemperatureSection(
                 state = state,
@@ -119,7 +115,7 @@ fun AcControllerScreen(
                 onDecrease = viewModel::decreaseTemperature
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             AcModeSection(
                 currentMode = state.mode,
@@ -185,7 +181,7 @@ private fun PowerAndTemperatureSection(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = bgColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
             modifier = Modifier
@@ -193,10 +189,10 @@ private fun PowerAndTemperatureSection(
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            IconButton(
-                onClick = onTogglePower,
+            Box(
                 modifier = Modifier
-                    .size(56.dp)
+                    .fillMaxWidth(0.5f)
+                    .aspectRatio(1f)
                     .clip(CircleShape)
                     .background(
                         if (state.isPoweredOn)
@@ -204,6 +200,8 @@ private fun PowerAndTemperatureSection(
                         else
                             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
                     )
+                    .clickable(onClick = onTogglePower),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.PowerSettingsNew,
@@ -212,49 +210,54 @@ private fun PowerAndTemperatureSection(
                         MaterialTheme.colorScheme.onPrimary
                     else
                         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.fillMaxSize(0.45f)
                 )
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             Text(
                 text = if (state.isPoweredOn) "ON" else "OFF",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
                 color = if (state.isPoweredOn)
                     MaterialTheme.colorScheme.primary
                 else
                     MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                IconButton(
-                    onClick = onDecrease,
-                    enabled = state.isPoweredOn,
+                Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .fillMaxWidth(0.22f)
+                        .aspectRatio(1f)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
+                        .clickable(enabled = state.isPoweredOn, onClick = onDecrease),
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Remove,
                         contentDescription = null,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.fillMaxSize(0.5f),
+                        tint = if (state.isPoweredOn)
+                            MaterialTheme.colorScheme.onSurface
+                        else
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                     )
                 }
 
-                Spacer(modifier = Modifier.width(24.dp))
+                Spacer(modifier = Modifier.width(20.dp))
 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = "${state.temperature}°",
-                        fontSize = 52.sp,
+                        fontSize = 56.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (state.isPoweredOn)
                             MaterialTheme.colorScheme.onPrimaryContainer
@@ -271,25 +274,30 @@ private fun PowerAndTemperatureSection(
                     )
                 }
 
-                Spacer(modifier = Modifier.width(24.dp))
+                Spacer(modifier = Modifier.width(20.dp))
 
-                IconButton(
-                    onClick = onIncrease,
-                    enabled = state.isPoweredOn,
+                Box(
                     modifier = Modifier
-                        .size(48.dp)
+                        .fillMaxWidth(0.28f)
+                        .aspectRatio(1f)
                         .clip(CircleShape)
                         .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
+                        .clickable(enabled = state.isPoweredOn, onClick = onIncrease),
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
                         contentDescription = null,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.fillMaxSize(0.5f),
+                        tint = if (state.isPoweredOn)
+                            MaterialTheme.colorScheme.onSurface
+                        else
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             Text(
                 text = "${AcState.MIN_TEMP}°C — ${AcState.MAX_TEMP}°C",
@@ -416,58 +424,70 @@ private fun TimerSection(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(
-                onClick = onDecrease,
-                enabled = isPoweredOn && timerHours > 0,
+            Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(56.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable(enabled = isPoweredOn && timerHours > 0, onClick = onDecrease),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Remove,
                     contentDescription = null,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(28.dp),
+                    tint = if (isPoweredOn && timerHours > 0)
+                        MaterialTheme.colorScheme.onSurface
+                    else
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                 )
             }
 
-            Spacer(modifier = Modifier.width(20.dp))
+            Spacer(modifier = Modifier.width(24.dp))
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Icon(
-                        imageVector = Icons.Default.Timer,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (timerHours == 0) "Off" else "${timerHours}h",
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = if (timerHours > 0)
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                    )
-                }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Timer,
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp),
+                    tint = if (timerHours > 0)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = if (timerHours == 0) "Off" else "${timerHours}h",
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (timerHours > 0)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                )
             }
 
-            Spacer(modifier = Modifier.width(20.dp))
+            Spacer(modifier = Modifier.width(24.dp))
 
-            IconButton(
-                onClick = onIncrease,
-                enabled = isPoweredOn && timerHours < 24,
+            Box(
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(56.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clickable(enabled = isPoweredOn && timerHours < 24, onClick = onIncrease),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
                     contentDescription = null,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(28.dp),
+                    tint = if (isPoweredOn && timerHours < 24)
+                        MaterialTheme.colorScheme.onSurface
+                    else
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                 )
             }
         }
@@ -518,20 +538,20 @@ private fun SectionCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
             Text(
                 text = title,
-                fontSize = 15.sp,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             content()
         }
     }
@@ -567,19 +587,19 @@ private fun ModeChip(
             .clip(RoundedCornerShape(12.dp))
             .clickable(enabled = isEnabled, onClick = onClick)
             .background(bgColor)
-            .padding(horizontal = 10.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            modifier = Modifier.size(22.dp),
+            modifier = Modifier.size(24.dp),
             tint = contentColor
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = label,
-            fontSize = 11.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
             color = contentColor
         )
@@ -620,7 +640,7 @@ private fun ToggleChip(
             )
             .clickable(enabled = isEnabled, onClick = onClick)
             .background(bgColor)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
@@ -632,7 +652,7 @@ private fun ToggleChip(
             else
                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = label,
             fontSize = 12.sp,
@@ -641,42 +661,6 @@ private fun ToggleChip(
                 MaterialTheme.colorScheme.onPrimaryContainer
             else
                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-        )
-    }
-}
-
-@Composable
-private fun IrStatusBadge(isAvailable: Boolean) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(
-                if (isAvailable)
-                    MaterialTheme.colorScheme.primaryContainer
-                else
-                    MaterialTheme.colorScheme.errorContainer
-            )
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = Icons.Default.SettingsRemote,
-            contentDescription = null,
-            modifier = Modifier.size(16.dp),
-            tint = if (isAvailable)
-                MaterialTheme.colorScheme.primary
-            else
-                MaterialTheme.colorScheme.error
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = if (isAvailable) "IR Blaster Ready" else "IR Blaster Unavailable — controls are simulated only",
-            fontSize = 12.sp,
-            color = if (isAvailable)
-                MaterialTheme.colorScheme.onPrimaryContainer
-            else
-                MaterialTheme.colorScheme.onErrorContainer
         )
     }
 }
