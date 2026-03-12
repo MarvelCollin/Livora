@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.PowerSettingsNew
@@ -60,14 +61,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.livora.ui.ac.AcViewModel
+import com.example.livora.ui.bulb.BulbViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     acViewModel: AcViewModel,
-    onNavigateToAc: () -> Unit
+    bulbViewModel: BulbViewModel,
+    onNavigateToAc: () -> Unit,
+    onNavigateToBulb: () -> Unit
 ) {
     val acState by acViewModel.acState.collectAsState()
+    val bulbState by bulbViewModel.bulbState.collectAsState()
+    val connectedBulb by bulbViewModel.connectedBulb.collectAsState()
     val context = LocalContext.current
     val voiceManager = remember { VoiceRecognitionManager(context) }
     var isListening by remember { mutableStateOf(false) }
@@ -185,6 +191,33 @@ fun DashboardScreen(
                         },
                         onTogglePower = { acViewModel.togglePower() },
                         onClick = onNavigateToAc
+                    )
+                }
+
+                item {
+                    val bulbIsOn = bulbState.isPoweredOn && connectedBulb != null
+                    DeviceCard(
+                        name = "Smart Bulb",
+                        brand = "WiZ",
+                        isOn = bulbIsOn,
+                        statusText = if (bulbIsOn) "${bulbState.brightness}% · ${bulbState.colorTemp}K" else if (connectedBulb != null) "Off" else "Not Connected",
+                        icon = { modifier ->
+                            Icon(
+                                imageVector = Icons.Default.Lightbulb,
+                                contentDescription = null,
+                                modifier = modifier,
+                                tint = if (bulbIsOn)
+                                    MaterialTheme.colorScheme.primary
+                                else
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                            )
+                        },
+                        onTogglePower = {
+                            if (connectedBulb != null) {
+                                bulbViewModel.togglePower()
+                            }
+                        },
+                        onClick = onNavigateToBulb
                     )
                 }
             }

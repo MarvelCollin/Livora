@@ -7,11 +7,14 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.livora.ui.ac.AcControllerScreen
 import com.example.livora.ui.ac.AcViewModel
+import com.example.livora.ui.bulb.BulbControllerScreen
+import com.example.livora.ui.bulb.BulbViewModel
 import com.example.livora.ui.dashboard.DashboardScreen
 
 @Composable
 fun LivoraNavHost(navController: NavHostController) {
     val acViewModel: AcViewModel = viewModel()
+    val bulbViewModel: BulbViewModel = viewModel()
 
     NavHost(
         navController = navController,
@@ -20,12 +23,20 @@ fun LivoraNavHost(navController: NavHostController) {
         composable(Screen.Dashboard.route) {
             DashboardScreen(
                 acViewModel = acViewModel,
-                onNavigateToAc = { navController.navigate(Screen.AcController.route) }
+                bulbViewModel = bulbViewModel,
+                onNavigateToAc = { navController.navigate(Screen.AcController.route) },
+                onNavigateToBulb = { navController.navigate(Screen.BulbController.route) }
             )
         }
         composable(Screen.AcController.route) {
             AcControllerScreen(
                 viewModel = acViewModel,
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable(Screen.BulbController.route) {
+            BulbControllerScreen(
+                viewModel = bulbViewModel,
                 onBack = { navController.popBackStack() }
             )
         }
