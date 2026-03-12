@@ -421,7 +421,7 @@ private fun AcModeSection(
             ModeChip(
                 label = "Dry",
                 icon = Icons.Default.WaterDrop,
-                isSelected = currentMode == AcMode.DRY,
+                isSelected = currentMode == AcMode.DRY, 
                 isEnabled = isPoweredOn,
                 onClick = { onModeSelected(AcMode.DRY) }
             )

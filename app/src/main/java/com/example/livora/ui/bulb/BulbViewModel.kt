@@ -1,6 +1,7 @@
 package com.example.livora.ui.bulb
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.livora.data.model.WizBulb
@@ -17,6 +18,7 @@ import kotlinx.coroutines.launch
 class BulbViewModel(application: Application) : AndroidViewModel(application) {
 
     private val wizController = WizBulbController()
+    private val prefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     private val _discoveredBulbs = MutableStateFlow<List<WizBulb>>(emptyList())
     val discoveredBulbs: StateFlow<List<WizBulb>> = _discoveredBulbs.asStateFlow()
@@ -30,6 +32,38 @@ class BulbViewModel(application: Application) : AndroidViewModel(application) {
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
+    init {
+        loadSavedBulb()
+    }
+
+    private fun loadSavedBulb() {
+        val ip = prefs.getString(KEY_BULB_IP, null)
+        val mac = prefs.getString(KEY_BULB_MAC, null)
+        val moduleName = prefs.getString(KEY_BULB_MODULE, "") ?: ""
+        if (ip != null && mac != null) {
+            val bulb = WizBulb(ip = ip, mac = mac, moduleName = moduleName)
+            _connectedBulb.value = bulb
+            LivoraLogger.debug(TAG, "Loaded saved bulb ${bulb.mac} at ${bulb.ip}")
+            refreshBulbState()
+        }
+    }
+
+    private fun saveBulb(bulb: WizBulb) {
+        prefs.edit()
+            .putString(KEY_BULB_IP, bulb.ip)
+            .putString(KEY_BULB_MAC, bulb.mac)
+            .putString(KEY_BULB_MODULE, bulb.moduleName)
+            .apply()
+    }
+
+    private fun clearSavedBulb() {
+        prefs.edit()
+            .remove(KEY_BULB_IP)
+            .remove(KEY_BULB_MAC)
+            .remove(KEY_BULB_MODULE)
+            .apply()
+    }
+
     fun scanForBulbs() {
         _isScanning.value = true
         viewModelScope.launch {
@@ -42,6 +76,7 @@ class BulbViewModel(application: Application) : AndroidViewModel(application) {
 
     fun connectToBulb(bulb: WizBulb) {
         _connectedBulb.value = bulb
+        saveBulb(bulb)
         LivoraLogger.debug(TAG, "Connected to bulb ${bulb.mac} at ${bulb.ip}")
         refreshBulbState()
     }
@@ -49,6 +84,7 @@ class BulbViewModel(application: Application) : AndroidViewModel(application) {
     fun disconnectBulb() {
         _connectedBulb.value = null
         _bulbState.value = WizBulbState()
+        clearSavedBulb()
         LivoraLogger.debug(TAG, "Disconnected from bulb")
     }
 
@@ -169,5 +205,9 @@ class BulbViewModel(application: Application) : AndroidViewModel(application) {
 
     companion object {
         private const val TAG = "Livora.BulbViewModel"
+        private const val PREFS_NAME = "livora_bulb_prefs"
+        private const val KEY_BULB_IP = "bulb_ip"
+        private const val KEY_BULB_MAC = "bulb_mac"
+        private const val KEY_BULB_MODULE = "bulb_module"
     }
 }
