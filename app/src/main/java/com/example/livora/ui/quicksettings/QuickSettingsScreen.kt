@@ -106,10 +106,9 @@ fun QuickSettingsScreen(
     val processQuickVoiceCommand: (String) -> Unit = { text ->
         val lower = text.lowercase()
         when {
-            lower.contains("normal") && lower.contains("mode") -> activateNormalMode()
-            lower.contains("sleep") && lower.contains("mode") -> activateSleepMode()
-            lower.contains("out") && lower.contains("mode") -> activateOutMode()
-            lower.contains("leave") || lower.contains("going out") -> activateOutMode()
+            lower.contains("normal") -> activateNormalMode()
+            lower.contains("sleep") -> activateSleepMode()
+            lower.contains("out") || lower.contains("leave") -> activateOutMode()
         }
     }
 
@@ -129,40 +128,31 @@ fun QuickSettingsScreen(
         )
     }
 
+    fun restartWakeWordLoop() {
+        if (!isWakeWordActive) return
+        wakeWordListener.start {
+            wakeWordListener.stop()
+            voiceManager.startListening(
+                onResult = { text ->
+                    processQuickVoiceCommand(text)
+                    acViewModel.processVoiceCommand(text)
+                    bulbViewModel.processVoiceCommand(text)
+                },
+                onPartialResult = { partial -> partialText = partial },
+                onListeningStarted = { isListening = true },
+                onListeningEnded = {
+                    isListening = false
+                    partialText = ""
+                    restartWakeWordLoop()
+                }
+            )
+        }
+    }
+
     DisposableEffect(Unit) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             isWakeWordActive = true
-            wakeWordListener.start {
-                wakeWordListener.stop()
-                voiceManager.startListening(
-                    onResult = { text ->
-                        processQuickVoiceCommand(text)
-                        acViewModel.processVoiceCommand(text)
-                        bulbViewModel.processVoiceCommand(text)
-                    },
-                    onPartialResult = { partial -> partialText = partial },
-                    onListeningStarted = { isListening = true },
-                    onListeningEnded = {
-                        isListening = false
-                        partialText = ""
-                        if (isWakeWordActive) {
-                            wakeWordListener.start {
-                                wakeWordListener.stop()
-                                voiceManager.startListening(
-                                    onResult = { text ->
-                                        processQuickVoiceCommand(text)
-                                        acViewModel.processVoiceCommand(text)
-                                        bulbViewModel.processVoiceCommand(text)
-                                    },
-                                    onPartialResult = { partial -> partialText = partial },
-                                    onListeningStarted = { isListening = true },
-                                    onListeningEnded = { isListening = false; partialText = "" }
-                                )
-                            }
-                        }
-                    }
-                )
-            }
+            restartWakeWordLoop()
         }
         onDispose {
             wakeWordListener.destroy()
@@ -210,6 +200,7 @@ fun QuickSettingsScreen(
                                 voiceManager.stopListening()
                                 isListening = false
                                 partialText = ""
+                                restartWakeWordLoop()
                             } else {
                                 wakeWordListener.stop()
                                 voiceManager.startListening(
@@ -223,21 +214,7 @@ fun QuickSettingsScreen(
                                     onListeningEnded = {
                                         isListening = false
                                         partialText = ""
-                                        if (isWakeWordActive) {
-                                            wakeWordListener.start {
-                                                wakeWordListener.stop()
-                                                voiceManager.startListening(
-                                                    onResult = { text2 ->
-                                                        processQuickVoiceCommand(text2)
-                                                        acViewModel.processVoiceCommand(text2)
-                                                        bulbViewModel.processVoiceCommand(text2)
-                                                    },
-                                                    onPartialResult = { partial -> partialText = partial },
-                                                    onListeningStarted = { isListening = true },
-                                                    onListeningEnded = { isListening = false; partialText = "" }
-                                                )
-                                            }
-                                        }
+                                        restartWakeWordLoop()
                                     }
                                 )
                             }
@@ -398,21 +375,7 @@ fun QuickSettingsScreen(
                 voiceManager.stopListening()
                 isListening = false
                 partialText = ""
-                if (isWakeWordActive) {
-                    wakeWordListener.start {
-                        wakeWordListener.stop()
-                        voiceManager.startListening(
-                            onResult = { text ->
-                                processQuickVoiceCommand(text)
-                                acViewModel.processVoiceCommand(text)
-                                bulbViewModel.processVoiceCommand(text)
-                            },
-                            onPartialResult = { partial -> partialText = partial },
-                            onListeningStarted = { isListening = true },
-                            onListeningEnded = { isListening = false; partialText = "" }
-                        )
-                    }
-                }
+                restartWakeWordLoop()
             }
         )
     }
