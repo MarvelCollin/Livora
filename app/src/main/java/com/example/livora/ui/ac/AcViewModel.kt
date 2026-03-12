@@ -53,6 +53,25 @@ class AcViewModel(application: Application) : AndroidViewModel(application) {
         if (current.isPoweredOn) transmitState(current) else transmitPowerOff()
     }
 
+    fun powerOn() {
+        if (!_acState.value.isPoweredOn) {
+            _acState.update { it.copy(isPoweredOn = true) }
+            transmitState(_acState.value)
+        }
+    }
+
+    fun powerOff() {
+        if (_acState.value.isPoweredOn) {
+            _acState.update { it.copy(isPoweredOn = false) }
+            transmitPowerOff()
+        }
+    }
+
+    fun setTemperature(temp: Int) {
+        _acState.update { it.copy(temperature = temp.coerceIn(AcState.MIN_TEMP, AcState.MAX_TEMP)) }
+        if (_acState.value.isPoweredOn) transmitState(_acState.value)
+    }
+
     fun increaseTemperature() {
         _acState.update { state ->
             if (state.temperature < AcState.MAX_TEMP) state.copy(temperature = state.temperature + 1)

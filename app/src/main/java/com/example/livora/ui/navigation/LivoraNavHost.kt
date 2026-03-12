@@ -10,6 +10,7 @@ import com.example.livora.ui.ac.AcViewModel
 import com.example.livora.ui.bulb.BulbControllerScreen
 import com.example.livora.ui.bulb.BulbViewModel
 import com.example.livora.ui.dashboard.DashboardScreen
+import com.example.livora.ui.quicksettings.QuickSettingsScreen
 
 @Composable
 fun LivoraNavHost(navController: NavHostController) {
@@ -18,8 +19,15 @@ fun LivoraNavHost(navController: NavHostController) {
 
     NavHost(
         navController = navController,
-        startDestination = Screen.Dashboard.route
+        startDestination = Screen.QuickSettings.route
     ) {
+        composable(Screen.QuickSettings.route) {
+            QuickSettingsScreen(
+                acViewModel = acViewModel,
+                bulbViewModel = bulbViewModel,
+                onNavigateToAdvanced = { navController.navigate(Screen.Dashboard.route) }
+            )
+        }
         composable(Screen.Dashboard.route) {
             DashboardScreen(
                 acViewModel = acViewModel,

@@ -72,6 +72,26 @@ class BulbViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun powerOn() {
+        val bulb = _connectedBulb.value ?: return
+        if (!_bulbState.value.isPoweredOn) {
+            _bulbState.update { it.copy(isPoweredOn = true) }
+            viewModelScope.launch {
+                wizController.setPower(bulb.ip, true)
+            }
+        }
+    }
+
+    fun powerOff() {
+        val bulb = _connectedBulb.value ?: return
+        if (_bulbState.value.isPoweredOn) {
+            _bulbState.update { it.copy(isPoweredOn = false) }
+            viewModelScope.launch {
+                wizController.setPower(bulb.ip, false)
+            }
+        }
+    }
+
     fun setBrightness(brightness: Int) {
         val bulb = _connectedBulb.value ?: return
         val clamped = brightness.coerceIn(WizBulbState.MIN_BRIGHTNESS, WizBulbState.MAX_BRIGHTNESS)
