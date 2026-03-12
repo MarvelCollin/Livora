@@ -1,5 +1,9 @@
 package com.example.livora.ui.ac
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,6 +30,8 @@ import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.BrightnessHigh
 import androidx.compose.material.icons.filled.EnergySavingsLeaf
@@ -45,10 +51,23 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
+import com.example.livora.ui.components.VoiceListeningOverlay
+import com.example.livora.util.VoiceRecognitionManager
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -67,7 +86,29 @@ fun AcControllerScreen(
     onBack: () -> Unit
 ) {
     val state by viewModel.acState.collectAsState()
+    val context = LocalContext.current
+    val voiceManager = remember { VoiceRecognitionManager(context) }
+    var isListening by remember { mutableStateOf(false) }
+    var partialText by remember { mutableStateOf("") }
 
+    DisposableEffect(Unit) {
+        onDispose { voiceManager.destroy() }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            voiceManager.startListening(
+                onResult = { text -> viewModel.processVoiceCommand(text) },
+                onPartialResult = { partial -> partialText = partial },
+                onListeningStarted = { isListening = true },
+                onListeningEnded = { isListening = false; partialText = "" }
+            )
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -89,6 +130,35 @@ fun AcControllerScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = null
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = {
+                        if (ContextCompat.checkSelfPermission(
+                                context, Manifest.permission.RECORD_AUDIO
+                            ) == PackageManager.PERMISSION_GRANTED
+                        ) {
+                            if (isListening) {
+                                voiceManager.stopListening()
+                                isListening = false
+                                partialText = ""
+                            } else {
+                                voiceManager.startListening(
+                                    onResult = { text -> viewModel.processVoiceCommand(text) },
+                                    onPartialResult = { partial -> partialText = partial },
+                                    onListeningStarted = { isListening = true },
+                                    onListeningEnded = { isListening = false; partialText = "" }
+                                )
+                            }
+                        } else {
+                            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    }) {
+                        Icon(
+                            imageVector = if (isListening) Icons.Default.MicOff else Icons.Default.Mic,
+                            contentDescription = null,
+                            tint = if (isListening) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 },
@@ -159,6 +229,21 @@ fun AcControllerScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+    AnimatedVisibility(
+        visible = isListening,
+        enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
+        exit = fadeOut() + slideOutVertically(targetOffsetY = { it })
+    ) {
+        VoiceListeningOverlay(
+            partialText = partialText,
+            onDismiss = {
+                voiceManager.stopListening()
+                isListening = false
+                partialText = ""
+            }
+        )
+    }
     }
 }
 

@@ -99,6 +99,46 @@ class AcViewModel(application: Application) : AndroidViewModel(application) {
         _acState.update { it.copy(isDisplayOn = !it.isDisplayOn) }
     }
 
+    fun processVoiceCommand(text: String) {
+        val lower = text.lowercase()
+        LivoraLogger.debug(TAG, "processVoiceCommand: $lower")
+        when {
+            lower.contains("turn on") || lower.contains("power on") -> {
+                if (!_acState.value.isPoweredOn) togglePower()
+            }
+            lower.contains("turn off") || lower.contains("power off") -> {
+                if (_acState.value.isPoweredOn) togglePower()
+            }
+            lower.contains("cool") && lower.contains("mode") -> setMode(AcMode.COOL)
+            lower.contains("heat") && lower.contains("mode") -> setMode(AcMode.HEAT)
+            lower.contains("dry") && lower.contains("mode") -> setMode(AcMode.DRY)
+            lower.contains("fan") && lower.contains("mode") -> setMode(AcMode.FAN)
+            lower.contains("auto") && lower.contains("mode") -> setMode(AcMode.AUTO)
+            lower.contains("increase") && lower.contains("temp") -> increaseTemperature()
+            lower.contains("decrease") && lower.contains("temp") -> decreaseTemperature()
+            lower.contains("temp up") || lower.contains("warmer") -> increaseTemperature()
+            lower.contains("temp down") || lower.contains("cooler") -> decreaseTemperature()
+            lower.contains("fan") && lower.contains("low") -> setFanSpeed(FanSpeed.LOW)
+            lower.contains("fan") && lower.contains("medium") -> setFanSpeed(FanSpeed.MEDIUM)
+            lower.contains("fan") && lower.contains("high") -> setFanSpeed(FanSpeed.HIGH)
+            lower.contains("fan") && lower.contains("auto") -> setFanSpeed(FanSpeed.AUTO)
+            lower.contains("sleep") -> toggleSleepMode()
+            lower.contains("energy") && lower.contains("saving") -> toggleEnergySaving()
+            else -> {
+                val tempMatch = Regex("(\\d+)\\s*(degree|celsius)").find(lower)
+                if (tempMatch != null) {
+                    val temp = tempMatch.groupValues[1].toIntOrNull()
+                    if (temp != null) {
+                        _acState.update { state ->
+                            state.copy(temperature = temp.coerceIn(AcState.MIN_TEMP, AcState.MAX_TEMP))
+                        }
+                        if (_acState.value.isPoweredOn) transmitState(_acState.value)
+                    }
+                }
+            }
+        }
+    }
+
     fun setTimer(hours: Int) {
         _acState.update { it.copy(timerHours = hours.coerceIn(0, 24)) }
     }
