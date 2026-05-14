@@ -32,6 +32,9 @@ class BulbViewModel(application: Application) : AndroidViewModel(application) {
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
+    private val _isAddingBulb = MutableStateFlow(false)
+    val isAddingBulb: StateFlow<Boolean> = _isAddingBulb.asStateFlow()
+
     init {
         loadSavedBulb()
     }
@@ -74,7 +77,17 @@ class BulbViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun startBulbSetup() {
+        _isAddingBulb.value = true
+        scanForBulbs()
+    }
+
+    fun cancelBulbSetup() {
+        _isAddingBulb.value = false
+    }
+
     fun connectToBulb(bulb: WizBulb) {
+        _isAddingBulb.value = false
         _connectedBulb.value = bulb
         saveBulb(bulb)
         LivoraLogger.debug(TAG, "Connected to bulb ${bulb.mac} at ${bulb.ip}")
@@ -82,6 +95,7 @@ class BulbViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun disconnectBulb() {
+        _isAddingBulb.value = false
         _connectedBulb.value = null
         _bulbState.value = WizBulbState()
         clearSavedBulb()

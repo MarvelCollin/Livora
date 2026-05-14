@@ -11,11 +11,14 @@ import com.example.livora.ui.bulb.BulbControllerScreen
 import com.example.livora.ui.bulb.BulbViewModel
 import com.example.livora.ui.dashboard.DashboardScreen
 import com.example.livora.ui.quicksettings.QuickSettingsScreen
+import com.example.livora.ui.todo.TodoScreen
+import com.example.livora.ui.todo.TodoViewModel
 
 @Composable
 fun LivoraNavHost(navController: NavHostController) {
     val acViewModel: AcViewModel = viewModel()
     val bulbViewModel: BulbViewModel = viewModel()
+    val todoViewModel: TodoViewModel = viewModel()
 
     NavHost(
         navController = navController,
@@ -33,7 +36,8 @@ fun LivoraNavHost(navController: NavHostController) {
                 acViewModel = acViewModel,
                 bulbViewModel = bulbViewModel,
                 onNavigateToAc = { navController.navigate(Screen.AcController.route) },
-                onNavigateToBulb = { navController.navigate(Screen.BulbController.route) }
+                onNavigateToBulb = { navController.navigate(Screen.BulbController.route) },
+                onNavigateToTodo = { navController.navigate(Screen.TodoList.route) }
             )
         }
         composable(Screen.AcController.route) {
@@ -45,6 +49,12 @@ fun LivoraNavHost(navController: NavHostController) {
         composable(Screen.BulbController.route) {
             BulbControllerScreen(
                 viewModel = bulbViewModel,
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable(Screen.TodoList.route) {
+            TodoScreen(
+                viewModel = todoViewModel,
                 onBack = { navController.popBackStack() }
             )
         }

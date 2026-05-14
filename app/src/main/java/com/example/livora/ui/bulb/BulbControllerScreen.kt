@@ -32,11 +32,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Brightness5
 import androidx.compose.material.icons.filled.Brightness7
 import androidx.compose.material.icons.filled.Circle
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Mic
@@ -94,6 +92,7 @@ fun BulbControllerScreen(
     val connectedBulb by viewModel.connectedBulb.collectAsState()
     val discoveredBulbs by viewModel.discoveredBulbs.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
+    val isAddingBulb by viewModel.isAddingBulb.collectAsState()
     val context = LocalContext.current
     val voiceManager = remember { VoiceRecognitionManager(context) }
     var isListening by remember { mutableStateOf(false) }
@@ -134,7 +133,10 @@ fun BulbControllerScreen(
                         }
                     },
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
+                        IconButton(onClick = {
+                            viewModel.cancelBulbSetup()
+                            onBack()
+                        }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = null
@@ -142,25 +144,10 @@ fun BulbControllerScreen(
                         }
                     },
                     actions = {
-                        if (connectedBulb != null) {
+                        if (connectedBulb != null && !isAddingBulb) {
                             IconButton(onClick = { viewModel.refreshBulbState() }) {
                                 Icon(
                                     imageVector = Icons.Default.Refresh,
-                                    contentDescription = null
-                                )
-                            }
-                            IconButton(onClick = { viewModel.disconnectBulb() }) {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = null
-                                )
-                            }
-                            IconButton(onClick = {
-                                viewModel.disconnectBulb()
-                                viewModel.scanForBulbs()
-                            }) {
-                                Icon(
-                                    imageVector = Icons.Default.Add,
                                     contentDescription = null
                                 )
                             }
@@ -199,7 +186,7 @@ fun BulbControllerScreen(
                 )
             }
         ) { innerPadding ->
-            if (connectedBulb == null) {
+            if (connectedBulb == null || isAddingBulb) {
                 DiscoveryContent(
                     discoveredBulbs = discoveredBulbs,
                     isScanning = isScanning,

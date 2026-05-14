@@ -5,4 +5,5 @@ sealed class Screen(val route: String) {
     data object Dashboard : Screen("dashboard")
     data object AcController : Screen("ac_controller")
     data object BulbController : Screen("bulb_controller")
+    data object TodoList : Screen("todo_list")
 }

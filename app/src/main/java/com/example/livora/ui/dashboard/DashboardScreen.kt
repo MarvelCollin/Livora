@@ -24,6 +24,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
@@ -69,7 +71,8 @@ fun DashboardScreen(
     acViewModel: AcViewModel,
     bulbViewModel: BulbViewModel,
     onNavigateToAc: () -> Unit,
-    onNavigateToBulb: () -> Unit
+    onNavigateToBulb: () -> Unit,
+    onNavigateToTodo: () -> Unit
 ) {
     val acState by acViewModel.acState.collectAsState()
     val bulbState by bulbViewModel.bulbState.collectAsState()
@@ -118,6 +121,23 @@ fun DashboardScreen(
                     containerColor = MaterialTheme.colorScheme.surface
                 ),
                 actions = {
+                    IconButton(onClick = onNavigateToTodo) {
+                        Icon(
+                            imageVector = Icons.Default.Checklist,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    IconButton(onClick = {
+                        bulbViewModel.startBulbSetup()
+                        onNavigateToBulb()
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                     IconButton(onClick = {
                         if (ContextCompat.checkSelfPermission(
                                 context, Manifest.permission.RECORD_AUDIO
