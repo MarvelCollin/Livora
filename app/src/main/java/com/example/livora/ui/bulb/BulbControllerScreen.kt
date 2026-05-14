@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Brightness5
 import androidx.compose.material.icons.filled.Brightness7
 import androidx.compose.material.icons.filled.Circle
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Mic
@@ -145,6 +146,21 @@ fun BulbControllerScreen(
                             IconButton(onClick = { viewModel.refreshBulbState() }) {
                                 Icon(
                                     imageVector = Icons.Default.Refresh,
+                                    contentDescription = null
+                                )
+                            }
+                            IconButton(onClick = { viewModel.disconnectBulb() }) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = null
+                                )
+                            }
+                            IconButton(onClick = {
+                                viewModel.disconnectBulb()
+                                viewModel.scanForBulbs()
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
                                     contentDescription = null
                                 )
                             }
