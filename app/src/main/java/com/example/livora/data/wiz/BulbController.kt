@@ -1,8 +1,8 @@
 package com.example.livora.data.wiz
 
-import com.example.livora.data.model.WizBulb
-import com.example.livora.data.model.WizBulbState
-import com.example.livora.util.LivoraLogger
+import com.example.livora.data.model.Bulb
+import com.example.livora.data.model.BulbState
+import com.example.livora.util.Logger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -10,18 +10,18 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 
-class WizBulbController {
+class BulbController {
 
     companion object {
-        private const val TAG = "Livora.WizBulb"
+        private const val TAG = "Bulb"
         private const val WIZ_PORT = 38899
         private const val DISCOVERY_TIMEOUT_MS = 3000
         private const val COMMAND_TIMEOUT_MS = 2000
         private const val BUFFER_SIZE = 1024
     }
 
-    suspend fun discoverBulbs(): List<WizBulb> = withContext(Dispatchers.IO) {
-        val bulbs = mutableListOf<WizBulb>()
+    suspend fun discoverBulbs(): List<Bulb> = withContext(Dispatchers.IO) {
+        val bulbs = mutableListOf<Bulb>()
         var socket: DatagramSocket? = null
         try {
             socket = DatagramSocket()
@@ -43,7 +43,7 @@ class WizBulbController {
             val sendPacket = DatagramPacket(sendData, sendData.size, broadcastAddress, WIZ_PORT)
             socket.send(sendPacket)
 
-            LivoraLogger.debug(TAG, "Discovery broadcast sent")
+            Logger.debug(TAG, "Discovery broadcast sent")
 
             val buffer = ByteArray(BUFFER_SIZE)
             while (true) {
@@ -52,7 +52,7 @@ class WizBulbController {
                     socket.receive(receivePacket)
                     val response = String(receivePacket.data, 0, receivePacket.length)
                     val ip = receivePacket.address.hostAddress ?: continue
-                    LivoraLogger.debug(TAG, "Discovered device at $ip: $response")
+                    Logger.debug(TAG, "Discovered device at $ip: $response")
 
                     val json = JSONObject(response)
                     val result = json.optJSONObject("result")
@@ -60,7 +60,7 @@ class WizBulbController {
                     val moduleName = result?.optString("moduleName", "") ?: ""
 
                     if (mac.isNotEmpty()) {
-                        val bulb = WizBulb(ip = ip, mac = mac, moduleName = moduleName)
+                        val bulb = Bulb(ip = ip, mac = mac, moduleName = moduleName)
                         if (bulbs.none { it.mac == mac }) {
                             bulbs.add(bulb)
                         }
@@ -70,15 +70,15 @@ class WizBulbController {
                 }
             }
         } catch (e: Exception) {
-            LivoraLogger.debug(TAG, "Discovery error: ${e.message}")
+            Logger.debug(TAG, "Discovery error: ${e.message}")
         } finally {
             socket?.close()
         }
-        LivoraLogger.debug(TAG, "Discovered ${bulbs.size} bulb(s)")
+        Logger.debug(TAG, "Discovered ${bulbs.size} bulb(s)")
         bulbs
     }
 
-    suspend fun getBulbState(ip: String): WizBulbState? = withContext(Dispatchers.IO) {
+    suspend fun getBulbState(ip: String): BulbState? = withContext(Dispatchers.IO) {
         try {
             val msg = JSONObject().apply {
                 put("method", "getPilot")
@@ -97,7 +97,7 @@ class WizBulbController {
                 val sceneId = result.optInt("sceneId", 0)
                 val hasRgb = result.has("r") && result.has("g") && result.has("b") && !result.has("temp")
 
-                WizBulbState(
+                BulbState(
                     isPoweredOn = state,
                     brightness = dimming,
                     colorTemp = temp,
@@ -111,7 +111,7 @@ class WizBulbController {
                 null
             }
         } catch (e: Exception) {
-            LivoraLogger.debug(TAG, "getBulbState error: ${e.message}")
+            Logger.debug(TAG, "getBulbState error: ${e.message}")
             null
         }
     }
@@ -132,8 +132,8 @@ class WizBulbController {
             put("params", JSONObject().apply {
                 put("state", true)
                 put("dimming", brightness.coerceIn(
-                    WizBulbState.MIN_BRIGHTNESS,
-                    WizBulbState.MAX_BRIGHTNESS
+                    BulbState.MIN_BRIGHTNESS,
+                    BulbState.MAX_BRIGHTNESS
                 ))
             })
         }
@@ -146,12 +146,12 @@ class WizBulbController {
             put("params", JSONObject().apply {
                 put("state", true)
                 put("temp", temp.coerceIn(
-                    WizBulbState.MIN_COLOR_TEMP,
-                    WizBulbState.MAX_COLOR_TEMP
+                    BulbState.MIN_COLOR_TEMP,
+                    BulbState.MAX_COLOR_TEMP
                 ))
                 put("dimming", brightness.coerceIn(
-                    WizBulbState.MIN_BRIGHTNESS,
-                    WizBulbState.MAX_BRIGHTNESS
+                    BulbState.MIN_BRIGHTNESS,
+                    BulbState.MAX_BRIGHTNESS
                 ))
             })
         }
@@ -167,8 +167,8 @@ class WizBulbController {
                 put("g", g.coerceIn(0, 255))
                 put("b", b.coerceIn(0, 255))
                 put("dimming", brightness.coerceIn(
-                    WizBulbState.MIN_BRIGHTNESS,
-                    WizBulbState.MAX_BRIGHTNESS
+                    BulbState.MIN_BRIGHTNESS,
+                    BulbState.MAX_BRIGHTNESS
                 ))
             })
         }
@@ -191,7 +191,7 @@ class WizBulbController {
         if (response != null) {
             val json = JSONObject(response)
             val success = json.optBoolean("success", false)
-            LivoraLogger.debug(TAG, "Command to $ip success=$success")
+            Logger.debug(TAG, "Command to $ip success=$success")
             return success
         }
         return false
@@ -212,7 +212,7 @@ class WizBulbController {
             socket.receive(receivePacket)
             String(receivePacket.data, 0, receivePacket.length)
         } catch (e: Exception) {
-            LivoraLogger.debug(TAG, "UDP command error to $ip: ${e.message}")
+            Logger.debug(TAG, "UDP command error to $ip: ${e.message}")
             null
         } finally {
             socket?.close()

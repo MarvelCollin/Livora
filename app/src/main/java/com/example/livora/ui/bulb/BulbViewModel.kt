@@ -4,11 +4,11 @@ import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.livora.data.model.WizBulb
-import com.example.livora.data.model.WizBulbState
-import com.example.livora.data.model.WizScene
-import com.example.livora.data.wiz.WizBulbController
-import com.example.livora.util.LivoraLogger
+import com.example.livora.data.model.Bulb
+import com.example.livora.data.model.BulbState
+import com.example.livora.data.model.BulbScene
+import com.example.livora.data.wiz.BulbController
+import com.example.livora.util.Logger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,17 +17,17 @@ import kotlinx.coroutines.launch
 
 class BulbViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val wizController = WizBulbController()
+    private val bulbController = BulbController()
     private val prefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    private val _discoveredBulbs = MutableStateFlow<List<WizBulb>>(emptyList())
-    val discoveredBulbs: StateFlow<List<WizBulb>> = _discoveredBulbs.asStateFlow()
+    private val _discoveredBulbs = MutableStateFlow<List<Bulb>>(emptyList())
+    val discoveredBulbs: StateFlow<List<Bulb>> = _discoveredBulbs.asStateFlow()
 
-    private val _connectedBulb = MutableStateFlow<WizBulb?>(null)
-    val connectedBulb: StateFlow<WizBulb?> = _connectedBulb.asStateFlow()
+    private val _connectedBulb = MutableStateFlow<Bulb?>(null)
+    val connectedBulb: StateFlow<Bulb?> = _connectedBulb.asStateFlow()
 
-    private val _bulbState = MutableStateFlow(WizBulbState())
-    val bulbState: StateFlow<WizBulbState> = _bulbState.asStateFlow()
+    private val _bulbState = MutableStateFlow(BulbState())
+    val bulbState: StateFlow<BulbState> = _bulbState.asStateFlow()
 
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
@@ -44,14 +44,14 @@ class BulbViewModel(application: Application) : AndroidViewModel(application) {
         val mac = prefs.getString(KEY_BULB_MAC, null)
         val moduleName = prefs.getString(KEY_BULB_MODULE, "") ?: ""
         if (ip != null && mac != null) {
-            val bulb = WizBulb(ip = ip, mac = mac, moduleName = moduleName)
+            val bulb = Bulb(ip = ip, mac = mac, moduleName = moduleName)
             _connectedBulb.value = bulb
-            LivoraLogger.debug(TAG, "Loaded saved bulb ${bulb.mac} at ${bulb.ip}")
+            Logger.debug(TAG, "Loaded saved bulb ${bulb.mac} at ${bulb.ip}")
             refreshBulbState()
         }
     }
 
-    private fun saveBulb(bulb: WizBulb) {
+    private fun saveBulb(bulb: Bulb) {
         prefs.edit()
             .putString(KEY_BULB_IP, bulb.ip)
             .putString(KEY_BULB_MAC, bulb.mac)
@@ -70,10 +70,10 @@ class BulbViewModel(application: Application) : AndroidViewModel(application) {
     fun scanForBulbs() {
         _isScanning.value = true
         viewModelScope.launch {
-            val bulbs = wizController.discoverBulbs()
+            val bulbs = bulbController.discoverBulbs()
             _discoveredBulbs.value = bulbs
             _isScanning.value = false
-            LivoraLogger.debug(TAG, "Scan complete, found ${bulbs.size} bulb(s)")
+            Logger.debug(TAG, "Scan complete, found ${bulbs.size} bulb(s)")
         }
     }
 
@@ -86,29 +86,29 @@ class BulbViewModel(application: Application) : AndroidViewModel(application) {
         _isAddingBulb.value = false
     }
 
-    fun connectToBulb(bulb: WizBulb) {
+    fun connectToBulb(bulb: Bulb) {
         _isAddingBulb.value = false
         _connectedBulb.value = bulb
         saveBulb(bulb)
-        LivoraLogger.debug(TAG, "Connected to bulb ${bulb.mac} at ${bulb.ip}")
+        Logger.debug(TAG, "Connected to bulb ${bulb.mac} at ${bulb.ip}")
         refreshBulbState()
     }
 
     fun disconnectBulb() {
         _isAddingBulb.value = false
         _connectedBulb.value = null
-        _bulbState.value = WizBulbState()
+        _bulbState.value = BulbState()
         clearSavedBulb()
-        LivoraLogger.debug(TAG, "Disconnected from bulb")
+        Logger.debug(TAG, "Disconnected from bulb")
     }
 
     fun refreshBulbState() {
         val bulb = _connectedBulb.value ?: return
         viewModelScope.launch {
-            val state = wizController.getBulbState(bulb.ip)
+            val state = bulbController.getBulbState(bulb.ip)
             if (state != null) {
                 _bulbState.value = state
-                LivoraLogger.debug(TAG, "Refreshed state: on=${state.isPoweredOn} brightness=${state.brightness}")
+                Logger.debug(TAG, "Refreshed state: on=${state.isPoweredOn} brightness=${state.brightness}")
             }
         }
     }
@@ -118,7 +118,7 @@ class BulbViewModel(application: Application) : AndroidViewModel(application) {
         val newPower = !_bulbState.value.isPoweredOn
         _bulbState.update { it.copy(isPoweredOn = newPower) }
         viewModelScope.launch {
-            wizController.setPower(bulb.ip, newPower)
+            bulbController.setPower(bulb.ip, newPower)
         }
     }
 
@@ -127,7 +127,7 @@ class BulbViewModel(application: Application) : AndroidViewModel(application) {
         if (!_bulbState.value.isPoweredOn) {
             _bulbState.update { it.copy(isPoweredOn = true) }
             viewModelScope.launch {
-                wizController.setPower(bulb.ip, true)
+                bulbController.setPower(bulb.ip, true)
             }
         }
     }
@@ -137,40 +137,40 @@ class BulbViewModel(application: Application) : AndroidViewModel(application) {
         if (_bulbState.value.isPoweredOn) {
             _bulbState.update { it.copy(isPoweredOn = false) }
             viewModelScope.launch {
-                wizController.setPower(bulb.ip, false)
+                bulbController.setPower(bulb.ip, false)
             }
         }
     }
 
     fun setBrightness(brightness: Int) {
         val bulb = _connectedBulb.value ?: return
-        val clamped = brightness.coerceIn(WizBulbState.MIN_BRIGHTNESS, WizBulbState.MAX_BRIGHTNESS)
+        val clamped = brightness.coerceIn(BulbState.MIN_BRIGHTNESS, BulbState.MAX_BRIGHTNESS)
         _bulbState.update { it.copy(brightness = clamped, isPoweredOn = true) }
         viewModelScope.launch {
-            wizController.setBrightness(bulb.ip, clamped)
+            bulbController.setBrightness(bulb.ip, clamped)
         }
     }
 
     fun increaseBrightness() {
         val current = _bulbState.value.brightness
-        if (current < WizBulbState.MAX_BRIGHTNESS) {
+        if (current < BulbState.MAX_BRIGHTNESS) {
             setBrightness(current + 10)
         }
     }
 
     fun decreaseBrightness() {
         val current = _bulbState.value.brightness
-        if (current > WizBulbState.MIN_BRIGHTNESS) {
+        if (current > BulbState.MIN_BRIGHTNESS) {
             setBrightness(current - 10)
         }
     }
 
     fun setColorTemperature(temp: Int) {
         val bulb = _connectedBulb.value ?: return
-        val clamped = temp.coerceIn(WizBulbState.MIN_COLOR_TEMP, WizBulbState.MAX_COLOR_TEMP)
+        val clamped = temp.coerceIn(BulbState.MIN_COLOR_TEMP, BulbState.MAX_COLOR_TEMP)
         _bulbState.update { it.copy(colorTemp = clamped, useRgb = false, sceneId = 0, isPoweredOn = true) }
         viewModelScope.launch {
-            wizController.setColorTemperature(bulb.ip, clamped, _bulbState.value.brightness)
+            bulbController.setColorTemperature(bulb.ip, clamped, _bulbState.value.brightness)
         }
     }
 
@@ -178,21 +178,21 @@ class BulbViewModel(application: Application) : AndroidViewModel(application) {
         val bulb = _connectedBulb.value ?: return
         _bulbState.update { it.copy(r = r, g = g, b = b, useRgb = true, sceneId = 0, isPoweredOn = true) }
         viewModelScope.launch {
-            wizController.setRgb(bulb.ip, r, g, b, _bulbState.value.brightness)
+            bulbController.setRgb(bulb.ip, r, g, b, _bulbState.value.brightness)
         }
     }
 
-    fun setScene(scene: WizScene) {
+    fun setScene(scene: BulbScene) {
         val bulb = _connectedBulb.value ?: return
         _bulbState.update { it.copy(sceneId = scene.id, useRgb = false, isPoweredOn = true) }
         viewModelScope.launch {
-            wizController.setScene(bulb.ip, scene.id)
+            bulbController.setScene(bulb.ip, scene.id)
         }
     }
 
     fun processVoiceCommand(text: String) {
         val lower = text.lowercase()
-        LivoraLogger.debug(TAG, "Bulb voice command: $lower")
+        Logger.debug(TAG, "Bulb voice command: $lower")
         when {
             lower.contains("light") && (lower.contains("on") || lower.contains("turn on")) -> {
                 if (!_bulbState.value.isPoweredOn) togglePower()
@@ -210,7 +210,7 @@ class BulbViewModel(application: Application) : AndroidViewModel(application) {
                 if (brightnessMatch != null) {
                     val value = brightnessMatch.groupValues[1].toIntOrNull()
                     if (value != null) {
-                        setBrightness(value.coerceIn(WizBulbState.MIN_BRIGHTNESS, WizBulbState.MAX_BRIGHTNESS))
+                        setBrightness(value.coerceIn(BulbState.MIN_BRIGHTNESS, BulbState.MAX_BRIGHTNESS))
                     }
                 }
             }

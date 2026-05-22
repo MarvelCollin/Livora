@@ -8,18 +8,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
-import com.example.livora.ui.navigation.LivoraNavHost
-import com.example.livora.ui.theme.LivoraTheme
+import com.example.livora.ui.navigation.AppNavHost
+import com.example.livora.ui.theme.AppTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            LivoraTheme {
+            AppTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val navController = rememberNavController()
-                    LivoraNavHost(navController = navController)
+                    AppNavHost(navController = navController)
                 }
             }
         }

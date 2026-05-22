@@ -1,12 +1,12 @@
 package com.example.livora.data.model
 
-data class WizBulb(
+data class Bulb(
     val ip: String,
     val mac: String,
     val moduleName: String = ""
 )
 
-data class WizBulbState(
+data class BulbState(
     val isPoweredOn: Boolean = false,
     val brightness: Int = 100,
     val colorTemp: Int = 4000,
@@ -24,7 +24,7 @@ data class WizBulbState(
     }
 }
 
-enum class WizScene(val id: Int, val label: String) {
+enum class BulbScene(val id: Int, val label: String) {
     OCEAN(1, "Ocean"),
     ROMANCE(2, "Romance"),
     SUNSET(3, "Sunset"),

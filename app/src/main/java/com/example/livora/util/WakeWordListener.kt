@@ -69,7 +69,7 @@ class WakeWordListener(private val context: Context) {
                     for (candidate in matches) {
                         val text = candidate.lowercase()
                         if (matchesWakeWord(text)) {
-                            LivoraLogger.debug(TAG, "Wake word detected: $text")
+                            Logger.debug(TAG, "Wake word detected: $text")
                             onWakeWordDetected?.invoke()
                             return
                         }
@@ -86,7 +86,7 @@ class WakeWordListener(private val context: Context) {
                     for (candidate in partial) {
                         val text = candidate.lowercase()
                         if (matchesWakeWord(text)) {
-                            LivoraLogger.debug(TAG, "Wake word partial detected: $text")
+                            Logger.debug(TAG, "Wake word partial detected: $text")
                             isRunning = false
                             speechRecognizer?.stopListening()
                             onWakeWordDetected?.invoke()

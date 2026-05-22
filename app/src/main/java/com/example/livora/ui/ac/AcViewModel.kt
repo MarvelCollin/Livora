@@ -4,7 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.livora.data.ir.IrBlasterController
-import com.example.livora.data.ir.LgAcIrEncoder
+import com.example.livora.data.ir.AcIrEncoder
 import com.example.livora.data.model.AcMode
 import com.example.livora.data.model.AcState
 import com.example.livora.data.model.FanSpeed
@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import com.example.livora.util.LivoraLogger
+import com.example.livora.util.Logger
 import kotlinx.coroutines.launch
 
 class AcViewModel(application: Application) : AndroidViewModel(application) {
@@ -27,21 +27,21 @@ class AcViewModel(application: Application) : AndroidViewModel(application) {
     val isIrAvailable: Boolean get() = irController.isAvailable
 
     init {
-        LivoraLogger.debug(TAG, "AcViewModel created. isIrAvailable=$isIrAvailable")
+        Logger.debug(TAG, "AcViewModel created. isIrAvailable=$isIrAvailable")
     }
 
     private fun transmitState(state: AcState) {
-        LivoraLogger.debug(TAG, "transmitState temp=${state.temperature} mode=${state.mode} fan=${state.fanSpeed}")
+        Logger.debug(TAG, "transmitState temp=${state.temperature} mode=${state.mode} fan=${state.fanSpeed}")
         viewModelScope.launch(Dispatchers.IO) {
-            val (freq, pattern) = LgAcIrEncoder.encodeState(state)
+            val (freq, pattern) = AcIrEncoder.encodeState(state)
             irController.transmit(freq, pattern)
         }
     }
 
     private fun transmitPowerOff() {
-        LivoraLogger.debug(TAG, "transmitPowerOff POWER OFF")
+        Logger.debug(TAG, "transmitPowerOff POWER OFF")
         viewModelScope.launch(Dispatchers.IO) {
-            val (freq, pattern) = LgAcIrEncoder.encodePowerOff()
+            val (freq, pattern) = AcIrEncoder.encodePowerOff()
             irController.transmit(freq, pattern)
         }
     }
@@ -49,7 +49,7 @@ class AcViewModel(application: Application) : AndroidViewModel(application) {
     fun togglePower() {
         _acState.update { it.copy(isPoweredOn = !it.isPoweredOn) }
         val current = _acState.value
-        LivoraLogger.debug(TAG, "togglePower -> isPoweredOn=${current.isPoweredOn}")
+        Logger.debug(TAG, "togglePower -> isPoweredOn=${current.isPoweredOn}")
         if (current.isPoweredOn) transmitState(current) else transmitPowerOff()
     }
 
@@ -77,7 +77,7 @@ class AcViewModel(application: Application) : AndroidViewModel(application) {
             if (state.temperature < AcState.MAX_TEMP) state.copy(temperature = state.temperature + 1)
             else state
         }
-        LivoraLogger.debug(TAG, "increaseTemperature -> temp=${_acState.value.temperature} isPoweredOn=${_acState.value.isPoweredOn}")
+        Logger.debug(TAG, "increaseTemperature -> temp=${_acState.value.temperature} isPoweredOn=${_acState.value.isPoweredOn}")
         if (_acState.value.isPoweredOn) transmitState(_acState.value)
     }
 
@@ -86,19 +86,19 @@ class AcViewModel(application: Application) : AndroidViewModel(application) {
             if (state.temperature > AcState.MIN_TEMP) state.copy(temperature = state.temperature - 1)
             else state
         }
-        LivoraLogger.debug(TAG, "decreaseTemperature -> temp=${_acState.value.temperature} isPoweredOn=${_acState.value.isPoweredOn}")
+        Logger.debug(TAG, "decreaseTemperature -> temp=${_acState.value.temperature} isPoweredOn=${_acState.value.isPoweredOn}")
         if (_acState.value.isPoweredOn) transmitState(_acState.value)
     }
 
     fun setMode(mode: AcMode) {
         _acState.update { it.copy(mode = mode) }
-        LivoraLogger.debug(TAG, "setMode -> mode=$mode isPoweredOn=${_acState.value.isPoweredOn}")
+        Logger.debug(TAG, "setMode -> mode=$mode isPoweredOn=${_acState.value.isPoweredOn}")
         if (_acState.value.isPoweredOn) transmitState(_acState.value)
     }
 
     fun setFanSpeed(speed: FanSpeed) {
         _acState.update { it.copy(fanSpeed = speed) }
-        LivoraLogger.debug(TAG, "setFanSpeed -> speed=$speed isPoweredOn=${_acState.value.isPoweredOn}")
+        Logger.debug(TAG, "setFanSpeed -> speed=$speed isPoweredOn=${_acState.value.isPoweredOn}")
         if (_acState.value.isPoweredOn) transmitState(_acState.value)
     }
 
@@ -120,7 +120,7 @@ class AcViewModel(application: Application) : AndroidViewModel(application) {
 
     fun processVoiceCommand(text: String) {
         val lower = text.lowercase()
-        LivoraLogger.debug(TAG, "processVoiceCommand: $lower")
+        Logger.debug(TAG, "processVoiceCommand: $lower")
         when {
             lower.contains("turn on") || lower.contains("power on") -> {
                 if (!_acState.value.isPoweredOn) togglePower()

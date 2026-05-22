@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Add
@@ -38,8 +37,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -55,6 +52,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import com.example.livora.ui.components.Design
+import com.example.livora.ui.components.TopBar
 import com.example.livora.ui.components.VoiceListeningOverlay
 import com.example.livora.util.VoiceRecognitionManager
 import androidx.compose.ui.Modifier
@@ -102,24 +101,9 @@ fun DashboardScreen(
     Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "Livora",
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Smart Home Controller",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
+            TopBar(
+                title = "Devices",
+                subtitle = "Tap a device to control it",
                 actions = {
                     IconButton(onClick = onNavigateToTodo) {
                         Icon(
@@ -173,18 +157,9 @@ fun DashboardScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = Design.screenHorizontalPadding)
         ) {
             Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "My Devices",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
 
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
@@ -194,19 +169,16 @@ fun DashboardScreen(
             ) {
                 item {
                     DeviceCard(
-                        name = "Air Conditioner",
+                        name = "Air conditioner",
                         brand = "LG",
                         isOn = acState.isPoweredOn,
-                        statusText = if (acState.isPoweredOn) "${acState.temperature}°C · ${acState.mode.name}" else "Off",
+                        statusText = if (acState.isPoweredOn) "${acState.temperature}°C · ${acState.mode.name.lowercase().replaceFirstChar { it.uppercase() }}" else "Off",
                         icon = { modifier ->
                             Icon(
                                 imageVector = Icons.Default.AcUnit,
                                 contentDescription = null,
                                 modifier = modifier,
-                                tint = if (acState.isPoweredOn)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (acState.isPoweredOn) 0.85f else 0.35f)
                             )
                         },
                         onTogglePower = { acViewModel.togglePower() },
@@ -217,19 +189,20 @@ fun DashboardScreen(
                 item {
                     val bulbIsOn = bulbState.isPoweredOn && connectedBulb != null
                     DeviceCard(
-                        name = "Smart Bulb",
+                        name = "Smart bulb",
                         brand = "WiZ",
                         isOn = bulbIsOn,
-                        statusText = if (bulbIsOn) "${bulbState.brightness}% · ${bulbState.colorTemp}K" else if (connectedBulb != null) "Off" else "Not Connected",
+                        statusText = when {
+                            bulbIsOn -> "${bulbState.brightness}% · ${bulbState.colorTemp}K"
+                            connectedBulb != null -> "Off"
+                            else -> "Not connected"
+                        },
                         icon = { modifier ->
                             Icon(
                                 imageVector = Icons.Default.Lightbulb,
                                 contentDescription = null,
                                 modifier = modifier,
-                                tint = if (bulbIsOn)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (bulbIsOn) 0.85f else 0.35f)
                             )
                         },
                         onTogglePower = {
@@ -273,21 +246,18 @@ fun DeviceCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(160.dp)
+            .height(150.dp)
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(16.dp),
+        shape = Design.cardShape,
         colors = CardDefaults.cardColors(
-            containerColor = if (isOn)
-                MaterialTheme.colorScheme.primaryContainer
-            else
-                MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = Design.cardElevation)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(14.dp),
+                .padding(16.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
@@ -295,20 +265,9 @@ fun DeviceCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (isOn)
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                            else
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    icon(Modifier.size(24.dp))
-                }
+                icon(
+                    Modifier.size(24.dp)
+                )
 
                 IconButton(
                     onClick = onTogglePower,
@@ -318,57 +277,41 @@ fun DeviceCard(
                         imageVector = Icons.Default.PowerSettingsNew,
                         contentDescription = null,
                         tint = if (isOn)
-                            MaterialTheme.colorScheme.primary
+                            MaterialTheme.colorScheme.onSurface
                         else
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
                         modifier = Modifier.size(20.dp)
                     )
                 }
             }
 
             Column {
-                Text(
-                    text = name,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (isOn)
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    else
-                        MaterialTheme.colorScheme.onSurface
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = brand,
-                        fontSize = 12.sp,
-                        color = if (isOn)
-                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
-                        else
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        text = name,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Box(
                         modifier = Modifier
-                            .size(4.dp)
+                            .size(6.dp)
                             .clip(CircleShape)
                             .background(
                                 if (isOn)
-                                    MaterialTheme.colorScheme.primary
+                                    MaterialTheme.colorScheme.onSurface
                                 else
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
                             )
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = statusText,
-                        fontSize = 12.sp,
-                        color = if (isOn)
-                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
-                        else
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                    )
                 }
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "$brand · $statusText",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
             }
         }
     }

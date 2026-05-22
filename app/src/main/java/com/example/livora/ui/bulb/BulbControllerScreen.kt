@@ -5,7 +5,6 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -56,8 +55,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
@@ -76,9 +73,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.example.livora.data.model.WizBulb
-import com.example.livora.data.model.WizBulbState
-import com.example.livora.data.model.WizScene
+import com.example.livora.data.model.Bulb
+import com.example.livora.data.model.BulbState
+import com.example.livora.data.model.BulbScene
+import com.example.livora.ui.components.Design
+import com.example.livora.ui.components.Section
+import com.example.livora.ui.components.SelectChip
+import com.example.livora.ui.components.TopBar
 import com.example.livora.ui.components.VoiceListeningOverlay
 import com.example.livora.util.VoiceRecognitionManager
 
@@ -118,20 +119,9 @@ fun BulbControllerScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
-                TopAppBar(
-                    title = {
-                        Column {
-                            Text(
-                                text = "Smart Bulb",
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = if (connectedBulb != null) "WiZ · ${connectedBulb!!.ip}" else "WiZ Downlight",
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                            )
-                        }
-                    },
+                TopBar(
+                    title = "Smart bulb",
+                    subtitle = if (connectedBulb != null) "WiZ · ${connectedBulb!!.ip}" else "WiZ Downlight",
                     navigationIcon = {
                         IconButton(onClick = {
                             viewModel.cancelBulbSetup()
@@ -139,7 +129,8 @@ fun BulbControllerScreen(
                         }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = null
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                             )
                         }
                     },
@@ -179,10 +170,7 @@ fun BulbControllerScreen(
                                 tint = if (isListening) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                             )
                         }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = MaterialTheme.colorScheme.surface
-                    )
+                    }
                 )
             }
         ) { innerPadding ->
@@ -226,43 +214,34 @@ fun BulbControllerScreen(
 
 @Composable
 private fun DiscoveryContent(
-    discoveredBulbs: List<WizBulb>,
+    discoveredBulbs: List<Bulb>,
     isScanning: Boolean,
     onScan: () -> Unit,
-    onSelectBulb: (WizBulb) -> Unit,
+    onSelectBulb: (Bulb) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = Design.screenHorizontalPadding),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Icon(
-            imageVector = Icons.Default.Search,
-            contentDescription = null,
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(40.dp))
 
         Text(
-            text = "Find WiZ Bulbs",
+            text = "Find WiZ bulbs",
             fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
         )
 
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Make sure your WiZ bulb is connected to the same WiFi network as your phone",
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            text = "Connect your bulb to the same Wi-Fi as your phone, then scan.",
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 24.dp)
         )
@@ -273,61 +252,62 @@ private fun DiscoveryContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable(enabled = !isScanning, onClick = onScan),
-            shape = RoundedCornerShape(16.dp),
+            shape = Design.cardShape,
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primary
-            )
+                containerColor = MaterialTheme.colorScheme.onSurface
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = Design.cardElevation)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(14.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (isScanning) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(16.dp),
+                        color = MaterialTheme.colorScheme.surface,
                         strokeWidth = 2.dp
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Scanning...",
-                        fontSize = 16.sp,
+                        text = "Scanning",
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onPrimary
+                        color = MaterialTheme.colorScheme.surface
                     )
                 } else {
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(20.dp)
+                        tint = MaterialTheme.colorScheme.surface,
+                        modifier = Modifier.size(18.dp)
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Scan for Bulbs",
-                        fontSize = 16.sp,
+                        text = "Scan for bulbs",
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onPrimary
+                        color = MaterialTheme.colorScheme.surface
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(28.dp))
 
         if (discoveredBulbs.isNotEmpty()) {
             Text(
-                text = "Found Devices",
-                fontSize = 16.sp,
+                text = "Found devices",
+                fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             discoveredBulbs.forEach { bulb ->
                 BulbDiscoveryCard(
@@ -339,11 +319,11 @@ private fun DiscoveryContent(
         }
 
         if (!isScanning && discoveredBulbs.isEmpty()) {
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "No bulbs found yet.\nTap Scan to search your network.",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                text = "No bulbs found yet. Tap Scan to search your network.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
                 textAlign = TextAlign.Center
             )
         }
@@ -354,61 +334,53 @@ private fun DiscoveryContent(
 
 @Composable
 private fun BulbDiscoveryCard(
-    bulb: WizBulb,
+    bulb: Bulb,
     onClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(14.dp),
+        shape = Design.cardShape,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = Design.cardElevation)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(Design.cardPadding),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Lightbulb,
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
+            Icon(
+                imageVector = Icons.Default.Lightbulb,
+                contentDescription = null,
+                modifier = Modifier.size(22.dp),
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+            )
 
             Spacer(modifier = Modifier.width(14.dp))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (bulb.moduleName.isNotEmpty()) bulb.moduleName else "WiZ Bulb",
-                    fontSize = 15.sp,
+                    text = if (bulb.moduleName.isNotEmpty()) bulb.moduleName else "WiZ bulb",
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "${bulb.ip} · ${bulb.mac}",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
                 )
             }
 
             Text(
                 text = "Connect",
-                fontSize = 13.sp,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.primary
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }
@@ -416,22 +388,22 @@ private fun BulbDiscoveryCard(
 
 @Composable
 private fun BulbControlContent(
-    state: WizBulbState,
+    state: BulbState,
     onTogglePower: () -> Unit,
     onBrightnessChange: (Int) -> Unit,
     onColorTempChange: (Int) -> Unit,
     onSetRgb: (Int, Int, Int) -> Unit,
-    onSetScene: (WizScene) -> Unit,
+    onSetScene: (BulbScene) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = Design.screenHorizontalPadding),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         PowerSection(
             isPoweredOn = state.isPoweredOn,
@@ -439,7 +411,7 @@ private fun BulbControlContent(
             onTogglePower = onTogglePower
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(Design.sectionSpacing))
 
         BrightnessSection(
             brightness = state.brightness,
@@ -447,7 +419,7 @@ private fun BulbControlContent(
             onBrightnessChange = onBrightnessChange
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(Design.sectionSpacing))
 
         ColorTemperatureSection(
             colorTemp = state.colorTemp,
@@ -456,14 +428,14 @@ private fun BulbControlContent(
             onColorTempChange = onColorTempChange
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(Design.sectionSpacing))
 
         ColorPresetsSection(
             isPoweredOn = state.isPoweredOn,
             onSetRgb = onSetRgb
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(Design.sectionSpacing))
 
         ScenesSection(
             currentSceneId = state.sceneId,
@@ -481,19 +453,11 @@ private fun PowerSection(
     brightness: Int,
     onTogglePower: () -> Unit
 ) {
-    val bgColor by animateColorAsState(
-        targetValue = if (isPoweredOn)
-            MaterialTheme.colorScheme.primaryContainer
-        else
-            MaterialTheme.colorScheme.surfaceVariant,
-        label = "bulbPowerBg"
-    )
-
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = bgColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        shape = Design.cardShape,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        elevation = CardDefaults.cardElevation(defaultElevation = Design.cardElevation)
     ) {
         Column(
             modifier = Modifier
@@ -507,9 +471,9 @@ private fun PowerSection(
                     .clip(CircleShape)
                     .background(
                         if (isPoweredOn)
-                            MaterialTheme.colorScheme.primary
+                            MaterialTheme.colorScheme.onSurface
                         else
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
                     )
                     .clickable(onClick = onTogglePower),
                 contentAlignment = Alignment.Center
@@ -518,31 +482,28 @@ private fun PowerSection(
                     imageVector = Icons.Default.PowerSettingsNew,
                     contentDescription = null,
                     tint = if (isPoweredOn)
-                        MaterialTheme.colorScheme.onPrimary
+                        MaterialTheme.colorScheme.surface
                     else
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                    modifier = Modifier.size(54.dp)
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                    modifier = Modifier.size(48.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             Text(
-                text = if (isPoweredOn) "ON" else "OFF",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (isPoweredOn)
-                    MaterialTheme.colorScheme.primary
-                else
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                text = if (isPoweredOn) "On" else "Off",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isPoweredOn) 1f else 0.45f)
             )
 
             if (isPoweredOn) {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "Brightness: ${brightness}%",
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    text = "Brightness ${brightness}%",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 )
             }
         }
@@ -555,7 +516,7 @@ private fun BrightnessSection(
     isPoweredOn: Boolean,
     onBrightnessChange: (Int) -> Unit
 ) {
-    BulbSectionCard(title = "Brightness") {
+    Section(title = "Brightness") {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -573,7 +534,7 @@ private fun BrightnessSection(
             Slider(
                 value = brightness.toFloat(),
                 onValueChange = { onBrightnessChange(it.toInt()) },
-                valueRange = WizBulbState.MIN_BRIGHTNESS.toFloat()..WizBulbState.MAX_BRIGHTNESS.toFloat(),
+                valueRange = BulbState.MIN_BRIGHTNESS.toFloat()..BulbState.MAX_BRIGHTNESS.toFloat(),
                 enabled = isPoweredOn,
                 modifier = Modifier
                     .weight(1f)
@@ -618,7 +579,7 @@ private fun ColorTemperatureSection(
     isActive: Boolean,
     onColorTempChange: (Int) -> Unit
 ) {
-    BulbSectionCard(title = "Color Temperature") {
+    Section(title = "Color temperature") {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -635,7 +596,7 @@ private fun ColorTemperatureSection(
             Slider(
                 value = colorTemp.toFloat(),
                 onValueChange = { onColorTempChange(it.toInt()) },
-                valueRange = WizBulbState.MIN_COLOR_TEMP.toFloat()..WizBulbState.MAX_COLOR_TEMP.toFloat(),
+                valueRange = BulbState.MIN_COLOR_TEMP.toFloat()..BulbState.MAX_COLOR_TEMP.toFloat(),
                 enabled = isPoweredOn,
                 modifier = Modifier
                     .weight(1f)
@@ -690,7 +651,7 @@ private fun ColorPresetsSection(
         Triple(255, 255, 255) to "White"
     )
 
-    BulbSectionCard(title = "Colors") {
+    Section(title = "Colors") {
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -742,38 +703,38 @@ private fun ColorPresetsSection(
 private fun ScenesSection(
     currentSceneId: Int,
     isPoweredOn: Boolean,
-    onSetScene: (WizScene) -> Unit
+    onSetScene: (BulbScene) -> Unit
 ) {
     val popularScenes = listOf(
-        WizScene.WARM_WHITE,
-        WizScene.DAYLIGHT,
-        WizScene.COOL_WHITE,
-        WizScene.NIGHT_LIGHT,
-        WizScene.COZY,
-        WizScene.FOCUS,
-        WizScene.RELAX,
-        WizScene.TV_TIME,
-        WizScene.ROMANCE,
-        WizScene.SUNSET,
-        WizScene.PARTY,
-        WizScene.FIREPLACE,
-        WizScene.OCEAN,
-        WizScene.FOREST,
-        WizScene.CANDLELIGHT,
-        WizScene.BEDTIME
+        BulbScene.WARM_WHITE,
+        BulbScene.DAYLIGHT,
+        BulbScene.COOL_WHITE,
+        BulbScene.NIGHT_LIGHT,
+        BulbScene.COZY,
+        BulbScene.FOCUS,
+        BulbScene.RELAX,
+        BulbScene.TV_TIME,
+        BulbScene.ROMANCE,
+        BulbScene.SUNSET,
+        BulbScene.PARTY,
+        BulbScene.FIREPLACE,
+        BulbScene.OCEAN,
+        BulbScene.FOREST,
+        BulbScene.CANDLELIGHT,
+        BulbScene.BEDTIME
     )
 
-    BulbSectionCard(title = "Scenes") {
+    Section(title = "Scenes") {
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             popularScenes.forEach { scene ->
-                SceneChip(
+                SelectChip(
                     label = scene.label,
-                    isSelected = currentSceneId == scene.id,
-                    isEnabled = isPoweredOn,
+                    selected = currentSceneId == scene.id,
+                    enabled = isPoweredOn,
                     onClick = { onSetScene(scene) }
                 )
             }
@@ -781,68 +742,3 @@ private fun ScenesSection(
     }
 }
 
-@Composable
-private fun SceneChip(
-    label: String,
-    isSelected: Boolean,
-    isEnabled: Boolean,
-    onClick: () -> Unit
-) {
-    val bgColor by animateColorAsState(
-        targetValue = when {
-            isSelected && isEnabled -> MaterialTheme.colorScheme.primary
-            else -> MaterialTheme.colorScheme.surfaceVariant
-        },
-        label = "sceneBg"
-    )
-
-    val contentColor by animateColorAsState(
-        targetValue = when {
-            isSelected && isEnabled -> MaterialTheme.colorScheme.onPrimary
-            isEnabled -> MaterialTheme.colorScheme.onSurface
-            else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-        },
-        label = "sceneContent"
-    )
-
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(10.dp))
-            .clickable(enabled = isEnabled, onClick = onClick)
-            .background(bgColor)
-            .padding(horizontal = 14.dp, vertical = 10.dp)
-    ) {
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = contentColor
-        )
-    }
-}
-
-@Composable
-private fun BulbSectionCard(
-    title: String,
-    content: @Composable () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Text(
-                text = title,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            content()
-        }
-    }
-}

@@ -3,7 +3,7 @@ package com.example.livora.data.ir
 import com.example.livora.data.model.AcMode
 import com.example.livora.data.model.AcState
 import com.example.livora.data.model.FanSpeed
-import com.example.livora.util.LivoraLogger
+import com.example.livora.util.Logger
 
 data class IrTimingProfile(
     val name: String,
@@ -15,7 +15,7 @@ data class IrTimingProfile(
     val zeroSpace: Int
 )
 
-object LgAcIrEncoder {
+object AcIrEncoder {
 
     private const val TAG = "Livora.IrEncoder"
 
@@ -65,13 +65,13 @@ object LgAcIrEncoder {
                 (fan shl 4)
         val chk = calcChecksum(codeWithoutChk)
         val code = codeWithoutChk or chk
-        LivoraLogger.debug(TAG, "encodeState code=0x${code.toString(16)} mode=${state.mode}(0x${mode.toString(16)}) fan=${state.fanSpeed}(0x${fan.toString(16)}) temp=${state.temperature}(nibble=0x${temp15.toString(16)}) chk=0x${chk.toString(16)}")
+        Logger.debug(TAG, "encodeState code=0x${code.toString(16)} mode=${state.mode}(0x${mode.toString(16)}) fan=${state.fanSpeed}(0x${fan.toString(16)}) temp=${state.temperature}(nibble=0x${temp15.toString(16)}) chk=0x${chk.toString(16)}")
         return Pair(LG1.frequency, buildPattern(LG1, code))
     }
 
     fun encodePowerOff(): Pair<Int, IntArray> {
         val code = 0x88C0051
-        LivoraLogger.debug(TAG, "encodePowerOff code=0x${code.toString(16)}")
+        Logger.debug(TAG, "encodePowerOff code=0x${code.toString(16)}")
         return Pair(LG1.frequency, buildPattern(LG1, code))
     }
 
@@ -84,7 +84,7 @@ object LgAcIrEncoder {
         pattern.add(timing.bitMark)
         val result = pattern.toIntArray()
         val bits = (27 downTo 0).map { if ((code shr it) and 1 == 1) '1' else '0' }.joinToString("")
-        LivoraLogger.debug(TAG, "buildPattern timing=${timing.name} pulses=${result.size} bits=$bits")
+        Logger.debug(TAG, "buildPattern timing=${timing.name} pulses=${result.size} bits=$bits")
         return result
     }
 }

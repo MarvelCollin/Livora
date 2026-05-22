@@ -9,7 +9,7 @@ import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Query
 
-data class SupabaseTodoDto(
+data class TodoDto(
     @SerializedName("id") val id: String,
     @SerializedName("title") val title: String,
     @SerializedName("notes") val notes: String,
@@ -21,7 +21,7 @@ data class SupabaseTodoDto(
     @SerializedName("created_at") val createdAt: Long
 )
 
-data class SupabaseTodoInsertDto(
+data class TodoInsertDto(
     @SerializedName("id") val id: String,
     @SerializedName("title") val title: String,
     @SerializedName("notes") val notes: String,
@@ -33,7 +33,7 @@ data class SupabaseTodoInsertDto(
     @SerializedName("created_at") val createdAt: Long
 )
 
-data class SupabaseTodoUpdateDto(
+data class TodoUpdateDto(
     @SerializedName("title") val title: String,
     @SerializedName("notes") val notes: String,
     @SerializedName("interval_value") val intervalValue: Int,
@@ -43,36 +43,36 @@ data class SupabaseTodoUpdateDto(
     @SerializedName("duration_unit") val durationUnit: String
 )
 
-data class SupabaseCompletionDto(
+data class CompletionDto(
     @SerializedName("id") val id: String,
     @SerializedName("todo_id") val todoId: String,
     @SerializedName("completed_at") val completedAt: Long
 )
 
-data class SupabaseCompletionInsertDto(
+data class CompletionInsertDto(
     @SerializedName("id") val id: String,
     @SerializedName("todo_id") val todoId: String,
     @SerializedName("completed_at") val completedAt: Long
 )
 
-interface SupabaseTodoApi {
+interface TodoApi {
 
     @GET("todos")
     suspend fun getAllTodos(
         @Query("select") select: String = "*",
         @Query("order") order: String = "created_at.desc"
-    ): List<SupabaseTodoDto>
+    ): List<TodoDto>
 
     @Headers("Prefer: return=representation")
     @POST("todos")
-    suspend fun insertTodo(@Body body: SupabaseTodoInsertDto): List<SupabaseTodoDto>
+    suspend fun insertTodo(@Body body: TodoInsertDto): List<TodoDto>
 
     @Headers("Prefer: return=representation")
     @PATCH("todos")
     suspend fun updateTodo(
         @Query("id") idFilter: String,
-        @Body body: SupabaseTodoUpdateDto
-    ): List<SupabaseTodoDto>
+        @Body body: TodoUpdateDto
+    ): List<TodoDto>
 
     @DELETE("todos")
     suspend fun deleteTodo(@Query("id") idFilter: String)
@@ -81,11 +81,11 @@ interface SupabaseTodoApi {
     suspend fun getAllCompletions(
         @Query("select") select: String = "*",
         @Query("order") order: String = "completed_at.desc"
-    ): List<SupabaseCompletionDto>
+    ): List<CompletionDto>
 
     @Headers("Prefer: return=representation")
     @POST("todo_completions")
-    suspend fun insertCompletion(@Body body: SupabaseCompletionInsertDto): List<SupabaseCompletionDto>
+    suspend fun insertCompletion(@Body body: CompletionInsertDto): List<CompletionDto>
 
     @DELETE("todo_completions")
     suspend fun deleteCompletion(@Query("id") idFilter: String)

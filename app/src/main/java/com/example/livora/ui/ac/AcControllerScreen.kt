@@ -6,7 +6,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -49,8 +47,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -66,11 +62,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import com.example.livora.ui.components.Design
+import com.example.livora.ui.components.Section
+import com.example.livora.ui.components.SelectChip
+import com.example.livora.ui.components.TopBar
 import com.example.livora.ui.components.VoiceListeningOverlay
 import com.example.livora.util.VoiceRecognitionManager
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -111,25 +110,15 @@ fun AcControllerScreen(
     Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "Air Conditioner",
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "LG Smart Inverter",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                        )
-                    }
-                },
+            TopBar(
+                title = "Air conditioner",
+                subtitle = "LG Smart Inverter",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = null
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
                     }
                 },
@@ -161,10 +150,7 @@ fun AcControllerScreen(
                             tint = if (isListening) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                }
             )
         }
     ) { innerPadding ->
@@ -173,10 +159,10 @@ fun AcControllerScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = Design.screenHorizontalPadding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             PowerAndTemperatureSection(
                 state = state,
@@ -185,7 +171,7 @@ fun AcControllerScreen(
                 onDecrease = viewModel::decreaseTemperature
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(Design.sectionSpacing))
 
             AcModeSection(
                 currentMode = state.mode,
@@ -193,7 +179,7 @@ fun AcControllerScreen(
                 onModeSelected = viewModel::setMode
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(Design.sectionSpacing))
 
             FanSpeedSection(
                 currentSpeed = state.fanSpeed,
@@ -201,7 +187,7 @@ fun AcControllerScreen(
                 onSpeedSelected = viewModel::setFanSpeed
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(Design.sectionSpacing))
 
             SwingSection(
                 currentSwing = state.swingMode,
@@ -209,7 +195,7 @@ fun AcControllerScreen(
                 onSwingSelected = viewModel::setSwingMode
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(Design.sectionSpacing))
 
             TimerSection(
                 timerHours = state.timerHours,
@@ -218,7 +204,7 @@ fun AcControllerScreen(
                 onDecrease = viewModel::decreaseTimer
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(Design.sectionSpacing))
 
             QuickTogglesSection(
                 state = state,
@@ -255,18 +241,15 @@ private fun PowerAndTemperatureSection(
     onDecrease: () -> Unit
 ) {
     val bgColor by animateColorAsState(
-        targetValue = if (state.isPoweredOn)
-            MaterialTheme.colorScheme.primaryContainer
-        else
-            MaterialTheme.colorScheme.surfaceVariant,
+        targetValue = MaterialTheme.colorScheme.surfaceContainerLow,
         label = "powerBg"
     )
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = Design.cardShape,
         colors = CardDefaults.cardColors(containerColor = bgColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = Design.cardElevation)
     ) {
         Column(
             modifier = Modifier
@@ -322,7 +305,7 @@ private fun PowerAndTemperatureSection(
                         .fillMaxWidth(0.22f)
                         .aspectRatio(1f)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                         .clickable(enabled = state.isPoweredOn, onClick = onDecrease),
                     contentAlignment = Alignment.Center
                 ) {
@@ -344,18 +327,12 @@ private fun PowerAndTemperatureSection(
                         text = "${state.temperature}°",
                         fontSize = 56.sp,
                         fontWeight = FontWeight.Bold,
-                        color = if (state.isPoweredOn)
-                            MaterialTheme.colorScheme.onPrimaryContainer
-                        else
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (state.isPoweredOn) 1f else 0.35f)
                     )
                     Text(
                         text = "Celsius",
-                        fontSize = 13.sp,
-                        color = if (state.isPoweredOn)
-                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
-                        else
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (state.isPoweredOn) 0.5f else 0.3f)
                     )
                 }
 
@@ -366,7 +343,7 @@ private fun PowerAndTemperatureSection(
                         .fillMaxWidth(0.28f)
                         .aspectRatio(1f)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                         .clickable(enabled = state.isPoweredOn, onClick = onIncrease),
                     contentAlignment = Alignment.Center
                 ) {
@@ -399,44 +376,44 @@ private fun AcModeSection(
     isPoweredOn: Boolean,
     onModeSelected: (AcMode) -> Unit
 ) {
-    SectionCard(title = "Mode") {
+    Section(title = "Mode") {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            ModeChip(
+            SelectChip(
                 label = "Cool",
                 icon = Icons.Default.AcUnit,
-                isSelected = currentMode == AcMode.COOL,
-                isEnabled = isPoweredOn,
+                selected = currentMode == AcMode.COOL,
+                enabled = isPoweredOn,
                 onClick = { onModeSelected(AcMode.COOL) }
             )
-            ModeChip(
+            SelectChip(
                 label = "Heat",
                 icon = Icons.Default.Thermostat,
-                isSelected = currentMode == AcMode.HEAT,
-                isEnabled = isPoweredOn,
+                selected = currentMode == AcMode.HEAT,
+                enabled = isPoweredOn,
                 onClick = { onModeSelected(AcMode.HEAT) }
             )
-            ModeChip(
+            SelectChip(
                 label = "Dry",
                 icon = Icons.Default.WaterDrop,
-                isSelected = currentMode == AcMode.DRY,
-                isEnabled = isPoweredOn,
+                selected = currentMode == AcMode.DRY,
+                enabled = isPoweredOn,
                 onClick = { onModeSelected(AcMode.DRY) }
             )
-            ModeChip(
+            SelectChip(
                 label = "Fan",
                 icon = Icons.Default.Air,
-                isSelected = currentMode == AcMode.FAN,
-                isEnabled = isPoweredOn,
+                selected = currentMode == AcMode.FAN,
+                enabled = isPoweredOn,
                 onClick = { onModeSelected(AcMode.FAN) }
             )
-            ModeChip(
+            SelectChip(
                 label = "Auto",
                 icon = Icons.Default.BrightnessHigh,
-                isSelected = currentMode == AcMode.AUTO,
-                isEnabled = isPoweredOn,
+                selected = currentMode == AcMode.AUTO,
+                enabled = isPoweredOn,
                 onClick = { onModeSelected(AcMode.AUTO) }
             )
         }
@@ -449,17 +426,17 @@ private fun FanSpeedSection(
     isPoweredOn: Boolean,
     onSpeedSelected: (FanSpeed) -> Unit
 ) {
-    SectionCard(title = "Fan Speed") {
+    Section(title = "Fan speed") {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             FanSpeed.entries.forEach { speed ->
-                ModeChip(
+                SelectChip(
                     label = speed.name.lowercase().replaceFirstChar { it.uppercase() },
                     icon = Icons.Default.Air,
-                    isSelected = currentSpeed == speed,
-                    isEnabled = isPoweredOn,
+                    selected = currentSpeed == speed,
+                    enabled = isPoweredOn,
                     onClick = { onSpeedSelected(speed) }
                 )
             }
@@ -473,13 +450,13 @@ private fun SwingSection(
     isPoweredOn: Boolean,
     onSwingSelected: (SwingMode) -> Unit
 ) {
-    SectionCard(title = "Swing") {
+    Section(title = "Swing") {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             SwingMode.entries.forEach { swing ->
-                ModeChip(
+                SelectChip(
                     label = when (swing) {
                         SwingMode.OFF -> "Off"
                         SwingMode.VERTICAL -> "Vertical"
@@ -487,8 +464,8 @@ private fun SwingSection(
                         SwingMode.BOTH -> "Both"
                     },
                     icon = Icons.Default.SwapVert,
-                    isSelected = currentSwing == swing,
-                    isEnabled = isPoweredOn,
+                    selected = currentSwing == swing,
+                    enabled = isPoweredOn,
                     onClick = { onSwingSelected(swing) }
                 )
             }
@@ -503,7 +480,7 @@ private fun TimerSection(
     onIncrease: () -> Unit,
     onDecrease: () -> Unit
 ) {
-    SectionCard(title = "Timer") {
+    Section(title = "Timer") {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
@@ -513,7 +490,7 @@ private fun TimerSection(
                 modifier = Modifier
                     .size(56.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .clickable(enabled = isPoweredOn && timerHours > 0, onClick = onDecrease),
                 contentAlignment = Alignment.Center
             ) {
@@ -537,21 +514,15 @@ private fun TimerSection(
                 Icon(
                     imageVector = Icons.Default.Timer,
                     contentDescription = null,
-                    modifier = Modifier.size(28.dp),
-                    tint = if (timerHours > 0)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    modifier = Modifier.size(24.dp),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (timerHours > 0) 0.85f else 0.35f)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = if (timerHours == 0) "Off" else "${timerHours}h",
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (timerHours > 0)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (timerHours > 0) 1f else 0.35f)
                 )
             }
 
@@ -561,7 +532,7 @@ private fun TimerSection(
                 modifier = Modifier
                     .size(56.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .clickable(enabled = isPoweredOn && timerHours < 24, onClick = onIncrease),
                 contentAlignment = Alignment.Center
             ) {
@@ -586,166 +557,32 @@ private fun QuickTogglesSection(
     onToggleEnergySaving: () -> Unit,
     onToggleDisplay: () -> Unit
 ) {
-    SectionCard(title = "Quick Settings") {
+    Section(title = "Quick settings") {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            ToggleChip(
+            SelectChip(
                 label = "Sleep",
                 icon = Icons.Default.Bedtime,
-                isActive = state.isSleepMode,
-                isEnabled = state.isPoweredOn,
+                selected = state.isSleepMode,
+                enabled = state.isPoweredOn,
                 onClick = onToggleSleep
             )
-            ToggleChip(
+            SelectChip(
                 label = "Eco",
                 icon = Icons.Default.EnergySavingsLeaf,
-                isActive = state.isEnergySaving,
-                isEnabled = state.isPoweredOn,
+                selected = state.isEnergySaving,
+                enabled = state.isPoweredOn,
                 onClick = onToggleEnergySaving
             )
-            ToggleChip(
+            SelectChip(
                 label = "Display",
                 icon = Icons.Default.Brightness6,
-                isActive = state.isDisplayOn,
-                isEnabled = state.isPoweredOn,
+                selected = state.isDisplayOn,
+                enabled = state.isPoweredOn,
                 onClick = onToggleDisplay
             )
         }
-    }
-}
-
-@Composable
-private fun SectionCard(
-    title: String,
-    content: @Composable () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Text(
-                text = title,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            content()
-        }
-    }
-}
-
-@Composable
-private fun ModeChip(
-    label: String,
-    icon: ImageVector,
-    isSelected: Boolean,
-    isEnabled: Boolean,
-    onClick: () -> Unit
-) {
-    val bgColor by animateColorAsState(
-        targetValue = when {
-            isSelected && isEnabled -> MaterialTheme.colorScheme.primary
-            else -> MaterialTheme.colorScheme.surfaceVariant
-        },
-        label = "chipBg"
-    )
-
-    val contentColor by animateColorAsState(
-        targetValue = when {
-            isSelected && isEnabled -> MaterialTheme.colorScheme.onPrimary
-            isEnabled -> MaterialTheme.colorScheme.onSurface
-            else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-        },
-        label = "chipContent"
-    )
-
-    Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(enabled = isEnabled, onClick = onClick)
-            .background(bgColor)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(24.dp),
-            tint = contentColor
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = contentColor
-        )
-    }
-}
-
-@Composable
-private fun ToggleChip(
-    label: String,
-    icon: ImageVector,
-    isActive: Boolean,
-    isEnabled: Boolean,
-    onClick: () -> Unit
-) {
-    val bgColor by animateColorAsState(
-        targetValue = when {
-            isActive && isEnabled -> MaterialTheme.colorScheme.primaryContainer
-            else -> MaterialTheme.colorScheme.surfaceVariant
-        },
-        label = "toggleBg"
-    )
-
-    val borderColor by animateColorAsState(
-        targetValue = when {
-            isActive && isEnabled -> MaterialTheme.colorScheme.primary
-            else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-        },
-        label = "toggleBorder"
-    )
-
-    Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .border(
-                width = 1.dp,
-                color = borderColor,
-                shape = RoundedCornerShape(12.dp)
-            )
-            .clickable(enabled = isEnabled, onClick = onClick)
-            .background(bgColor)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(24.dp),
-            tint = if (isActive && isEnabled)
-                MaterialTheme.colorScheme.primary
-            else
-                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = if (isActive && isEnabled)
-                MaterialTheme.colorScheme.onPrimaryContainer
-            else
-                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-        )
     }
 }

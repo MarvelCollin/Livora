@@ -18,7 +18,7 @@ import com.example.livora.ui.todo.TodoScreen
 import com.example.livora.ui.todo.TodoViewModel
 
 @Composable
-fun LivoraNavHost(navController: NavHostController) {
+fun AppNavHost(navController: NavHostController) {
     val acViewModel: AcViewModel = viewModel()
     val bulbViewModel: BulbViewModel = viewModel()
     val todoViewModel: TodoViewModel = viewModel()
