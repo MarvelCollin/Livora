@@ -7,7 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.livora.data.model.WizBulb
 import com.example.livora.data.model.WizBulbState
 import com.example.livora.data.model.WizScene
-import com.example.livora.data.network.WizBulbController
+import com.example.livora.data.wiz.WizBulbController
 import com.example.livora.util.LivoraLogger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

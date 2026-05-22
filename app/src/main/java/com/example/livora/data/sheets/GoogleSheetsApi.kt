@@ -1,4 +1,4 @@
-package com.example.livora.data
+package com.example.livora.data.sheets
 
 import retrofit2.http.GET
 import retrofit2.http.Path

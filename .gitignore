@@ -14,5 +14,12 @@
 .cxx
 local.properties
 secrets.properties
+.env
+.env.*
+!.env.example
+*.keystore
+*.jks
+keystore.properties
+google-services.json
 /.codex/
 /codex.md

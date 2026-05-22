@@ -1,70 +1,50 @@
 package com.example.livora.ui.todo
 
-import android.app.Application
-import android.content.Context
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.livora.data.model.Todo
+import com.example.livora.data.model.TodoCompletion
 import com.example.livora.data.model.TodoDurationUnit
 import com.example.livora.data.model.TodoIntervalUnit
+import com.example.livora.data.model.TodoScheduleCalculator
+import com.example.livora.data.model.TodoStats
+import com.example.livora.data.supabase.SupabaseCompletionDto
+import com.example.livora.data.supabase.SupabaseCompletionInsertDto
+import com.example.livora.data.supabase.SupabaseTodoDto
+import com.example.livora.data.supabase.SupabaseTodoInsertDto
+import com.example.livora.data.supabase.SupabaseTodoRepository
+import com.example.livora.data.supabase.SupabaseTodoUpdateDto
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.coroutines.launch
 import java.util.UUID
 
-class TodoViewModel(application: Application) : AndroidViewModel(application) {
+class TodoViewModel : ViewModel() {
 
-    private val prefs = application.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val repository = SupabaseTodoRepository()
 
     private val _todos = MutableStateFlow<List<Todo>>(emptyList())
-    val todos: StateFlow<List<Todo>> = _todos.asStateFlow()
+    private val _completions = MutableStateFlow<List<TodoCompletion>>(emptyList())
+
+    private val _stats = MutableStateFlow<List<TodoStats>>(emptyList())
+    val stats: StateFlow<List<TodoStats>> = _stats.asStateFlow()
 
     init {
-        loadTodos()
+        refresh()
     }
 
-    private fun loadTodos() {
-        val raw = prefs.getString(KEY_TODOS, null) ?: return
-        val loaded = mutableListOf<Todo>()
-        val array = JSONArray(raw)
-        for (index in 0 until array.length()) {
-            val item = array.getJSONObject(index)
-            loaded.add(
-                Todo(
-                    id = item.getString("id"),
-                    title = item.getString("title"),
-                    notes = item.optString("notes", ""),
-                    intervalValue = item.optInt("intervalValue", 1).coerceAtLeast(1),
-                    intervalUnit = item.optString("intervalUnit", TodoIntervalUnit.Day.name).toIntervalUnit(),
-                    durationValue = item.optInt("durationValue", 30).coerceAtLeast(1),
-                    durationUnit = item.optString("durationUnit", TodoDurationUnit.Minute.name).toDurationUnit(),
-                    isCompleted = item.optBoolean("isCompleted", false),
-                    createdAt = item.optLong("createdAt", System.currentTimeMillis())
-                )
-            )
+    fun refresh() {
+        viewModelScope.launch {
+            val todos = repository.fetchAllTodos().map { it.toTodo() }
+            val completions = repository.fetchAllCompletions().map { it.toCompletion() }
+            _todos.value = todos
+            _completions.value = completions
+            recompute()
         }
-        _todos.value = loaded.sortedTodos()
     }
 
-    private fun saveTodos(todos: List<Todo>) {
-        val array = JSONArray()
-        todos.forEach { todo ->
-            array.put(
-                JSONObject()
-                    .put("id", todo.id)
-                    .put("title", todo.title)
-                    .put("notes", todo.notes)
-                    .put("intervalValue", todo.intervalValue)
-                    .put("intervalUnit", todo.intervalUnit.name)
-                    .put("durationValue", todo.durationValue)
-                    .put("durationUnit", todo.durationUnit.name)
-                    .put("isCompleted", todo.isCompleted)
-                    .put("createdAt", todo.createdAt)
-            )
-        }
-        prefs.edit().putString(KEY_TODOS, array.toString()).apply()
-    }
+    fun statsFor(id: String): TodoStats? = _stats.value.firstOrNull { it.todo.id == id }
 
     fun upsertTodo(
         existing: Todo?,
@@ -72,57 +52,116 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
         notes: String,
         intervalValue: Int,
         intervalUnit: TodoIntervalUnit,
+        timeOfDay: String?,
         durationValue: Int,
         durationUnit: TodoDurationUnit
     ): Boolean {
         val trimmedTitle = title.trim()
         if (trimmedTitle.isBlank() || intervalValue < 1 || durationValue < 1) return false
-        val nextTodo = Todo(
-            id = existing?.id ?: UUID.randomUUID().toString(),
-            title = trimmedTitle,
-            notes = notes.trim(),
-            intervalValue = intervalValue,
-            intervalUnit = intervalUnit,
-            durationValue = durationValue,
-            durationUnit = durationUnit,
-            isCompleted = existing?.isCompleted ?: false,
-            createdAt = existing?.createdAt ?: System.currentTimeMillis()
-        )
-        val nextTodos = if (existing == null) {
-            _todos.value + nextTodo
-        } else {
-            _todos.value.map { if (it.id == existing.id) nextTodo else it }
-        }.sortedTodos()
-        _todos.value = nextTodos
-        saveTodos(nextTodos)
+        val trimmedNotes = notes.trim()
+        val sanitizedTime = timeOfDay?.takeIf { it.isNotBlank() }
+        viewModelScope.launch {
+            if (existing == null) {
+                val inserted = repository.insertTodo(
+                    SupabaseTodoInsertDto(
+                        id = UUID.randomUUID().toString(),
+                        title = trimmedTitle,
+                        notes = trimmedNotes,
+                        intervalValue = intervalValue,
+                        intervalUnit = intervalUnit.name,
+                        timeOfDay = sanitizedTime,
+                        durationValue = durationValue,
+                        durationUnit = durationUnit.name,
+                        createdAt = System.currentTimeMillis()
+                    )
+                )
+                _todos.value = _todos.value + inserted.toTodo()
+            } else {
+                val updated = repository.updateTodo(
+                    id = existing.id,
+                    dto = SupabaseTodoUpdateDto(
+                        title = trimmedTitle,
+                        notes = trimmedNotes,
+                        intervalValue = intervalValue,
+                        intervalUnit = intervalUnit.name,
+                        timeOfDay = sanitizedTime,
+                        durationValue = durationValue,
+                        durationUnit = durationUnit.name
+                    )
+                )
+                _todos.value = _todos.value.map { if (it.id == existing.id) updated.toTodo() else it }
+            }
+            recompute()
+        }
         return true
     }
 
-    fun toggleCompleted(todo: Todo) {
-        val nextTodos = _todos.value.map {
-            if (it.id == todo.id) it.copy(isCompleted = !it.isCompleted) else it
-        }.sortedTodos()
-        _todos.value = nextTodos
-        saveTodos(nextTodos)
+    fun toggleCurrentInterval(todoId: String) {
+        val stats = _stats.value.firstOrNull { it.todo.id == todoId } ?: return
+        viewModelScope.launch {
+            if (stats.isDoneCurrentInterval) {
+                val intervalMs = TodoScheduleCalculator.intervalMs(stats.todo)
+                val now = System.currentTimeMillis()
+                val rangeStart = now - intervalMs + 1
+                val targetId = _completions.value
+                    .filter { it.todoId == todoId && it.completedAt in rangeStart..now }
+                    .maxByOrNull { it.completedAt }
+                    ?.id
+                if (targetId != null) {
+                    repository.deleteCompletion(targetId)
+                    _completions.value = _completions.value.filterNot { it.id == targetId }
+                }
+            } else {
+                val inserted = repository.insertCompletion(
+                    SupabaseCompletionInsertDto(
+                        id = UUID.randomUUID().toString(),
+                        todoId = todoId,
+                        completedAt = System.currentTimeMillis()
+                    )
+                )
+                _completions.value = _completions.value + inserted.toCompletion()
+            }
+            recompute()
+        }
     }
 
     fun deleteTodo(todo: Todo) {
-        val nextTodos = _todos.value.filterNot { it.id == todo.id }.sortedTodos()
-        _todos.value = nextTodos
-        saveTodos(nextTodos)
+        viewModelScope.launch {
+            repository.deleteTodo(todo.id)
+            _todos.value = _todos.value.filterNot { it.id == todo.id }
+            _completions.value = _completions.value.filterNot { it.todoId == todo.id }
+            recompute()
+        }
     }
 
-    private fun List<Todo>.sortedTodos(): List<Todo> =
-        sortedWith(compareBy<Todo> { it.isCompleted }.thenByDescending { it.createdAt })
-
-    private fun String.toIntervalUnit(): TodoIntervalUnit =
-        TodoIntervalUnit.entries.firstOrNull { it.name == this } ?: TodoIntervalUnit.Day
-
-    private fun String.toDurationUnit(): TodoDurationUnit =
-        TodoDurationUnit.entries.firstOrNull { it.name == this } ?: TodoDurationUnit.Minute
-
-    companion object {
-        private const val PREFS_NAME = "livora_todo_prefs"
-        private const val KEY_TODOS = "todos"
+    private fun recompute() {
+        val now = System.currentTimeMillis()
+        val grouped = _completions.value.groupBy { it.todoId }
+        val computed = _todos.value.map { todo ->
+            val ts = grouped[todo.id]?.map { it.completedAt } ?: emptyList()
+            TodoScheduleCalculator.stats(todo, ts, now)
+        }
+        _stats.value = computed.sortedWith(
+            compareBy<TodoStats> { it.isDoneCurrentInterval }
+                .thenByDescending { it.todo.createdAt }
+        )
     }
+
+    private fun SupabaseTodoDto.toTodo(): Todo = Todo(
+        id = id,
+        title = title,
+        notes = notes,
+        intervalValue = intervalValue,
+        intervalUnit = TodoIntervalUnit.valueOf(intervalUnit),
+        timeOfDay = timeOfDay,
+        durationValue = durationValue,
+        durationUnit = TodoDurationUnit.valueOf(durationUnit),
+        createdAt = createdAt
+    )
+
+    private fun SupabaseCompletionDto.toCompletion(): TodoCompletion = TodoCompletion(
+        id = id,
+        todoId = todoId,
+        completedAt = completedAt
+    )
 }

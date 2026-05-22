@@ -5,8 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,21 +14,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.outlined.Circle
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,8 +34,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -49,7 +48,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
@@ -58,17 +57,19 @@ import androidx.compose.ui.unit.sp
 import com.example.livora.data.model.Todo
 import com.example.livora.data.model.TodoDurationUnit
 import com.example.livora.data.model.TodoIntervalUnit
+import com.example.livora.data.model.TodoStats
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TodoScreen(
     viewModel: TodoViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpenDetail: (String) -> Unit
 ) {
-    val todos by viewModel.todos.collectAsState()
+    val stats by viewModel.stats.collectAsState()
     var isEditing by rememberSaveable { mutableStateOf(false) }
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
-    val editingTodo = todos.firstOrNull { it.id == editingId }
+    val editingTodo = stats.firstOrNull { it.todo.id == editingId }?.todo
 
     Scaffold(
         topBar = {
@@ -76,13 +77,15 @@ fun TodoScreen(
                 title = {
                     Column {
                         Text(
-                            text = "To-Do List",
-                            fontWeight = FontWeight.Bold
+                            text = "Tasks",
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Intervals and durations",
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            text = "Routines and streaks",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
                         )
                     }
                 },
@@ -90,7 +93,8 @@ fun TodoScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = null
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
                     }
                 },
@@ -101,7 +105,8 @@ fun TodoScreen(
                     }) {
                         Icon(
                             imageVector = Icons.Default.Add,
-                            contentDescription = null
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 },
@@ -115,8 +120,7 @@ fun TodoScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 4.dp)
         ) {
             item { Spacer(modifier = Modifier.height(4.dp)) }
 
@@ -124,8 +128,18 @@ fun TodoScreen(
                 item {
                     TodoForm(
                         todo = editingTodo,
-                        onSave = { title, notes, intervalValue, intervalUnit, durationValue, durationUnit ->
-                            if (viewModel.upsertTodo(editingTodo, title, notes, intervalValue, intervalUnit, durationValue, durationUnit)) {
+                        onSave = { title, notes, intervalValue, intervalUnit, timeOfDay, durationValue, durationUnit ->
+                            if (viewModel.upsertTodo(
+                                    editingTodo,
+                                    title,
+                                    notes,
+                                    intervalValue,
+                                    intervalUnit,
+                                    timeOfDay,
+                                    durationValue,
+                                    durationUnit
+                                )
+                            ) {
                                 isEditing = false
                                 editingId = null
                             }
@@ -135,12 +149,17 @@ fun TodoScreen(
                             editingId = null
                         }
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                        thickness = 0.5.dp
+                    )
                 }
             }
 
-            if (todos.isEmpty() && !isEditing) {
+            if (stats.isEmpty() && !isEditing) {
                 item {
-                    EmptyTodoState(
+                    EmptyState(
                         onAdd = {
                             editingId = null
                             isEditing = true
@@ -149,305 +168,467 @@ fun TodoScreen(
                 }
             }
 
-            items(todos, key = { it.id }) { todo ->
-                TodoCard(
-                    todo = todo,
-                    onToggle = { viewModel.toggleCompleted(todo) },
+            itemsIndexed(stats) { index, item ->
+                TodoRow(
+                    stats = item,
+                    onToggle = { viewModel.toggleCurrentInterval(item.todo.id) },
                     onEdit = {
-                        editingId = todo.id
+                        editingId = item.todo.id
                         isEditing = true
                     },
-                    onDelete = { viewModel.deleteTodo(todo) }
+                    onDelete = { viewModel.deleteTodo(item.todo) },
+                    onOpen = { onOpenDetail(item.todo.id) }
                 )
+                if (index < stats.lastIndex) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f),
+                        thickness = 0.5.dp
+                    )
+                }
             }
 
-            item { Spacer(modifier = Modifier.height(12.dp)) }
+            item { Spacer(modifier = Modifier.height(24.dp)) }
         }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TodoRow(
+    stats: TodoStats,
+    onToggle: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onOpen: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpen)
+            .padding(horizontal = 12.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        IconButton(
+            onClick = onToggle,
+            modifier = Modifier.size(28.dp)
+        ) {
+            Icon(
+                imageVector = if (stats.isDoneCurrentInterval) Icons.Default.CheckCircle else Icons.Outlined.Circle,
+                contentDescription = null,
+                tint = if (stats.isDoneCurrentInterval)
+                    MaterialTheme.colorScheme.onSurface
+                else
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(10.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stats.todo.title,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+                textDecoration = if (stats.isDoneCurrentInterval) TextDecoration.LineThrough else TextDecoration.None
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = scheduleSummary(stats.todo),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                StreakDots(stats = stats)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = streakSummary(stats),
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                )
+            }
+        }
+
+        IconButton(
+            onClick = onEdit,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Edit,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+            )
+        }
+        IconButton(
+            onClick = onDelete,
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Delete,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun StreakDots(stats: TodoStats) {
+    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        val visible = stats.history.take(7).reversed()
+        if (visible.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(50)
+                    )
+            )
+        } else {
+            visible.forEach { interval ->
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .background(
+                            color = if (interval.isDone)
+                                MaterialTheme.colorScheme.onSurface
+                            else
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(50)
+                        )
+                )
+            }
+        }
+    }
+}
+
+private fun streakSummary(stats: TodoStats): String {
+    val streak = stats.currentStreak
+    return when {
+        streak <= 0 -> "No streak yet"
+        streak == 1 -> "1 in a row"
+        else -> "$streak in a row"
+    }
+}
+
+internal fun scheduleSummary(todo: Todo): String {
+    val intervalLabel = if (todo.intervalValue == 1) {
+        "Every ${todo.intervalUnit.label.lowercase()}"
+    } else {
+        "Every ${todo.intervalValue} ${todo.intervalUnit.label.lowercase()}s"
+    }
+    val timePart = todo.timeOfDay?.takeIf { it.isNotBlank() }?.let { " at $it" } ?: ""
+    val durationLabel = "${todo.durationValue} ${todo.durationUnit.label.lowercase()}"
+    return "$intervalLabel$timePart  ·  $durationLabel"
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TodoForm(
     todo: Todo?,
-    onSave: (String, String, Int, TodoIntervalUnit, Int, TodoDurationUnit) -> Unit,
+    onSave: (String, String, Int, TodoIntervalUnit, String?, Int, TodoDurationUnit) -> Unit,
     onCancel: () -> Unit
 ) {
     var title by remember(todo?.id) { mutableStateOf(todo?.title ?: "") }
     var notes by remember(todo?.id) { mutableStateOf(todo?.notes ?: "") }
     var intervalValue by remember(todo?.id) { mutableStateOf((todo?.intervalValue ?: 1).toString()) }
     var intervalUnit by remember(todo?.id) { mutableStateOf(todo?.intervalUnit ?: TodoIntervalUnit.Day) }
+    var timeOfDay by remember(todo?.id) { mutableStateOf(todo?.timeOfDay ?: "") }
     var durationValue by remember(todo?.id) { mutableStateOf((todo?.durationValue ?: 30).toString()) }
     var durationUnit by remember(todo?.id) { mutableStateOf(todo?.durationUnit ?: TodoDurationUnit.Minute) }
-    val canSave = title.isNotBlank() && (intervalValue.toIntOrNull() ?: 0) > 0 && (durationValue.toIntOrNull() ?: 0) > 0
+    var showTimePicker by remember { mutableStateOf(false) }
+    val canSave = title.isNotBlank() &&
+        (intervalValue.toIntOrNull() ?: 0) > 0 &&
+        (durationValue.toIntOrNull() ?: 0) > 0
+    val supportsTime = intervalUnit == TodoIntervalUnit.Day || intervalUnit == TodoIntervalUnit.Week
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 16.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Text(
+            text = if (todo == null) "New task" else "Edit task",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        FlatTextField(
+            value = title,
+            onValueChange = { title = it },
+            placeholder = "Task title",
+            singleLine = true
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        FlatTextField(
+            value = notes,
+            onValueChange = { notes = it },
+            placeholder = "Notes",
+            singleLine = false,
+            minLines = 2
+        )
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        PropertyLabel(text = "Repeat")
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = if (todo == null) "New Task" else "Edit Task",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
+                text = "Every",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
             )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = { Text("Title") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+            Spacer(modifier = Modifier.width(8.dp))
+            CompactNumberField(
+                value = intervalValue,
+                onValueChange = { intervalValue = it.filter(Char::isDigit) }
             )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            OutlinedTextField(
-                value = notes,
-                onValueChange = { notes = it },
-                label = { Text("Notes") },
-                minLines = 2,
-                modifier = Modifier.fillMaxWidth()
+            Spacer(modifier = Modifier.width(10.dp))
+            UnitSelector(
+                options = TodoIntervalUnit.entries.toList(),
+                selected = intervalUnit,
+                label = { it.label },
+                onSelect = { intervalUnit = it }
             )
+        }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
-                    value = intervalValue,
-                    onValueChange = { intervalValue = it.filter(Char::isDigit) },
-                    label = { Text("Interval") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
+        if (supportsTime) {
+            Spacer(modifier = Modifier.height(16.dp))
+            PropertyLabel(text = "Time of day")
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = if (timeOfDay.isBlank()) "Not set" else timeOfDay,
+                    fontSize = 14.sp,
+                    fontWeight = if (timeOfDay.isBlank()) FontWeight.Normal else FontWeight.Medium,
+                    color = if (timeOfDay.isBlank())
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                    else
+                        MaterialTheme.colorScheme.onSurface
                 )
-                OutlinedTextField(
-                    value = durationValue,
-                    onValueChange = { durationValue = it.filter(Char::isDigit) },
-                    label = { Text("Duration") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
+                Spacer(modifier = Modifier.width(12.dp))
+                LinkText(
+                    text = if (timeOfDay.isBlank()) "Set time" else "Change",
+                    onClick = { showTimePicker = true }
                 )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                TodoIntervalUnit.entries.forEach { unit ->
-                    UnitChip(
-                        label = unit.label,
-                        selected = intervalUnit == unit,
-                        onClick = { intervalUnit = unit }
+                if (timeOfDay.isNotBlank()) {
+                    Spacer(modifier = Modifier.width(12.dp))
+                    LinkText(
+                        text = "Clear",
+                        onClick = { timeOfDay = "" }
                     )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                TodoDurationUnit.entries.forEach { unit ->
-                    UnitChip(
-                        label = unit.label,
-                        selected = durationUnit == unit,
-                        onClick = { durationUnit = unit }
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                TextButton(onClick = onCancel) {
-                    Text("Cancel")
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(
-                    onClick = {
-                        onSave(
-                            title,
-                            notes,
-                            intervalValue.toIntOrNull() ?: 0,
-                            intervalUnit,
-                            durationValue.toIntOrNull() ?: 0,
-                            durationUnit
-                        )
-                    },
-                    enabled = canSave
-                ) {
-                    Text("Save")
                 }
             }
         }
-    }
-}
 
-@Composable
-private fun UnitChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(
-                if (selected) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.surface
+        Spacer(modifier = Modifier.height(16.dp))
+
+        PropertyLabel(text = "Duration")
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CompactNumberField(
+                value = durationValue,
+                onValueChange = { durationValue = it.filter(Char::isDigit) }
             )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-    ) {
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+            Spacer(modifier = Modifier.width(10.dp))
+            UnitSelector(
+                options = TodoDurationUnit.entries.toList(),
+                selected = durationUnit,
+                label = { it.label },
+                onSelect = { durationUnit = it }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            TextButton(onClick = onCancel) {
+                Text("Cancel", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f))
+            }
+            Spacer(modifier = Modifier.width(4.dp))
+            TextButton(
+                onClick = {
+                    onSave(
+                        title,
+                        notes,
+                        intervalValue.toIntOrNull() ?: 0,
+                        intervalUnit,
+                        timeOfDay.takeIf { it.isNotBlank() },
+                        durationValue.toIntOrNull() ?: 0,
+                        durationUnit
+                    )
+                },
+                enabled = canSave
+            ) {
+                Text(
+                    text = "Save",
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (canSave) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                )
+            }
+        }
+    }
+
+    if (showTimePicker) {
+        val initialHour = timeOfDay.substringBefore(':', "9").toIntOrNull() ?: 9
+        val initialMinute = timeOfDay.substringAfter(':', "0").toIntOrNull() ?: 0
+        val pickerState = rememberTimePickerState(
+            initialHour = initialHour.coerceIn(0, 23),
+            initialMinute = initialMinute.coerceIn(0, 59),
+            is24Hour = true
+        )
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    val hh = pickerState.hour.toString().padStart(2, '0')
+                    val mm = pickerState.minute.toString().padStart(2, '0')
+                    timeOfDay = "$hh:$mm"
+                    showTimePicker = false
+                }) { Text("Done") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) { Text("Cancel") }
+            },
+            text = { TimePicker(state = pickerState) }
         )
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun EmptyTodoState(
-    onAdd: () -> Unit
+private fun FlatTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    singleLine: Boolean,
+    minLines: Int = 1
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onAdd),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-            Spacer(modifier = Modifier.height(12.dp))
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        placeholder = {
             Text(
-                text = "No tasks yet",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
+                text = placeholder,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                fontSize = 15.sp
             )
+        },
+        singleLine = singleLine,
+        minLines = minLines,
+        modifier = Modifier.fillMaxWidth(),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = Color.Transparent,
+            unfocusedContainerColor = Color.Transparent,
+            disabledContainerColor = Color.Transparent,
+            focusedIndicatorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+            unfocusedIndicatorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+        )
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CompactNumberField(
+    value: String,
+    onValueChange: (String) -> Unit
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        modifier = Modifier.width(72.dp),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = Color.Transparent,
+            unfocusedContainerColor = Color.Transparent,
+            disabledContainerColor = Color.Transparent,
+            focusedIndicatorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+            unfocusedIndicatorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
+        )
+    )
+}
+
+@Composable
+private fun <T> UnitSelector(
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    onSelect: (T) -> Unit
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        options.forEach { option ->
+            val isSelected = option == selected
             Text(
-                text = "Add a task with intervals and duration",
+                text = label(option),
                 fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (isSelected)
+                    MaterialTheme.colorScheme.onSurface
+                else
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                textDecoration = if (isSelected) TextDecoration.Underline else TextDecoration.None,
+                modifier = Modifier
+                    .clickable { onSelect(option) }
+                    .padding(vertical = 4.dp)
             )
         }
     }
 }
 
 @Composable
-private fun TodoCard(
-    todo: Todo,
-    onToggle: () -> Unit,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (todo.isCompleted)
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
-            else
-                MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+private fun PropertyLabel(text: String) {
+    Text(
+        text = text,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+    )
+}
+
+@Composable
+private fun LinkText(text: String, onClick: () -> Unit) {
+    Text(
+        text = text,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Medium,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+        textDecoration = TextDecoration.Underline,
+        modifier = Modifier.clickable(onClick = onClick)
+    )
+}
+
+@Composable
+private fun EmptyState(onAdd: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 60.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.Top
-        ) {
-            IconButton(
-                onClick = onToggle,
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(
-                    imageVector = if (todo.isCompleted) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                    contentDescription = null,
-                    tint = if (todo.isCompleted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = todo.title,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textDecoration = if (todo.isCompleted) TextDecoration.LineThrough else TextDecoration.None
-                )
-                if (todo.notes.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(3.dp))
-                    Text(
-                        text = todo.notes,
-                        fontSize = 13.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
-                    )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Every ${todo.intervalValue} ${todo.intervalUnit.label.lowercase()} · ${todo.durationValue} ${todo.durationUnit.label.lowercase()}",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            IconButton(
-                onClick = onEdit,
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-            }
-            IconButton(
-                onClick = onDelete,
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error
-                )
-            }
-        }
+        Text(
+            text = "Nothing here yet",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = "Add a routine to start tracking your streak.",
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+        )
+        Spacer(modifier = Modifier.height(14.dp))
+        LinkText(text = "New task", onClick = onAdd)
     }
 }

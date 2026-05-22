@@ -1,4 +1,4 @@
-package com.example.livora.data.network
+package com.example.livora.data.wiz
 
 import com.example.livora.data.model.WizBulb
 import com.example.livora.data.model.WizBulbState

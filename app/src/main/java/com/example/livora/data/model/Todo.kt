@@ -6,10 +6,16 @@ data class Todo(
     val notes: String = "",
     val intervalValue: Int = 1,
     val intervalUnit: TodoIntervalUnit = TodoIntervalUnit.Day,
+    val timeOfDay: String? = null,
     val durationValue: Int = 30,
     val durationUnit: TodoDurationUnit = TodoDurationUnit.Minute,
-    val isCompleted: Boolean = false,
     val createdAt: Long = System.currentTimeMillis()
+)
+
+data class TodoCompletion(
+    val id: String,
+    val todoId: String,
+    val completedAt: Long
 )
 
 enum class TodoIntervalUnit(val label: String) {
