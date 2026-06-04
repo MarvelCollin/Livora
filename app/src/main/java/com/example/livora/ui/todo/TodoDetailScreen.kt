@@ -24,8 +24,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -37,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.livora.data.model.TodoIntervalStatus
 import com.example.livora.data.model.TodoStats
+import com.example.livora.ui.components.TopBar
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -54,15 +53,8 @@ fun TodoDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Task",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                    )
-                },
+            TopBar(
+                title = "Task",
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -71,10 +63,7 @@ fun TodoDetailScreen(
                             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                }
             )
         }
     ) { innerPadding ->

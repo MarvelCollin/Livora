@@ -11,10 +11,7 @@ import com.example.livora.ui.ac.AcControllerScreen
 import com.example.livora.ui.ac.AcViewModel
 import com.example.livora.ui.bulb.BulbControllerScreen
 import com.example.livora.ui.bulb.BulbViewModel
-import com.example.livora.ui.dashboard.DashboardScreen
-import com.example.livora.ui.quicksettings.QuickSettingsScreen
 import com.example.livora.ui.todo.TodoDetailScreen
-import com.example.livora.ui.todo.TodoScreen
 import com.example.livora.ui.todo.TodoViewModel
 
 @Composable
@@ -25,22 +22,16 @@ fun AppNavHost(navController: NavHostController) {
 
     NavHost(
         navController = navController,
-        startDestination = Screen.QuickSettings.route
+        startDestination = Screen.Main.route
     ) {
-        composable(Screen.QuickSettings.route) {
-            QuickSettingsScreen(
+        composable(Screen.Main.route) {
+            MainScreen(
                 acViewModel = acViewModel,
                 bulbViewModel = bulbViewModel,
-                onNavigateToAdvanced = { navController.navigate(Screen.Dashboard.route) }
-            )
-        }
-        composable(Screen.Dashboard.route) {
-            DashboardScreen(
-                acViewModel = acViewModel,
-                bulbViewModel = bulbViewModel,
+                todoViewModel = todoViewModel,
                 onNavigateToAc = { navController.navigate(Screen.AcController.route) },
                 onNavigateToBulb = { navController.navigate(Screen.BulbController.route) },
-                onNavigateToTodo = { navController.navigate(Screen.TodoList.route) }
+                onOpenTodoDetail = { id -> navController.navigate(Screen.TodoDetail.create(id)) }
             )
         }
         composable(Screen.AcController.route) {
@@ -53,13 +44,6 @@ fun AppNavHost(navController: NavHostController) {
             BulbControllerScreen(
                 viewModel = bulbViewModel,
                 onBack = { navController.popBackStack() }
-            )
-        }
-        composable(Screen.TodoList.route) {
-            TodoScreen(
-                viewModel = todoViewModel,
-                onBack = { navController.popBackStack() },
-                onOpenDetail = { id -> navController.navigate(Screen.TodoDetail.create(id)) }
             )
         }
         composable(

@@ -66,39 +66,39 @@ import com.example.livora.ui.components.TopBar
 @Composable
 fun TodoScreen(
     viewModel: TodoViewModel,
-    onBack: () -> Unit,
-    onOpenDetail: (String) -> Unit
+    onOpenDetail: (String) -> Unit,
+    onBack: (() -> Unit)? = null
 ) {
     val stats by viewModel.stats.collectAsState()
+    val error by viewModel.error.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
     var isEditing by rememberSaveable { mutableStateOf(false) }
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
     val editingTodo = stats.firstOrNull { it.todo.id == editingId }?.todo
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(error) {
+        val message = error
+        if (!message.isNullOrBlank()) {
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearError()
+        }
+    }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "Tasks",
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "Routines and streaks",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
-                        )
-                    }
-                },
+            TopBar(
+                title = "Tasks",
+                subtitle = "Routines and streaks",
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                        )
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            )
+                        }
                     }
                 },
                 actions = {
@@ -112,11 +112,17 @@ fun TodoScreen(
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
+                }
             )
+        },
+        snackbarHost = {
+            SnackbarHost(snackbarHostState) { data ->
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = MaterialTheme.colorScheme.onSurface,
+                    contentColor = MaterialTheme.colorScheme.surface
+                )
+            }
         }
     ) { innerPadding ->
         LazyColumn(
@@ -160,7 +166,7 @@ fun TodoScreen(
                 }
             }
 
-            if (stats.isEmpty() && !isEditing) {
+            if (stats.isEmpty() && !isEditing && !isLoading) {
                 item {
                     EmptyState(
                         onAdd = {
