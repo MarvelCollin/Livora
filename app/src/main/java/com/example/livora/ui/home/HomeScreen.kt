@@ -68,6 +68,7 @@ import com.example.livora.ui.bulb.BulbViewModel
 import com.example.livora.ui.components.Design
 import com.example.livora.ui.components.TopBar
 import com.example.livora.ui.components.DeviceCard
+import com.example.livora.ui.components.TaskTimerChip
 import com.example.livora.ui.components.VoiceListeningOverlay
 import com.example.livora.ui.todo.TodoViewModel
 import com.example.livora.ui.todo.scheduleSummary
@@ -92,6 +93,7 @@ fun HomeScreen(
     val bulbState by bulbViewModel.bulbState.collectAsState()
     val connectedBulb by bulbViewModel.connectedBulb.collectAsState()
     val stats by todoViewModel.stats.collectAsState()
+    val runningTimers by todoViewModel.runningTimers.collectAsState()
 
     val context = LocalContext.current
     val voiceManager = remember { VoiceRecognitionManager(context) }
@@ -267,7 +269,10 @@ fun HomeScreen(
                     pending.take(4).forEachIndexed { index, item ->
                         UpNextRow(
                             stats = item,
+                            remainingMs = runningTimers[item.todo.id],
                             onToggle = { todoViewModel.toggleCurrentInterval(item.todo.id) },
+                            onStartTimer = { todoViewModel.startTimer(item.todo.id) },
+                            onCancelTimer = { todoViewModel.cancelTimer(item.todo.id) },
                             onOpen = { onOpenTodoDetail(item.todo.id) }
                         )
                         if (index < pending.take(4).lastIndex) {
@@ -473,7 +478,10 @@ private fun StatItem(value: String, label: String) {
 @Composable
 private fun UpNextRow(
     stats: TodoStats,
+    remainingMs: Long?,
     onToggle: () -> Unit,
+    onStartTimer: () -> Unit,
+    onCancelTimer: () -> Unit,
     onOpen: () -> Unit
 ) {
     Card(
@@ -518,6 +526,14 @@ private fun UpNextRow(
                     text = scheduleSummary(stats.todo),
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                )
+            }
+            if (stats.todo.hasTimer) {
+                Spacer(modifier = Modifier.width(8.dp))
+                TaskTimerChip(
+                    remainingMs = remainingMs,
+                    onStart = onStartTimer,
+                    onCancel = onCancelTimer
                 )
             }
         }

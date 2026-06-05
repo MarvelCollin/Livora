@@ -18,6 +18,7 @@ data class TodoDto(
     @SerializedName("time_of_day") val timeOfDay: String?,
     @SerializedName("duration_value") val durationValue: Int,
     @SerializedName("duration_unit") val durationUnit: String,
+    @SerializedName("has_timer") val hasTimer: Boolean = false,
     @SerializedName("created_at") val createdAt: Long
 )
 
@@ -30,6 +31,7 @@ data class TodoInsertDto(
     @SerializedName("time_of_day") val timeOfDay: String?,
     @SerializedName("duration_value") val durationValue: Int,
     @SerializedName("duration_unit") val durationUnit: String,
+    @SerializedName("has_timer") val hasTimer: Boolean,
     @SerializedName("created_at") val createdAt: Long
 )
 
@@ -40,7 +42,8 @@ data class TodoUpdateDto(
     @SerializedName("interval_unit") val intervalUnit: String,
     @SerializedName("time_of_day") val timeOfDay: String?,
     @SerializedName("duration_value") val durationValue: Int,
-    @SerializedName("duration_unit") val durationUnit: String
+    @SerializedName("duration_unit") val durationUnit: String,
+    @SerializedName("has_timer") val hasTimer: Boolean
 )
 
 data class CompletionDto(

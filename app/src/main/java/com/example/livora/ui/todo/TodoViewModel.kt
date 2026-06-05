@@ -15,9 +15,11 @@ import com.example.livora.data.supabase.TodoInsertDto
 import com.example.livora.data.supabase.TodoRepository
 import com.example.livora.data.supabase.TodoUpdateDto
 import com.example.livora.util.Logger
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -43,6 +45,10 @@ class TodoViewModel : ViewModel() {
 
     private val pendingToggles = MutableStateFlow<Set<String>>(emptySet())
     private val pendingMutations = MutableStateFlow<Set<String>>(emptySet())
+
+    private val _runningTimers = MutableStateFlow<Map<String, Long>>(emptyMap())
+    val runningTimers: StateFlow<Map<String, Long>> = _runningTimers.asStateFlow()
+    private val timerJobs = mutableMapOf<String, Job>()
 
     init {
         refresh()
@@ -84,7 +90,8 @@ class TodoViewModel : ViewModel() {
         intervalUnit: TodoIntervalUnit,
         timeOfDay: String?,
         durationValue: Int,
-        durationUnit: TodoDurationUnit
+        durationUnit: TodoDurationUnit,
+        hasTimer: Boolean
     ): Boolean {
         val trimmedTitle = title.trim()
         if (trimmedTitle.isBlank() || intervalValue < 1 || durationValue < 1) return false
@@ -106,6 +113,7 @@ class TodoViewModel : ViewModel() {
                             timeOfDay = sanitizedTime,
                             durationValue = durationValue,
                             durationUnit = durationUnit.name,
+                            hasTimer = hasTimer,
                             createdAt = System.currentTimeMillis()
                         )
                     )
@@ -120,7 +128,8 @@ class TodoViewModel : ViewModel() {
                             intervalUnit = intervalUnit.name,
                             timeOfDay = sanitizedTime,
                             durationValue = durationValue,
-                            durationUnit = durationUnit.name
+                            durationUnit = durationUnit.name,
+                            hasTimer = hasTimer
                         )
                     )
                     _todos.update { list -> list.map { if (it.id == existing.id) updated.toTodo() else it } }
@@ -176,6 +185,7 @@ class TodoViewModel : ViewModel() {
 
     fun deleteTodo(todo: Todo) {
         if (todo.id in pendingMutations.value) return
+        cancelTimer(todo.id)
         pendingMutations.update { it + todo.id }
         viewModelScope.launch {
             try {
@@ -190,6 +200,47 @@ class TodoViewModel : ViewModel() {
                 pendingMutations.update { it - todo.id }
             }
         }
+    }
+
+    fun startTimer(todoId: String) {
+        if (todoId in timerJobs) return
+        val todo = _todos.value.firstOrNull { it.id == todoId } ?: return
+        if (!todo.hasTimer) return
+        val totalMs = timerDurationMs(todo)
+        if (totalMs <= 0) return
+        val job = viewModelScope.launch {
+            var remaining = totalMs
+            _runningTimers.update { it + (todoId to remaining) }
+            while (remaining > 0) {
+                delay(1000)
+                remaining -= 1000
+                _runningTimers.update { it + (todoId to remaining.coerceAtLeast(0)) }
+            }
+            timerJobs.remove(todoId)
+            _runningTimers.update { it - todoId }
+            completeFromTimer(todoId)
+        }
+        timerJobs[todoId] = job
+    }
+
+    fun cancelTimer(todoId: String) {
+        timerJobs.remove(todoId)?.cancel()
+        _runningTimers.update { it - todoId }
+    }
+
+    private fun completeFromTimer(todoId: String) {
+        val current = _stats.value.firstOrNull { it.todo.id == todoId } ?: return
+        if (!current.isDoneCurrentInterval) {
+            toggleCurrentInterval(todoId)
+        }
+    }
+
+    private fun timerDurationMs(todo: Todo): Long {
+        val unitMs = when (todo.durationUnit) {
+            TodoDurationUnit.Minute -> 60_000L
+            TodoDurationUnit.Hour -> 3_600_000L
+        }
+        return unitMs * todo.durationValue.coerceAtLeast(0)
     }
 
     private fun recompute() {
@@ -214,6 +265,7 @@ class TodoViewModel : ViewModel() {
         timeOfDay = timeOfDay,
         durationValue = durationValue,
         durationUnit = TodoDurationUnit.valueOf(durationUnit),
+        hasTimer = hasTimer,
         createdAt = createdAt
     )
 

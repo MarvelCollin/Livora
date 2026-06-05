@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -35,6 +36,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
@@ -60,6 +63,7 @@ import com.example.livora.data.model.Todo
 import com.example.livora.data.model.TodoDurationUnit
 import com.example.livora.data.model.TodoIntervalUnit
 import com.example.livora.data.model.TodoStats
+import com.example.livora.ui.components.TaskTimerChip
 import com.example.livora.ui.components.TopBar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,6 +76,7 @@ fun TodoScreen(
     val stats by viewModel.stats.collectAsState()
     val error by viewModel.error.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val runningTimers by viewModel.runningTimers.collectAsState()
     var isEditing by rememberSaveable { mutableStateOf(false) }
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
     val editingTodo = stats.firstOrNull { it.todo.id == editingId }?.todo
@@ -137,7 +142,7 @@ fun TodoScreen(
                 item {
                     TodoForm(
                         todo = editingTodo,
-                        onSave = { title, notes, intervalValue, intervalUnit, timeOfDay, durationValue, durationUnit ->
+                        onSave = { title, notes, intervalValue, intervalUnit, timeOfDay, durationValue, durationUnit, hasTimer ->
                             if (viewModel.upsertTodo(
                                     editingTodo,
                                     title,
@@ -146,7 +151,8 @@ fun TodoScreen(
                                     intervalUnit,
                                     timeOfDay,
                                     durationValue,
-                                    durationUnit
+                                    durationUnit,
+                                    hasTimer
                                 )
                             ) {
                                 isEditing = false
@@ -180,7 +186,10 @@ fun TodoScreen(
             itemsIndexed(stats) { index, item ->
                 TodoRow(
                     stats = item,
+                    remainingMs = runningTimers[item.todo.id],
                     onToggle = { viewModel.toggleCurrentInterval(item.todo.id) },
+                    onStartTimer = { viewModel.startTimer(item.todo.id) },
+                    onCancelTimer = { viewModel.cancelTimer(item.todo.id) },
                     onEdit = {
                         editingId = item.todo.id
                         isEditing = true
@@ -205,7 +214,10 @@ fun TodoScreen(
 @Composable
 private fun TodoRow(
     stats: TodoStats,
+    remainingMs: Long?,
     onToggle: () -> Unit,
+    onStartTimer: () -> Unit,
+    onCancelTimer: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onOpen: () -> Unit
@@ -255,6 +267,14 @@ private fun TodoRow(
                     text = streakSummary(stats),
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                )
+            }
+            if (stats.todo.hasTimer && !stats.isDoneCurrentInterval) {
+                Spacer(modifier = Modifier.height(8.dp))
+                TaskTimerChip(
+                    remainingMs = remainingMs,
+                    onStart = onStartTimer,
+                    onCancel = onCancelTimer
                 )
             }
         }
@@ -329,15 +349,18 @@ internal fun scheduleSummary(todo: Todo): String {
         "Every ${todo.intervalValue} ${todo.intervalUnit.label.lowercase()}s"
     }
     val timePart = todo.timeOfDay?.takeIf { it.isNotBlank() }?.let { " at $it" } ?: ""
+    if (!todo.hasTimer) {
+        return "$intervalLabel$timePart"
+    }
     val durationLabel = "${todo.durationValue} ${todo.durationUnit.label.lowercase()}"
-    return "$intervalLabel$timePart  ·  $durationLabel"
+    return "$intervalLabel$timePart  ·  $durationLabel timer"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TodoForm(
     todo: Todo?,
-    onSave: (String, String, Int, TodoIntervalUnit, String?, Int, TodoDurationUnit) -> Unit,
+    onSave: (String, String, Int, TodoIntervalUnit, String?, Int, TodoDurationUnit, Boolean) -> Unit,
     onCancel: () -> Unit
 ) {
     var title by remember(todo?.id) { mutableStateOf(todo?.title ?: "") }
@@ -347,10 +370,11 @@ private fun TodoForm(
     var timeOfDay by remember(todo?.id) { mutableStateOf(todo?.timeOfDay ?: "") }
     var durationValue by remember(todo?.id) { mutableStateOf((todo?.durationValue ?: 30).toString()) }
     var durationUnit by remember(todo?.id) { mutableStateOf(todo?.durationUnit ?: TodoDurationUnit.Minute) }
+    var hasTimer by remember(todo?.id) { mutableStateOf(todo?.hasTimer ?: false) }
     var showTimePicker by remember { mutableStateOf(false) }
     val canSave = title.isNotBlank() &&
         (intervalValue.toIntOrNull() ?: 0) > 0 &&
-        (durationValue.toIntOrNull() ?: 0) > 0
+        (!hasTimer || (durationValue.toIntOrNull() ?: 0) > 0)
     val supportsTime = intervalUnit == TodoIntervalUnit.Day || intervalUnit == TodoIntervalUnit.Week
 
     Column(
@@ -439,20 +463,57 @@ private fun TodoForm(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        PropertyLabel(text = "Duration")
-        Spacer(modifier = Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            CompactNumberField(
-                value = durationValue,
-                onValueChange = { durationValue = it.filter(Char::isDigit) }
+            Icon(
+                imageVector = Icons.Outlined.Timer,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
             )
-            Spacer(modifier = Modifier.width(10.dp))
-            UnitSelector(
-                options = TodoDurationUnit.entries.toList(),
-                selected = durationUnit,
-                label = { it.label },
-                onSelect = { durationUnit = it }
+            Spacer(modifier = Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Timer",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Count down while you do this task",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+            }
+            Switch(
+                checked = hasTimer,
+                onCheckedChange = { hasTimer = it },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.surface,
+                    checkedTrackColor = MaterialTheme.colorScheme.onSurface,
+                    uncheckedThumbColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    uncheckedTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                    uncheckedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                )
             )
+        }
+
+        if (hasTimer) {
+            Spacer(modifier = Modifier.height(14.dp))
+            PropertyLabel(text = "Timer length")
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CompactNumberField(
+                    value = durationValue,
+                    onValueChange = { durationValue = it.filter(Char::isDigit) }
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                UnitSelector(
+                    options = TodoDurationUnit.entries.toList(),
+                    selected = durationUnit,
+                    label = { it.label },
+                    onSelect = { durationUnit = it }
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -474,7 +535,8 @@ private fun TodoForm(
                         intervalUnit,
                         timeOfDay.takeIf { it.isNotBlank() },
                         durationValue.toIntOrNull() ?: 0,
-                        durationUnit
+                        durationUnit,
+                        hasTimer
                     )
                 },
                 enabled = canSave

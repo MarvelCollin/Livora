@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.livora.data.model.TodoIntervalStatus
 import com.example.livora.data.model.TodoStats
+import com.example.livora.ui.components.TaskTimerChip
 import com.example.livora.ui.components.TopBar
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -49,6 +50,7 @@ fun TodoDetailScreen(
     onBack: () -> Unit
 ) {
     val statsList by viewModel.stats.collectAsState()
+    val runningTimers by viewModel.runningTimers.collectAsState()
     val stats = statsList.firstOrNull { it.todo.id == todoId }
 
     Scaffold(
@@ -110,6 +112,15 @@ fun TodoDetailScreen(
                 )
             }
 
+            if (stats.todo.hasTimer && !stats.isDoneCurrentInterval) {
+                Spacer(modifier = Modifier.height(20.dp))
+                TaskTimerChip(
+                    remainingMs = runningTimers[stats.todo.id],
+                    onStart = { viewModel.startTimer(stats.todo.id) },
+                    onCancel = { viewModel.cancelTimer(stats.todo.id) }
+                )
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
             ThinDivider()
             Spacer(modifier = Modifier.height(8.dp))
@@ -118,6 +129,12 @@ fun TodoDetailScreen(
             PropertyRow(label = "Best streak", value = streakValue(stats.bestStreak))
             PropertyRow(label = "Completion rate", value = "${(stats.completionRate * 100).roundToInt()}%")
             PropertyRow(label = "This interval", value = if (stats.isDoneCurrentInterval) "Done" else "Pending")
+            if (stats.todo.hasTimer) {
+                PropertyRow(
+                    label = "Timer",
+                    value = "${stats.todo.durationValue} ${stats.todo.durationUnit.label.lowercase()}"
+                )
+            }
             PropertyRow(label = "Last done", value = lastDoneValue(stats.lastCompletedAt))
             PropertyRow(label = "Total check-ins", value = stats.completions.size.toString())
 

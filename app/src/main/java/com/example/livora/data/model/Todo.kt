@@ -9,6 +9,7 @@ data class Todo(
     val timeOfDay: String? = null,
     val durationValue: Int = 30,
     val durationUnit: TodoDurationUnit = TodoDurationUnit.Minute,
+    val hasTimer: Boolean = false,
     val createdAt: Long = System.currentTimeMillis()
 )
 
