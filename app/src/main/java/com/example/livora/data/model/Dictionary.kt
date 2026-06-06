@@ -6,6 +6,9 @@ data class DictionaryEntry(
     val language: String,
     val translation: String,
     val description: String,
+    val descriptionId: String = "",
+    val example: String = "",
+    val synonyms: List<String> = emptyList(),
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -27,6 +30,9 @@ enum class DictionaryLanguage(val code: String, val label: String) {
 data class LookupResult(
     val translation: String,
     val description: String,
+    val descriptionId: String,
+    val example: String,
+    val synonyms: List<String>,
     val definitionFound: Boolean
 )
 

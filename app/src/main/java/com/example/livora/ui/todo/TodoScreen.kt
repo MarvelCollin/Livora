@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -33,9 +34,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -63,6 +61,8 @@ import com.example.livora.data.model.Todo
 import com.example.livora.data.model.TodoDurationUnit
 import com.example.livora.data.model.TodoIntervalUnit
 import com.example.livora.data.model.TodoStats
+import com.example.livora.ui.components.SkeletonBox
+import com.example.livora.ui.components.SkeletonLine
 import com.example.livora.ui.components.TaskTimerChip
 import com.example.livora.ui.components.TopBar
 
@@ -74,21 +74,11 @@ fun TodoScreen(
     onBack: (() -> Unit)? = null
 ) {
     val stats by viewModel.stats.collectAsState()
-    val error by viewModel.error.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val runningTimers by viewModel.runningTimers.collectAsState()
     var isEditing by rememberSaveable { mutableStateOf(false) }
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
     val editingTodo = stats.firstOrNull { it.todo.id == editingId }?.todo
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    LaunchedEffect(error) {
-        val message = error
-        if (!message.isNullOrBlank()) {
-            snackbarHostState.showSnackbar(message)
-            viewModel.clearError()
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -119,15 +109,6 @@ fun TodoScreen(
                     }
                 }
             )
-        },
-        snackbarHost = {
-            SnackbarHost(snackbarHostState) { data ->
-                Snackbar(
-                    snackbarData = data,
-                    containerColor = MaterialTheme.colorScheme.onSurface,
-                    contentColor = MaterialTheme.colorScheme.surface
-                )
-            }
         }
     ) { innerPadding ->
         LazyColumn(
@@ -170,6 +151,10 @@ fun TodoScreen(
                         thickness = 0.5.dp
                     )
                 }
+            }
+
+            if (stats.isEmpty() && !isEditing && isLoading) {
+                items(5) { TodoRowSkeleton() }
             }
 
             if (stats.isEmpty() && !isEditing && !isLoading) {
@@ -540,7 +525,7 @@ private fun TodoForm(
                     )
                 },
                 enabled = canSave
-            ) {
+            ) { 
                 Text(
                     text = "Save",
                     fontWeight = FontWeight.SemiBold,
@@ -677,6 +662,36 @@ private fun LinkText(text: String, onClick: () -> Unit) {
         textDecoration = TextDecoration.Underline,
         modifier = Modifier.clickable(onClick = onClick)
     )
+}
+
+@Composable
+private fun TodoRowSkeleton() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        SkeletonBox(
+            modifier = Modifier.size(26.dp),
+            shape = RoundedCornerShape(50)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            SkeletonLine(width = 150.dp, height = 15.dp)
+            Spacer(modifier = Modifier.height(8.dp))
+            SkeletonLine(width = 110.dp, height = 12.dp)
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                repeat(7) {
+                    SkeletonBox(
+                        modifier = Modifier.size(6.dp),
+                        shape = RoundedCornerShape(50)
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable

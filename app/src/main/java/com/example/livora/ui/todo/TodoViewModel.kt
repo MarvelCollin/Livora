@@ -14,6 +14,7 @@ import com.example.livora.data.supabase.TodoDto
 import com.example.livora.data.supabase.TodoInsertDto
 import com.example.livora.data.supabase.TodoRepository
 import com.example.livora.data.supabase.TodoUpdateDto
+import com.example.livora.ui.components.Toaster
 import com.example.livora.util.Logger
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -40,9 +41,6 @@ class TodoViewModel : ViewModel() {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error.asStateFlow()
-
     private val pendingToggles = MutableStateFlow<Set<String>>(emptySet())
     private val pendingMutations = MutableStateFlow<Set<String>>(emptySet())
 
@@ -58,7 +56,6 @@ class TodoViewModel : ViewModel() {
         if (_isLoading.value) return
         viewModelScope.launch {
             _isLoading.value = true
-            _error.value = null
             try {
                 val (todos, completions) = coroutineScope {
                     val todosDeferred = async { repository.fetchAllTodos() }
@@ -71,15 +68,11 @@ class TodoViewModel : ViewModel() {
                 recompute()
             } catch (t: Throwable) {
                 Logger.debug(TAG, "refresh failed: ${t.message}")
-                _error.value = t.message ?: "Failed to load tasks"
+                Toaster.error(t.message ?: "Failed to load tasks")
             } finally {
                 _isLoading.value = false
             }
         }
-    }
-
-    fun clearError() {
-        _error.value = null
     }
 
     fun upsertTodo(
@@ -135,9 +128,10 @@ class TodoViewModel : ViewModel() {
                     _todos.update { list -> list.map { if (it.id == existing.id) updated.toTodo() else it } }
                 }
                 recompute()
+                Toaster.success(if (existing == null) "Task added" else "Task updated")
             } catch (t: Throwable) {
                 Logger.debug(TAG, "upsertTodo failed: ${t.message}")
-                _error.value = t.message ?: "Failed to save task"
+                Toaster.error(t.message ?: "Failed to save task")
             } finally {
                 pendingMutations.update { it - mutationKey }
             }
@@ -176,7 +170,7 @@ class TodoViewModel : ViewModel() {
                 recompute()
             } catch (t: Throwable) {
                 Logger.debug(TAG, "toggle failed: ${t.message}")
-                _error.value = t.message ?: "Failed to update task"
+                Toaster.error(t.message ?: "Failed to update task")
             } finally {
                 pendingToggles.update { it - todoId }
             }
@@ -193,9 +187,10 @@ class TodoViewModel : ViewModel() {
                 _todos.update { list -> list.filterNot { it.id == todo.id } }
                 _completions.update { list -> list.filterNot { it.todoId == todo.id } }
                 recompute()
+                Toaster.success("Task deleted")
             } catch (t: Throwable) {
                 Logger.debug(TAG, "delete failed: ${t.message}")
-                _error.value = t.message ?: "Failed to delete task"
+                Toaster.error(t.message ?: "Failed to delete task")
             } finally {
                 pendingMutations.update { it - todo.id }
             }
@@ -230,6 +225,7 @@ class TodoViewModel : ViewModel() {
 
     private fun completeFromTimer(todoId: String) {
         val current = _stats.value.firstOrNull { it.todo.id == todoId } ?: return
+        Toaster.success("Timer done — \"${current.todo.title}\"")
         if (!current.isDoneCurrentInterval) {
             toggleCurrentInterval(todoId)
         }

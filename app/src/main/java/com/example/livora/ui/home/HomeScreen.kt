@@ -68,6 +68,8 @@ import com.example.livora.ui.bulb.BulbViewModel
 import com.example.livora.ui.components.Design
 import com.example.livora.ui.components.TopBar
 import com.example.livora.ui.components.DeviceCard
+import com.example.livora.ui.components.SkeletonBox
+import com.example.livora.ui.components.SkeletonLine
 import com.example.livora.ui.components.TaskTimerChip
 import com.example.livora.ui.components.VoiceListeningOverlay
 import com.example.livora.ui.todo.TodoViewModel
@@ -94,6 +96,7 @@ fun HomeScreen(
     val connectedBulb by bulbViewModel.connectedBulb.collectAsState()
     val stats by todoViewModel.stats.collectAsState()
     val runningTimers by todoViewModel.runningTimers.collectAsState()
+    val todoLoading by todoViewModel.isLoading.collectAsState()
 
     val context = LocalContext.current
     val voiceManager = remember { VoiceRecognitionManager(context) }
@@ -252,31 +255,42 @@ fun HomeScreen(
             ) {
                 Spacer(modifier = Modifier.height(8.dp))
 
-                TodayProgressCard(
-                    doneCount = doneCount,
-                    totalCount = totalCount,
-                    activeStreaks = activeStreaks,
-                    bestStreak = bestStreak
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                SectionLabel(text = "Up next")
-                Spacer(modifier = Modifier.height(10.dp))
-                if (pending.isEmpty()) {
-                    AllClearCard(hasTasks = totalCount > 0)
+                if (todoLoading && stats.isEmpty()) {
+                    TodayProgressSkeleton()
+                    Spacer(modifier = Modifier.height(20.dp))
+                    SectionLabel(text = "Up next")
+                    Spacer(modifier = Modifier.height(10.dp))
+                    repeat(3) {
+                        UpNextSkeleton()
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                 } else {
-                    pending.take(4).forEachIndexed { index, item ->
-                        UpNextRow(
-                            stats = item,
-                            remainingMs = runningTimers[item.todo.id],
-                            onToggle = { todoViewModel.toggleCurrentInterval(item.todo.id) },
-                            onStartTimer = { todoViewModel.startTimer(item.todo.id) },
-                            onCancelTimer = { todoViewModel.cancelTimer(item.todo.id) },
-                            onOpen = { onOpenTodoDetail(item.todo.id) }
-                        )
-                        if (index < pending.take(4).lastIndex) {
-                            Spacer(modifier = Modifier.height(8.dp))
+                    TodayProgressCard(
+                        doneCount = doneCount,
+                        totalCount = totalCount,
+                        activeStreaks = activeStreaks,
+                        bestStreak = bestStreak
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    SectionLabel(text = "Up next")
+                    Spacer(modifier = Modifier.height(10.dp))
+                    if (pending.isEmpty()) {
+                        AllClearCard(hasTasks = totalCount > 0)
+                    } else {
+                        pending.take(4).forEachIndexed { index, item ->
+                            UpNextRow(
+                                stats = item,
+                                remainingMs = runningTimers[item.todo.id],
+                                onToggle = { todoViewModel.toggleCurrentInterval(item.todo.id) },
+                                onStartTimer = { todoViewModel.startTimer(item.todo.id) },
+                                onCancelTimer = { todoViewModel.cancelTimer(item.todo.id) },
+                                onOpen = { onOpenTodoDetail(item.todo.id) }
+                            )
+                            if (index < pending.take(4).lastIndex) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
                         }
                     }
                 }
@@ -629,6 +643,71 @@ private fun SectionLabel(text: String) {
         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
         modifier = Modifier.fillMaxWidth()
     )
+}
+
+@Composable
+private fun TodayProgressSkeleton() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = Design.cardShape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = Design.cardElevation)
+    ) {
+        Column(modifier = Modifier.padding(Design.cardPadding)) {
+            SkeletonLine(width = 110.dp, height = 12.dp)
+            Spacer(modifier = Modifier.height(14.dp))
+            SkeletonLine(width = 90.dp, height = 32.dp)
+            Spacer(modifier = Modifier.height(14.dp))
+            SkeletonBox(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp),
+                shape = RoundedCornerShape(50)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+                repeat(3) {
+                    Column {
+                        SkeletonLine(width = 28.dp, height = 18.dp)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        SkeletonLine(width = 60.dp, height = 11.dp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpNextSkeleton() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = Design.cardShape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = Design.cardElevation)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            SkeletonBox(
+                modifier = Modifier.size(28.dp),
+                shape = RoundedCornerShape(50)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                SkeletonLine(width = 140.dp, height = 15.dp)
+                Spacer(modifier = Modifier.height(6.dp))
+                SkeletonLine(width = 180.dp, height = 12.dp)
+            }
+        }
+    }
 }
 
 private fun greeting(): String {

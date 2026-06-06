@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -24,13 +25,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.example.livora.ui.ac.AcViewModel
 import com.example.livora.ui.bulb.BulbViewModel
+import com.example.livora.ui.dictionary.DictionaryScreen
+import com.example.livora.ui.dictionary.DictionaryViewModel
 import com.example.livora.ui.home.HomeScreen
 import com.example.livora.ui.todo.TodoScreen
 import com.example.livora.ui.todo.TodoViewModel
 
 private enum class MainTab(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Default.Home),
-    Tasks("Tasks", Icons.Default.Checklist)
+    Tasks("Tasks", Icons.Default.Checklist),
+    Dictionary("Dictionary", Icons.Default.Translate)
 }
 
 @Composable
@@ -38,9 +42,11 @@ fun MainScreen(
     acViewModel: AcViewModel,
     bulbViewModel: BulbViewModel,
     todoViewModel: TodoViewModel,
+    dictionaryViewModel: DictionaryViewModel,
     onNavigateToAc: () -> Unit,
     onNavigateToBulb: () -> Unit,
-    onOpenTodoDetail: (String) -> Unit
+    onOpenTodoDetail: (String) -> Unit,
+    onOpenQuiz: () -> Unit
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val tabs = MainTab.entries
@@ -96,6 +102,10 @@ fun MainScreen(
                 MainTab.Tasks -> TodoScreen(
                     viewModel = todoViewModel,
                     onOpenDetail = onOpenTodoDetail
+                )
+                MainTab.Dictionary -> DictionaryScreen(
+                    viewModel = dictionaryViewModel,
+                    onOpenQuiz = onOpenQuiz
                 )
             }
         }

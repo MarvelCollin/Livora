@@ -14,6 +14,9 @@ data class DictionaryDto(
     @SerializedName("language") val language: String,
     @SerializedName("translation") val translation: String,
     @SerializedName("description") val description: String,
+    @SerializedName("description_id") val descriptionId: String = "",
+    @SerializedName("example") val example: String = "",
+    @SerializedName("synonyms") val synonyms: String = "",
     @SerializedName("created_at") val createdAt: Long
 )
 
@@ -23,6 +26,9 @@ data class DictionaryInsertDto(
     @SerializedName("language") val language: String,
     @SerializedName("translation") val translation: String,
     @SerializedName("description") val description: String,
+    @SerializedName("description_id") val descriptionId: String,
+    @SerializedName("example") val example: String,
+    @SerializedName("synonyms") val synonyms: String,
     @SerializedName("created_at") val createdAt: Long
 )
 

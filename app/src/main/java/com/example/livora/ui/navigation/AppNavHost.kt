@@ -11,6 +11,8 @@ import com.example.livora.ui.ac.AcControllerScreen
 import com.example.livora.ui.ac.AcViewModel
 import com.example.livora.ui.bulb.BulbControllerScreen
 import com.example.livora.ui.bulb.BulbViewModel
+import com.example.livora.ui.dictionary.DictionaryQuizScreen
+import com.example.livora.ui.dictionary.DictionaryViewModel
 import com.example.livora.ui.todo.TodoDetailScreen
 import com.example.livora.ui.todo.TodoViewModel
 
@@ -19,6 +21,7 @@ fun AppNavHost(navController: NavHostController) {
     val acViewModel: AcViewModel = viewModel()
     val bulbViewModel: BulbViewModel = viewModel()
     val todoViewModel: TodoViewModel = viewModel()
+    val dictionaryViewModel: DictionaryViewModel = viewModel()
 
     NavHost(
         navController = navController,
@@ -29,9 +32,11 @@ fun AppNavHost(navController: NavHostController) {
                 acViewModel = acViewModel,
                 bulbViewModel = bulbViewModel,
                 todoViewModel = todoViewModel,
+                dictionaryViewModel = dictionaryViewModel,
                 onNavigateToAc = { navController.navigate(Screen.AcController.route) },
                 onNavigateToBulb = { navController.navigate(Screen.BulbController.route) },
-                onOpenTodoDetail = { id -> navController.navigate(Screen.TodoDetail.create(id)) }
+                onOpenTodoDetail = { id -> navController.navigate(Screen.TodoDetail.create(id)) },
+                onOpenQuiz = { navController.navigate(Screen.DictionaryQuiz.route) }
             )
         }
         composable(Screen.AcController.route) {
@@ -43,6 +48,12 @@ fun AppNavHost(navController: NavHostController) {
         composable(Screen.BulbController.route) {
             BulbControllerScreen(
                 viewModel = bulbViewModel,
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable(Screen.DictionaryQuiz.route) {
+            DictionaryQuizScreen(
+                viewModel = dictionaryViewModel,
                 onBack = { navController.popBackStack() }
             )
         }
