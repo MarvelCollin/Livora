@@ -26,15 +26,31 @@ class AnalyzerHolder(private val context: Context) {
 object EnrollDraft {
     var uris: List<android.net.Uri> = emptyList()
     var personId: Long? = null
+    var buckets: Set<Long> = emptySet()
+    var folderName: String? = null
 
-    fun set(uris: List<android.net.Uri>, personId: Long? = null) {
+    fun set(
+        uris: List<android.net.Uri>,
+        personId: Long? = null,
+        buckets: Set<Long> = emptySet(),
+        folderName: String? = null
+    ) {
         this.uris = uris
         this.personId = personId
+        this.buckets = buckets
+        this.folderName = folderName
     }
 
     fun take(): List<android.net.Uri> {
         val out = uris
         uris = emptyList()
+        return out
+    }
+
+    fun takeScope(): Pair<Set<Long>, String?> {
+        val out = Pair(buckets, folderName)
+        buckets = emptySet()
+        folderName = null
         return out
     }
 }

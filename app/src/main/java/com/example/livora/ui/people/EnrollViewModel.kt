@@ -10,6 +10,7 @@ import com.example.livora.data.people.EnrollFace
 import com.example.livora.data.people.EnrollPhoto
 import com.example.livora.data.people.PeopleServices
 import com.example.livora.data.people.ReferenceInput
+import com.example.livora.data.people.scan.ScanController
 import com.example.livora.ui.components.Toaster
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +31,8 @@ class EnrollViewModel(application: Application, handle: SavedStateHandle) : Andr
     private val repository = services.repository
 
     val personId: Long? = handle.get<Long>(PeopleRoutes.ARG_PERSON)?.takeIf { it > 0L }
+
+    private val scope = EnrollDraft.takeScope()
 
     private val itemsState = MutableStateFlow<List<EnrollItem>>(emptyList())
     val items: StateFlow<List<EnrollItem>> = itemsState.asStateFlow()
@@ -115,6 +118,10 @@ class EnrollViewModel(application: Application, handle: SavedStateHandle) : Andr
                     if (personId != null) "Added ${references.size} reference ${if (references.size == 1) "photo" else "photos"}"
                     else "Saved ${nameState.value.trim()} with ${references.size} reference ${if (references.size == 1) "photo" else "photos"}"
                 )
+                if (scope.first.isNotEmpty()) {
+                    ScanController.startFolders(getApplication(), scope.first)
+                    Toaster.info("Checking ${scope.second ?: "the folder"} for this person")
+                }
                 doneState.value = id
             } catch (e: Exception) {
                 Toaster.error("This could not be saved")

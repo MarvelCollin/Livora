@@ -44,11 +44,14 @@ fun FolderPickerSheet(
     onPick: (FolderInfo) -> Unit,
     onCreate: (String) -> Unit,
     onDismiss: () -> Unit,
-    excludeKey: String? = null
+    excludeKey: String? = null,
+    pickOnly: Boolean = false
 ) {
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var creating by remember { mutableStateOf(false) }
-    val targets = folders.filter { MediaFolders.isWritableTarget(it.relativePath) && it.key != excludeKey }
+    val targets = folders.filter {
+        it.key != excludeKey && if (pickOnly) !it.virtual else MediaFolders.isWritableTarget(it.relativePath)
+    }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = state,
@@ -62,27 +65,29 @@ fun FolderPickerSheet(
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
             )
-            Text(
-                text = "Only folders inside Pictures or DCIM can receive photos.",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 20.dp)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .defaultMinSize(minHeight = 56.dp)
-                    .clickable { creating = true }
-                    .padding(horizontal = 20.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            if (!pickOnly) {
                 Text(
-                    text = "New folder",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
+                    text = "Only folders inside Pictures or DCIM can receive photos.",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 20.dp)
                 )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = 56.dp)
+                        .clickable { creating = true }
+                        .padding(horizontal = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "New folder",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
             LazyColumn(modifier = Modifier.weight(1f, fill = false)) {

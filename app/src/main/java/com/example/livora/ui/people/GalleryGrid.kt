@@ -174,6 +174,25 @@ private fun PhotoCell(
 }
 
 @Composable
+fun PickPersonBar(count: Int, onUse: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.background(MaterialTheme.colorScheme.surface)) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+            PrimaryAction(
+                text = when (count) {
+                    0 -> "Tap the photos of the person"
+                    1 -> "Use 1 photo of the person"
+                    else -> "Use $count photos of the person"
+                },
+                onClick = onUse,
+                enabled = count > 0,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
 fun PhotoSelectionBar(
     canModify: Boolean,
     onCopy: () -> Unit,

@@ -84,7 +84,7 @@ fun PeopleScreen(
     onOpenPhoto: (Long) -> Unit,
     onOpenPerson: (Long) -> Unit,
     onOpenFolder: (String) -> Unit,
-    onAddPerson: () -> Unit,
+    onPickFolder: (String) -> Unit,
     onOpenMerge: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
@@ -110,6 +110,7 @@ fun PeopleScreen(
     var renaming by remember { mutableStateOf<PersonSummary?>(null) }
     var creatingFolder by remember { mutableStateOf(false) }
     var picker by remember { mutableStateOf<PickerMode?>(null) }
+    var choosingFolder by remember { mutableStateOf(false) }
     val selecting = selected.isNotEmpty()
     val selectingPhotos = photoSelected.isNotEmpty() && segment == 0
 
@@ -214,10 +215,10 @@ fun PeopleScreen(
                     },
                     actions = {
                         if (access != AccessLevel.None && segment != 0) {
-                            IconButton(onClick = { if (segment == 2) onAddPerson() else creatingFolder = true }) {
+                            IconButton(onClick = { if (segment == 2) choosingFolder = true else creatingFolder = true }) {
                                 Icon(
                                     imageVector = Icons.Default.Add,
-                                    contentDescription = if (segment == 2) "Add a person from photos" else "New folder",
+                                    contentDescription = if (segment == 2) "Check for a person in a folder" else "New folder",
                                     tint = MaterialTheme.colorScheme.onSurface
                                 )
                             }
@@ -327,7 +328,7 @@ fun PeopleScreen(
                         onRename = { renaming = it },
                         onStart = { startScanWithPrompt() },
                         onAllowAll = { openSettings() },
-                        onAddPerson = onAddPerson,
+                        onAddPerson = { choosingFolder = true },
                         onToggleSmall = { viewModel.toggleSmall() },
                         onOpenMerge = onOpenMerge
                     )
@@ -343,6 +344,20 @@ fun PeopleScreen(
                 }
             }
         }
+    }
+
+    if (choosingFolder) {
+        FolderPickerSheet(
+            title = "Choose the folder to look in",
+            folders = galleryViewModel.folderList(),
+            pickOnly = true,
+            onPick = { folder ->
+                choosingFolder = false
+                onPickFolder(folder.key)
+            },
+            onCreate = {},
+            onDismiss = { choosingFolder = false }
+        )
     }
 
     val mode = picker
@@ -466,7 +481,7 @@ private fun PeopleList(
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
             }
-        } else if (initialDone && status != null && status.indexedPhotos > 0) {
+        } else if (status != null && status.indexedPhotos > 0) {
             item(key = "status") {
                 IndexStatusBlock(status = status, onScanNew = onStart)
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
@@ -511,7 +526,6 @@ private fun PeopleList(
             ready.people.isEmpty() -> item(key = "empty") {
                 PeopleEmptyState(
                     scanning = scanning,
-                    initialDone = initialDone,
                     indexedPhotos = indexedPhotos,
                     indexedFaces = indexedFaces,
                     smallCount = ready.smallCount,
@@ -588,14 +602,13 @@ private fun IndexStatusBlock(status: IndexStatus, onScanNew: () -> Unit) {
                 )
             }
         }
-        LinkButton(text = "Scan new photos", onClick = onScanNew)
+        LinkButton(text = "Scan all photos", onClick = onScanNew)
     }
 }
 
 @Composable
 private fun PeopleEmptyState(
     scanning: Boolean,
-    initialDone: Boolean,
     indexedPhotos: Int,
     indexedFaces: Int,
     smallCount: Int,
@@ -608,40 +621,32 @@ private fun PeopleEmptyState(
         scanning -> {
             repeat(4) { PeopleRowSkeleton() }
         }
-        !initialDone && indexedPhotos == 0 -> EmptyBlock(
-            title = "Find the people in your photos",
-            body = "Livora looks at every photo on this phone and groups the faces of the same person together. It runs in the background and works offline.",
-            actionLabel = "Start scanning",
-            onAction = onStart
-        )
-        !initialDone -> EmptyBlock(
-            title = "The scan is paused",
-            body = "${formatCount(indexedPhotos)} photos are done and saved. Continue to finish the rest. Finished photos are not scanned again.",
-            actionLabel = "Continue scanning",
-            onAction = onStart
-        )
         indexedPhotos == 0 -> EmptyBlock(
-            title = "No photos on this phone yet",
-            body = "Take or save a few photos, then come back."
+            title = "Find someone in your photos",
+            body = "Choose a folder, tap a few photos of the person, and Livora looks only inside that folder. Nothing is scanned until you ask.",
+            actionLabel = "Choose a folder",
+            onAction = onAddPerson,
+            secondaryLabel = "Scan every photo instead",
+            onSecondary = onStart
         )
         indexedFaces == 0 -> EmptyBlock(
             title = "No faces found",
             body = "Livora checked ${formatCount(indexedPhotos)} photos and found no faces that are large and clear enough. Screenshots are skipped.",
-            actionLabel = "Scan new photos",
-            onAction = onStart
+            actionLabel = "Choose another folder",
+            onAction = onAddPerson
         )
         smallCount > 0 -> EmptyBlock(
             title = "No one appears in $minPhotos photos yet",
-            body = "Livora found $smallCount smaller groups. You can also add a person yourself from reference photos.",
+            body = "Livora found $smallCount smaller groups. You can also choose a folder and pick a person's photos yourself.",
             actionLabel = "Show smaller groups",
             onAction = onShowSmall,
-            secondaryLabel = "Add a person from photos",
+            secondaryLabel = "Choose a folder",
             onSecondary = onAddPerson
         )
         else -> EmptyBlock(
             title = "No people yet",
-            body = "Add a person from a few reference photos and Livora will look for them in the rest of your gallery.",
-            actionLabel = "Add a person",
+            body = "Choose a folder and pick a few photos of one person. Livora will look for them inside that folder.",
+            actionLabel = "Choose a folder",
             onAction = onAddPerson
         )
     }

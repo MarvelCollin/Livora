@@ -13,11 +13,12 @@ object PeopleRoutes {
     const val ARG_ID = "id"
     const val ARG_KEY = "key"
     const val ARG_PERSON = "personId"
+    const val ARG_PICK = "pick"
 
     const val PERSON = "people/person/{id}"
     const val SUGGESTIONS = "people/suggestions/{id}"
     const val RECOGNITION = "people/recognition/{id}"
-    const val FOLDER = "people/folder/{key}"
+    const val FOLDER = "people/folder/{key}?pick={pick}"
     const val VIEWER = "people/viewer/{key}/{id}"
     const val ENROLL = "people/enroll?personId={personId}"
     const val MERGE = "people/merge"
@@ -26,7 +27,7 @@ object PeopleRoutes {
     fun person(id: Long) = "people/person/$id"
     fun suggestions(id: Long) = "people/suggestions/$id"
     fun recognition(id: Long) = "people/recognition/$id"
-    fun folder(key: String) = "people/folder/${Uri.encode(key)}"
+    fun folder(key: String, pick: Boolean = false) = "people/folder/${Uri.encode(key)}?pick=$pick"
     fun viewer(key: String, id: Long) = "people/viewer/${Uri.encode(key)}/$id"
     fun enroll(personId: Long? = null) = if (personId == null) "people/enroll" else "people/enroll?personId=$personId"
 }
@@ -43,7 +44,7 @@ fun GalleryTab(onNavigate: (String) -> Unit) {
         onOpenPhoto = { onNavigate(PeopleRoutes.viewer(ALL_PHOTOS_KEY, it)) },
         onOpenPerson = { onNavigate(PeopleRoutes.person(it)) },
         onOpenFolder = { onNavigate(PeopleRoutes.folder(it)) },
-        onAddPerson = { onNavigate(PeopleRoutes.enroll()) },
+        onPickFolder = { onNavigate(PeopleRoutes.folder(it, pick = true)) },
         onOpenMerge = { onNavigate(PeopleRoutes.MERGE) },
         onOpenSettings = { onNavigate(PeopleRoutes.SETTINGS) }
     )
@@ -78,7 +79,13 @@ fun NavGraphBuilder.peopleGraph(navController: NavHostController) {
     }
     composable(
         PeopleRoutes.FOLDER,
-        arguments = listOf(navArgument(PeopleRoutes.ARG_KEY) { type = NavType.StringType })
+        arguments = listOf(
+            navArgument(PeopleRoutes.ARG_KEY) { type = NavType.StringType },
+            navArgument(PeopleRoutes.ARG_PICK) {
+                type = NavType.BoolType
+                defaultValue = false
+            }
+        )
     ) {
         val viewModel: FolderDetailViewModel = viewModel()
         FolderDetailScreen(

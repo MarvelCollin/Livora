@@ -48,6 +48,7 @@ fun FolderDetailScreen(
     var renaming by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     val selecting = selected.isNotEmpty()
+    val pick = viewModel.pickMode
     val all = viewModel.isAll
     val title = if (all) "All photos" else folder?.name ?: "Folder"
     val count = if (all) images.size else folder?.count ?: images.size
@@ -73,30 +74,36 @@ fun FolderDetailScreen(
                         }
                     },
                     actions = {
-                        LinkButton(text = "All", onClick = { viewModel.selectAll() })
-                        LinkButton(
-                            text = "Use as reference photos",
-                            onClick = { if (viewModel.useAsReferences()) onUseAsReferences() },
-                            modifier = Modifier.padding(end = 8.dp)
-                        )
+                        if (!pick) {
+                            LinkButton(text = "All", onClick = { viewModel.selectAll() })
+                            LinkButton(
+                                text = "Use as reference photos",
+                                onClick = { if (viewModel.useAsReferences()) onUseAsReferences() },
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                        }
                     }
                 )
             } else {
                 TopBar(
                     title = title,
-                    subtitle = if (folder?.virtual == true) "Empty folder" else photosLabel(count),
+                    subtitle = when {
+                        pick -> "Tap the photos of the person"
+                        folder?.virtual == true -> "Empty folder"
+                        else -> photosLabel(count)
+                    },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.onSurface)
                         }
                     },
                     actions = {
-                        if (canAdd) {
+                        if (canAdd && !pick) {
                             IconButton(onClick = { pickLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
                                 Icon(Icons.Default.Add, contentDescription = "Add photos to this folder", tint = MaterialTheme.colorScheme.onSurface)
                             }
                         }
-                        if (!all) {
+                        if (!all && !pick) {
                             Column {
                                 IconButton(onClick = { menuOpen = true }) {
                                     Icon(Icons.Default.MoreVert, contentDescription = "More options", tint = MaterialTheme.colorScheme.onSurface)
@@ -118,7 +125,13 @@ fun FolderDetailScreen(
             }
         },
         bottomBar = {
-            if (selecting) {
+            if (pick) {
+                PickPersonBar(
+                    count = selected.size,
+                    onUse = { if (viewModel.useAsReferences()) onUseAsReferences() },
+                    modifier = Modifier.navigationBarsPadding()
+                )
+            } else if (selecting) {
                 PhotoSelectionBar(
                     canModify = viewModel.supportsConsent,
                     onCopy = { picker = PickerMode.Copy },
@@ -132,7 +145,7 @@ fun FolderDetailScreen(
         GalleryGrid(
             rows = rows,
             selected = selected,
-            onOpen = onOpenPhoto,
+            onOpen = { if (pick) viewModel.toggle(it) else onOpenPhoto(it) },
             onToggle = { viewModel.toggle(it) },
             onToggleGroup = { viewModel.toggleGroup(it) },
             modifier = Modifier.padding(innerPadding),

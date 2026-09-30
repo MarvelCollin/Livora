@@ -41,6 +41,7 @@ class FolderDetailViewModel(application: Application, handle: SavedStateHandle) 
     private val repository = services.repository
 
     val key: String = Uri.decode(handle.get<String>(PeopleRoutes.ARG_KEY) ?: ALL_PHOTOS_KEY)
+    val pickMode: Boolean = handle.get<Boolean>(PeopleRoutes.ARG_PICK) ?: false
 
     private val folderState = MutableStateFlow<FolderInfo?>(null)
     val folder: StateFlow<FolderInfo?> = folderState.asStateFlow()
@@ -287,7 +288,12 @@ class FolderDetailViewModel(application: Application, handle: SavedStateHandle) 
     fun useAsReferences(): Boolean {
         val ids = selectedState.value.toList()
         if (ids.isEmpty()) return false
-        EnrollDraft.set(ids.map { MediaImages.uri(it) })
+        val bucket = if (key.startsWith("b:")) key.removePrefix("b:").toLongOrNull() else null
+        EnrollDraft.set(
+            ids.map { MediaImages.uri(it) },
+            buckets = if (bucket == null) emptySet() else setOf(bucket),
+            folderName = folderState.value?.name
+        )
         selectedState.value = emptySet()
         return true
     }
