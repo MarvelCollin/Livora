@@ -18,6 +18,7 @@ object PeopleRoutes {
     const val SUGGESTIONS = "people/suggestions/{id}"
     const val RECOGNITION = "people/recognition/{id}"
     const val FOLDER = "people/folder/{key}"
+    const val VIEWER = "people/viewer/{key}/{id}"
     const val ENROLL = "people/enroll?personId={personId}"
     const val MERGE = "people/merge"
     const val SETTINGS = "people/settings"
@@ -26,16 +27,20 @@ object PeopleRoutes {
     fun suggestions(id: Long) = "people/suggestions/$id"
     fun recognition(id: Long) = "people/recognition/$id"
     fun folder(key: String) = "people/folder/${Uri.encode(key)}"
+    fun viewer(key: String, id: Long) = "people/viewer/${Uri.encode(key)}/$id"
     fun enroll(personId: Long? = null) = if (personId == null) "people/enroll" else "people/enroll?personId=$personId"
 }
 
 @Composable
-fun PeopleTab(onNavigate: (String) -> Unit) {
+fun GalleryTab(onNavigate: (String) -> Unit) {
     val peopleViewModel: PeopleViewModel = viewModel()
     val foldersViewModel: FoldersViewModel = viewModel()
+    val galleryViewModel: FolderDetailViewModel = viewModel()
     PeopleScreen(
         viewModel = peopleViewModel,
         foldersViewModel = foldersViewModel,
+        galleryViewModel = galleryViewModel,
+        onOpenPhoto = { onNavigate(PeopleRoutes.viewer(ALL_PHOTOS_KEY, it)) },
         onOpenPerson = { onNavigate(PeopleRoutes.person(it)) },
         onOpenFolder = { onNavigate(PeopleRoutes.folder(it)) },
         onAddPerson = { onNavigate(PeopleRoutes.enroll()) },
@@ -79,8 +84,19 @@ fun NavGraphBuilder.peopleGraph(navController: NavHostController) {
         FolderDetailScreen(
             viewModel = viewModel,
             onBack = { navController.popBackStack() },
+            onOpenPhoto = { navController.navigate(PeopleRoutes.viewer(viewModel.key, it)) },
             onUseAsReferences = { navController.navigate(PeopleRoutes.enroll()) }
         )
+    }
+    composable(
+        PeopleRoutes.VIEWER,
+        arguments = listOf(
+            navArgument(PeopleRoutes.ARG_KEY) { type = NavType.StringType },
+            navArgument(PeopleRoutes.ARG_ID) { type = NavType.LongType }
+        )
+    ) {
+        val viewModel: PhotoViewerViewModel = viewModel()
+        PhotoViewerScreen(viewModel = viewModel, onBack = { navController.popBackStack() })
     }
     composable(
         PeopleRoutes.ENROLL,
