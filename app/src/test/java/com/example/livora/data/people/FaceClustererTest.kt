@@ -4,6 +4,7 @@ import com.example.livora.data.people.cluster.ClusterParams
 import com.example.livora.data.people.cluster.ExistingCluster
 import com.example.livora.data.people.cluster.FaceClusterer
 import com.example.livora.data.people.cluster.FaceRecord
+import com.example.livora.data.people.cluster.Linkage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -22,7 +23,7 @@ class FaceClustererTest {
         params: ClusterParams = ClusterParams()
     ): FaceClusterer {
         temp = 0L
-        return FaceClusterer(params, existing, rejected, newId)
+        return FaceClusterer(params, existing, rejected, emptySet(), newId)
     }
 
     @Test
@@ -222,5 +223,99 @@ class FaceClustererTest {
         val elapsed = System.currentTimeMillis() - started
         assertTrue("took $elapsed ms", elapsed < 20000)
         assertEquals(faces.size, outcome.assignments.size)
+    }
+
+    private fun withPhoto(face: FaceRecord, photoId: Long) = FaceRecord(face.id, face.vector, face.quality, photoId)
+
+    @Test
+    fun facesOfDifferentPeopleInOnePhotoNeverShareACluster() {
+        val gen = SyntheticFaces(30)
+        val base = gen.randomUnit()
+        val other = com.example.livora.data.people.ml.VectorMath.normalized(
+            FloatArray(base.size) { base[it] * 0.75f + gen.randomUnit()[it] * 0.55f }
+        )
+        val faces = ArrayList<FaceRecord>()
+        val truth = HashMap<Long, Int>()
+        for (photo in 1L..12L) {
+            val a = withPhoto(gen.face(gen.around(base, 0.5f)), photo)
+            val b = withPhoto(gen.face(gen.around(other, 0.5f)), photo)
+            truth[a.id] = 0
+            truth[b.id] = 1
+            faces.add(a)
+            faces.add(b)
+        }
+        val outcome = clusterer().assign(faces).merge().refine().outcome()
+        val perPhoto = HashMap<Long, MutableSet<Long?>>()
+        for (face in faces) perPhoto.getOrPut(face.photoId) { HashSet() }.add(outcome.assignments[face.id])
+        assertTrue(perPhoto.values.all { it.size == 2 })
+    }
+
+    @Test
+    fun nearIdenticalFacesInOnePhotoAreTreatedAsTheSamePerson() {
+        val gen = SyntheticFaces(31)
+        val center = gen.randomUnit()
+        val faces = ArrayList<FaceRecord>()
+        for (photo in 1L..15L) {
+            val v = gen.around(center, 0.5f)
+            faces.add(withPhoto(gen.face(v), photo))
+            faces.add(withPhoto(gen.face(gen.around(v, 0.1f)), photo))
+        }
+        val outcome = clusterer().assign(faces).merge().refine().outcome()
+        assertEquals(1, outcome.assignments.values.filterNotNull().toSet().size)
+    }
+
+    @Test
+    fun strictnessOnlyEverSplitsGroupsFurther() {
+        val gen = SyntheticFaces(32)
+        val faces = ArrayList<FaceRecord>()
+        repeat(10) {
+            val center = gen.randomUnit()
+            faces.addAll(gen.faces(center, 25, sigma = 1.0f))
+        }
+        var previous = 0
+        for (s in listOf(0f, 0.25f, 0.5f, 0.75f, 1f)) {
+            val outcome = clusterer(params = ClusterParams.forStrictness(s)).assign(faces).merge().refine().outcome()
+            val count = outcome.assignments.values.filterNotNull().toSet().size
+            assertTrue("clusters at strictness $s was $count, previous $previous", count >= previous)
+            previous = count
+        }
+    }
+
+    @Test
+    fun looserSettingsMergeWhatStricterSettingsSplit() {
+        val gen = SyntheticFaces(33)
+        val faces = ArrayList<FaceRecord>()
+        repeat(6) { faces.addAll(gen.faces(gen.randomUnit(), 30, sigma = 1.1f)) }
+        val loose = clusterer(params = ClusterParams.forStrictness(0.1f)).assign(faces).merge().refine().outcome()
+        val strict = clusterer(params = ClusterParams.forStrictness(0.9f)).assign(faces).merge().refine().outcome()
+        assertTrue(loose.assignments.values.filterNotNull().toSet().size <= strict.assignments.values.filterNotNull().toSet().size)
+    }
+
+    @Test
+    fun separatedClustersAreNeverMerged() {
+        val gen = SyntheticFaces(34)
+        val center = gen.randomUnit()
+        val a = gen.faces(center, 10, sigma = 0.5f)
+        val b = gen.faces(center, 10, sigma = 0.5f)
+        temp = 0L
+        val outcome = FaceClusterer(
+            ClusterParams(),
+            listOf(ExistingCluster(1L, a, false), ExistingCluster(2L, b, false)),
+            emptyMap(),
+            setOf(Pair(1L, 2L)),
+            newId
+        ).merge().outcome()
+        assertTrue(outcome.merges.isEmpty())
+    }
+
+    @Test
+    fun crossClusterLinkageIsHighForOneIdentityAndLowForTwo() {
+        val gen = SyntheticFaces(35)
+        val center = gen.randomUnit()
+        val a = gen.faces(center, 15, sigma = 0.6f)
+        val b = gen.faces(center, 15, sigma = 0.6f)
+        val c = gen.faces(gen.randomUnit(), 15, sigma = 0.6f)
+        assertTrue(Linkage.between(a, b) > 0.6f)
+        assertTrue(Linkage.between(a, c) < 0.4f)
     }
 }

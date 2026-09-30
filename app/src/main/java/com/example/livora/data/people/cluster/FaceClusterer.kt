@@ -3,7 +3,7 @@ package com.example.livora.data.people.cluster
 import com.example.livora.data.people.ml.VectorMath
 import kotlin.math.sqrt
 
-class FaceRecord(val id: Long, val vector: FloatArray, val quality: Float)
+class FaceRecord(val id: Long, val vector: FloatArray, val quality: Float, val photoId: Long = 0L)
 
 class ExistingCluster(
     val id: Long,
@@ -13,14 +13,38 @@ class ExistingCluster(
 )
 
 class ClusterParams(
-    val joinThreshold: Float = 0.60f,
-    val lowQualityJoinThreshold: Float = 0.66f,
-    val coreQuality: Float = 0.5f,
-    val linkThreshold: Float = 0.50f,
-    val cohesionThreshold: Float = 0.58f,
-    val outlierThreshold: Float = 0.42f,
-    val maxMergeClusters: Int = 3500
-)
+    val joinThreshold: Float = 0.50f,
+    val lowQualityJoinThreshold: Float = 0.56f,
+    val coreQuality: Float = 0.45f,
+    val linkThreshold: Float = 0.54f,
+    val cohesionThreshold: Float = 0.42f,
+    val outlierThreshold: Float = 0.36f,
+    val candidateFloor: Float = 0.25f,
+    val centroidFloor: Float = 0.35f,
+    val duplicateSimilarity: Float = 0.82f,
+    val neighbors: Int = 3,
+    val maxMergeClusters: Int = 2000
+) {
+    val suggestThreshold: Float get() = linkThreshold - 0.12f
+
+    companion object {
+        const val DEFAULT_STRICTNESS = 0.5f
+
+        fun forStrictness(strictness: Float): ClusterParams {
+            val s = strictness.coerceIn(0f, 1f)
+            val join = 0.40f + 0.25f * s
+            return ClusterParams(
+                joinThreshold = join,
+                lowQualityJoinThreshold = join + 0.06f,
+                linkThreshold = join + 0.04f,
+                cohesionThreshold = join - 0.08f,
+                outlierThreshold = join - 0.14f,
+                candidateFloor = (join - 0.25f).coerceAtLeast(0.15f),
+                centroidFloor = join - 0.15f
+            )
+        }
+    }
+}
 
 class ClusterMerge(val from: Long, val into: Long)
 
@@ -30,10 +54,67 @@ class ClusteringOutcome(
     val merges: List<ClusterMerge>
 )
 
+object Linkage {
+
+    fun topMean(values: FloatArray, count: Int): Float {
+        if (count == 0) return 0f
+        var sum = 0f
+        for (i in 0 until count) sum += values[i]
+        return sum / count
+    }
+
+    fun insertTop(top: FloatArray, size: Int, value: Float): Int {
+        val k = top.size
+        if (size < k) {
+            var i = size
+            while (i > 0 && top[i - 1] < value) {
+                top[i] = top[i - 1]
+                i--
+            }
+            top[i] = value
+            return size + 1
+        }
+        if (value <= top[k - 1]) return size
+        var i = k - 1
+        while (i > 0 && top[i - 1] < value) {
+            top[i] = top[i - 1]
+            i--
+        }
+        top[i] = value
+        return size
+    }
+
+    fun clusterToCluster(
+        centroidA: FloatArray,
+        membersA: List<FaceRecord>,
+        centroidB: FloatArray,
+        membersB: List<FaceRecord>,
+        k: Int
+    ): Float {
+        val top = FloatArray(k)
+        var size = 0
+        for (a in membersA) {
+            for (b in membersB) size = insertTop(top, size, VectorMath.dot(a.vector, b.vector))
+        }
+        return 0.5f * VectorMath.dot(centroidA, centroidB) + 0.5f * topMean(top, size)
+    }
+
+    fun centroidOf(members: List<FaceRecord>): FloatArray {
+        if (members.isEmpty()) return FloatArray(VectorMath.EMBEDDING_SIZE)
+        val sum = FloatArray(members[0].vector.size)
+        for (m in members) for (i in sum.indices) sum[i] += m.vector[i]
+        return VectorMath.normalized(sum)
+    }
+
+    fun between(a: List<FaceRecord>, b: List<FaceRecord>, k: Int = 3): Float =
+        clusterToCluster(centroidOf(a), a, centroidOf(b), b, k)
+}
+
 class FaceClusterer(
     private val params: ClusterParams,
     existing: List<ExistingCluster>,
     private val rejectedFaces: Map<Long, Set<Long>> = emptyMap(),
+    private val separated: Set<Pair<Long, Long>> = emptySet(),
     private val newClusterId: () -> Long
 ) {
 
@@ -41,6 +122,7 @@ class FaceClusterer(
         val sum = FloatArray(dimension)
         val members = ArrayList<FaceRecord>()
         val memberIds = HashSet<Long>()
+        val photoFaces = HashMap<Long, MutableList<FaceRecord>>()
         val frozen = HashSet<Long>()
         private var cachedCentroid: FloatArray? = null
 
@@ -50,6 +132,7 @@ class FaceClusterer(
             for (i in 0 until dimension) sum[i] += face.vector[i]
             members.add(face)
             memberIds.add(face.id)
+            if (face.photoId != 0L) photoFaces.getOrPut(face.photoId) { ArrayList(1) }.add(face)
             cachedCentroid = null
         }
 
@@ -58,8 +141,17 @@ class FaceClusterer(
             members.remove(face)
             memberIds.remove(face.id)
             frozen.remove(face.id)
+            if (face.photoId != 0L) {
+                val list = photoFaces[face.photoId]
+                if (list != null) {
+                    list.remove(face)
+                    if (list.isEmpty()) photoFaces.remove(face.photoId)
+                }
+            }
             cachedCentroid = null
         }
+
+        val photoCount: Int get() = photoFaces.size
 
         fun centroid(): FloatArray {
             val cached = cachedCentroid
@@ -100,23 +192,56 @@ class FaceClusterer(
         }
     }
 
+    private fun score(vector: FloatArray, cluster: Cluster, skip: FaceRecord? = null): Float {
+        val centroid = if (skip == null) {
+            cluster.centroid()
+        } else {
+            val rest = FloatArray(dimension) { cluster.sum[it] - skip.vector[it] }
+            VectorMath.normalized(rest)
+        }
+        val centroidSim = VectorMath.dot(vector, centroid)
+        if (centroidSim < params.centroidFloor) return centroidSim
+        val top = FloatArray(params.neighbors)
+        var size = 0
+        for (m in cluster.members) {
+            if (skip != null && m.id == skip.id) continue
+            size = Linkage.insertTop(top, size, VectorMath.dot(vector, m.vector))
+        }
+        return 0.5f * centroidSim + 0.5f * Linkage.topMean(top, size)
+    }
+
+    private fun photoConflict(face: FaceRecord, cluster: Cluster): Boolean {
+        if (face.photoId == 0L) return false
+        val others = cluster.photoFaces[face.photoId] ?: return false
+        for (other in others) {
+            if (VectorMath.dot(face.vector, other.vector) < params.duplicateSimilarity) return true
+        }
+        return false
+    }
+
+    private fun bestCluster(face: FaceRecord): Pair<Cluster?, Float> {
+        var best: Cluster? = null
+        var bestScore = -2f
+        for (cluster in clusters.values) {
+            if (cluster.count == 0) continue
+            if (isRejected(face.id, cluster.id)) continue
+            if (photoConflict(face, cluster)) continue
+            val s = score(face.vector, cluster)
+            if (s > bestScore) {
+                bestScore = s
+                best = cluster
+            }
+        }
+        return Pair(best, bestScore)
+    }
+
     fun assign(faces: List<FaceRecord>): FaceClusterer {
         val ordered = faces.sortedByDescending { it.quality }
         for (face in ordered) {
             val isCore = face.quality >= params.coreQuality
             val threshold = if (isCore) params.joinThreshold else params.lowQualityJoinThreshold
-            var best: Cluster? = null
-            var bestSim = -2f
-            for (cluster in clusters.values) {
-                if (cluster.count == 0) continue
-                if (isRejected(face.id, cluster.id)) continue
-                val sim = VectorMath.dot(face.vector, cluster.centroid())
-                if (sim > bestSim) {
-                    bestSim = sim
-                    best = cluster
-                }
-            }
-            if (best != null && bestSim >= threshold) {
+            val (best, bestScore) = bestCluster(face)
+            if (best != null && bestScore >= threshold) {
                 best.add(face)
                 assignments[face.id] = best.id
             } else if (isCore) {
@@ -142,16 +267,22 @@ class FaceClusterer(
         if (n < 2) return this
         val slots = candidates.toTypedArray()
         val alive = BooleanArray(n) { true }
-        val sums = Array(n) { slots[it].sum.copyOf() }
-        val counts = IntArray(n) { slots[it].count }
         val locked = BooleanArray(n) { slots[it].locked }
         val isNew = BooleanArray(n) { slots[it].id in created }
-        val memberSets = Array(n) { HashSet(slots[it].memberIds) }
         val ids = LongArray(n) { slots[it].id }
         val sim = FloatArray(n * n)
+
+        fun linkage(i: Int, j: Int): Float {
+            val a = slots[i]
+            val b = slots[j]
+            val centroidCos = VectorMath.dot(a.centroid(), b.centroid())
+            if (centroidCos < params.candidateFloor) return -1f
+            return Linkage.clusterToCluster(a.centroid(), a.members, b.centroid(), b.members, params.neighbors)
+        }
+
         for (i in 0 until n) {
             for (j in i + 1 until n) {
-                val value = VectorMath.dot(sums[i], sums[j]) / (counts[i].toFloat() * counts[j])
+                val value = linkage(i, j)
                 sim[i * n + j] = value
                 sim[j * n + i] = value
             }
@@ -188,16 +319,16 @@ class FaceClusterer(
             }
             if (bestI < 0) break
             val bestJ = rowBestJ[bestI]
-            var valid = !(locked[bestI] && locked[bestJ]) &&
-                !conflicts(ids[bestI], memberSets[bestI], ids[bestJ], memberSets[bestJ])
+            val a = slots[bestI]
+            val b = slots[bestJ]
+            var valid = !(locked[bestI] && locked[bestJ]) && !blocked(a, b)
             if (valid) {
                 var squared = 0f
                 for (k in 0 until dimension) {
-                    val v = sums[bestI][k] + sums[bestJ][k]
+                    val v = a.sum[k] + b.sum[k]
                     squared += v * v
                 }
-                val cohesion = sqrt(squared) / (counts[bestI] + counts[bestJ])
-                valid = cohesion >= params.cohesionThreshold
+                valid = sqrt(squared) / (a.count + b.count) >= params.cohesionThreshold
             }
             if (!valid) {
                 sim[bestI * n + bestJ] = -1f
@@ -214,20 +345,18 @@ class FaceClusterer(
             } else if (isNew[bestI] != isNew[bestJ]) {
                 keep = if (isNew[bestI]) bestJ else bestI
                 drop = if (keep == bestI) bestJ else bestI
-            } else if (counts[bestI] >= counts[bestJ]) {
+            } else if (a.count >= b.count) {
                 keep = bestI
                 drop = bestJ
             } else {
                 keep = bestJ
                 drop = bestI
             }
-            for (k in 0 until dimension) sums[keep][k] += sums[drop][k]
-            counts[keep] += counts[drop]
-            memberSets[keep].addAll(memberSets[drop])
             alive[drop] = false
+            absorb(ids[drop], ids[keep])
             for (other in 0 until n) {
                 if (!alive[other] || other == keep) continue
-                val value = VectorMath.dot(sums[keep], sums[other]) / (counts[keep].toFloat() * counts[other])
+                val value = linkage(keep, other)
                 sim[keep * n + other] = value
                 sim[other * n + keep] = value
             }
@@ -244,9 +373,29 @@ class FaceClusterer(
                     }
                 }
             }
-            absorb(ids[drop], ids[keep])
         }
         return this
+    }
+
+    private fun blocked(a: Cluster, b: Cluster): Boolean {
+        val small = if (a.photoFaces.size <= b.photoFaces.size) a else b
+        val large = if (small === a) b else a
+        for ((photo, smallFaces) in small.photoFaces) {
+            val largeFaces = large.photoFaces[photo] ?: continue
+            for (x in smallFaces) for (y in largeFaces) {
+                if (VectorMath.dot(x.vector, y.vector) < params.duplicateSimilarity) return true
+            }
+        }
+        if (separated.contains(Pair(a.id, b.id)) || separated.contains(Pair(b.id, a.id))) return true
+        val rejectedFromB = rejectedFaces[b.id]
+        if (rejectedFromB != null) {
+            for (face in rejectedFromB) if (face in a.memberIds) return true
+        }
+        val rejectedFromA = rejectedFaces[a.id]
+        if (rejectedFromA != null) {
+            for (face in rejectedFromA) if (face in b.memberIds) return true
+        }
+        return false
     }
 
     private fun absorb(fromId: Long, intoId: Long) {
@@ -262,48 +411,25 @@ class FaceClusterer(
         merges.add(ClusterMerge(fromId, intoId))
     }
 
-    private fun conflicts(idA: Long, membersA: Set<Long>, idB: Long, membersB: Set<Long>): Boolean {
-        val rejectedFromB = rejectedFaces[idB]
-        if (rejectedFromB != null) {
-            for (face in rejectedFromB) if (face in membersA) return true
-        }
-        val rejectedFromA = rejectedFaces[idA]
-        if (rejectedFromA != null) {
-            for (face in rejectedFromA) if (face in membersB) return true
-        }
-        return false
-    }
-
     private fun isRejected(faceId: Long, clusterId: Long): Boolean =
         rejectedFaces[clusterId]?.contains(faceId) == true
 
     fun refine(): FaceClusterer {
-        val ejected = ArrayList<FaceRecord>()
+        val moved = ArrayList<FaceRecord>()
         for (cluster in clusters.values.toList()) {
             if (cluster.count < 3 || cluster.locked) continue
             for (face in cluster.members.toList()) {
                 if (face.id in cluster.frozen) continue
-                val rest = FloatArray(dimension) { cluster.sum[it] - face.vector[it] }
-                val similarity = VectorMath.dot(face.vector, VectorMath.normalized(rest))
-                if (similarity < params.outlierThreshold) {
+                val own = score(face.vector, cluster, face)
+                if (own < params.outlierThreshold) {
                     cluster.remove(face)
-                    ejected.add(face)
+                    moved.add(face)
                 }
             }
         }
-        for (face in ejected) {
-            var best: Cluster? = null
-            var bestSim = -2f
-            for (cluster in clusters.values) {
-                if (cluster.count == 0) continue
-                if (isRejected(face.id, cluster.id)) continue
-                val sim = VectorMath.dot(face.vector, cluster.centroid())
-                if (sim > bestSim) {
-                    bestSim = sim
-                    best = cluster
-                }
-            }
-            if (best != null && bestSim >= params.joinThreshold) {
+        for (face in moved) {
+            val (best, bestScore) = bestCluster(face)
+            if (best != null && bestScore >= params.joinThreshold) {
                 best.add(face)
                 assignments[face.id] = best.id
             } else {
@@ -333,20 +459,7 @@ class FaceClusterer(
 
     fun clusterSize(id: Long): Int = clusters[id]?.count ?: 0
 
-    companion object {
-        fun similarityToCentroid(vector: FloatArray, members: List<FaceRecord>): Float {
-            if (members.isEmpty()) return 0f
-            val sum = FloatArray(vector.size)
-            for (m in members) for (i in sum.indices) sum[i] += m.vector[i]
-            return VectorMath.dot(vector, VectorMath.normalized(sum))
-        }
+    fun clusterPhotoCount(id: Long): Int = clusters[id]?.photoCount ?: 0
 
-        fun pairwiseCohesion(members: List<FaceRecord>): Float {
-            if (members.isEmpty()) return 0f
-            val sum = FloatArray(members[0].vector.size)
-            for (m in members) for (i in sum.indices) sum[i] += m.vector[i]
-            return VectorMath.norm(sum) / members.size
-        }
-
-    }
+    fun clusterMembers(id: Long): List<FaceRecord> = clusters[id]?.members ?: emptyList()
 }
