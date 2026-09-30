@@ -6,7 +6,15 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.ui.semantics.Role
+import com.example.livora.ui.components.Headline
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -76,7 +84,7 @@ fun CleanerReviewScreen(onBack: () -> Unit, viewModel: CleanerReviewViewModel = 
                     state.loading -> "Getting your files"
                     state.finished -> "Done"
                     state.queue.isEmpty() -> "Nothing to review"
-                    state.done -> "All reviewed"
+                    state.done -> "Review before trashing"
                     else -> "${state.index + 1} of ${formatCount(state.queue.size)}"
                 },
                 navigationIcon = { BackButton(onBack) }
@@ -103,13 +111,12 @@ fun CleanerReviewScreen(onBack: () -> Unit, viewModel: CleanerReviewViewModel = 
                     onBack = onBack
                 )
 
-                state.done -> Summary(
+                state.done -> TrashQueue(
                     kept = state.keptCount,
                     files = state.toTrash,
                     total = state.queue.size,
                     onTrash = viewModel::trash,
-                    onUndo = viewModel::undo,
-                    onRestart = viewModel::restart,
+                    onKeep = { viewModel.setKeep(it, true) },
                     onBack = onBack
                 )
 
@@ -313,59 +320,78 @@ private fun ReviewCard(item: CleanerFile, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun Summary(
+private fun TrashQueue(
     kept: Int,
     files: List<CleanerFile>,
     total: Int,
     onTrash: () -> Unit,
-    onUndo: () -> Unit,
-    onRestart: () -> Unit,
+    onKeep: (CleanerFile) -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val trashed = files.size
     val freed = files.sumOf { it.size }
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp)
-            .padding(top = 32.dp)
-    ) {
-        SuccessCheck(color = statusGood(), size = 72.dp)
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "All done for now",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+    if (files.isEmpty()) {
+        EmptyBlock(
+            title = "Nothing to trash",
+            body = "You kept all ${formatCount(total)} of the files you went through. They will not come back in the review.",
+            actionLabel = "Back to the cleaner",
+            onAction = onBack
         )
-        Text(
-            text = "You reviewed ${formatCount(total)} files. You kept ${formatCount(kept)} and marked ${formatCount(trashed)} for the trash.",
-            fontSize = 15.sp,
-            lineHeight = 22.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 8.dp)
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
-        Spacer(modifier = Modifier.height(16.dp))
-        PrimaryAction(
-            text = "Trash ${formatCount(trashed)} ${if (trashed == 1) "item" else "items"} and free ${Formatter.formatShortFileSize(context, freed)}",
-            onClick = onTrash,
-            enabled = trashed > 0,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Text(
-            text = "Your phone asks once, then moves them to the system trash. You can restore them for about 30 days.",
-            fontSize = 12.sp,
-            lineHeight = 16.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 8.dp)
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        LinkButton(text = "Undo last swipe", onClick = onUndo)
-        LinkButton(text = "Start over", onClick = onRestart)
-        LinkButton(text = "Back to the cleaner", onClick = onBack)
+        return
+    }
+    Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.padding(horizontal = Design.screenHorizontalPadding, vertical = 12.dp)) {
+            Headline(
+                label = "Ready to free",
+                value = Formatter.formatShortFileSize(context, freed),
+                context = "${formatCount(files.size)} ${if (files.size == 1) "file goes" else "files go"} to the system trash" +
+                    if (kept > 0) ". You kept ${formatCount(kept)}." else "."
+            )
+            Text(
+                text = "Tap a file to keep it instead.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 12.dp)
+            )
+        }
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(3),
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            items(files, key = { it.key }) { file ->
+                FileThumb(
+                    file = file,
+                    sizePx = 360,
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .animateItem()
+                        .aspectRatio(1f)
+                        .clickable(role = Role.Button, onClickLabel = "Keep ${file.name} instead") { onKeep(file) }
+                )
+            }
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface)
+                .navigationBarsPadding()
+                .padding(horizontal = Design.screenHorizontalPadding, vertical = 12.dp)
+        ) {
+            PrimaryAction(
+                text = "Move ${formatCount(files.size)} to the trash",
+                onClick = onTrash,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text(
+                text = "You can restore them from the trash for about 30 days.",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp).align(Alignment.CenterHorizontally)
+            )
+        }
     }
 }
 
@@ -394,6 +420,6 @@ private fun Finished(count: Int, bytes: Long, onBack: () -> Unit) {
             modifier = Modifier.padding(top = 8.dp)
         )
         Spacer(modifier = Modifier.height(24.dp))
-        PrimaryAction(text = "Back to the cleaner", onClick = onBack, modifier = Modifier.fillMaxWidth())
+        PrimaryAction(text = "Done", onClick = onBack, modifier = Modifier.fillMaxWidth())
     }
 }

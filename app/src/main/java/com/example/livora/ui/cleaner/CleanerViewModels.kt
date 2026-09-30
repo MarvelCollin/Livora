@@ -124,11 +124,12 @@ class CleanerReviewViewModel(application: Application, handle: SavedStateHandle)
         if (wasKeep) current.queue.getOrNull(index)?.let { file -> viewModelScope.launch { repository.unkeep(file) } }
     }
 
-    fun restart() {
+    fun setKeep(file: CleanerFile, keep: Boolean) {
         val current = _state.value
-        val keptFiles = current.queue.filterIndexed { i, _ -> current.decisions.getOrNull(i) == true }
-        viewModelScope.launch { keptFiles.forEach { repository.unkeep(it) } }
-        _state.update { it.copy(decisions = emptyList()) }
+        val index = current.queue.indexOfFirst { it.key == file.key }
+        if (index < 0 || index >= current.decisions.size) return
+        _state.update { it.copy(decisions = it.decisions.toMutableList().also { list -> list[index] = keep }) }
+        viewModelScope.launch { if (keep) repository.keep(file) else repository.unkeep(file) }
     }
 
     fun trash() {

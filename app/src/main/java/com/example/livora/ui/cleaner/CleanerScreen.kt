@@ -212,7 +212,7 @@ fun CleanerScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
                         if (kept > 0) {
-                            LinkButton(text = "Show ${formatCount(kept)} kept files again", onClick = viewModel::clearKept)
+                            LinkButton(text = "Show ${formatCount(kept)} kept ${if (kept == 1) "file" else "files"} again", onClick = viewModel::clearKept)
                         }
                     }
                 }
