@@ -1,6 +1,5 @@
 package com.example.livora.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -9,35 +8,77 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = NightPrimary,
+    onPrimary = NightOnPrimary,
+    primaryContainer = NightPrimaryContainer,
+    onPrimaryContainer = NightText,
+    secondary = NightPeach,
+    onSecondary = PeachInk,
+    secondaryContainer = NightPeachContainer,
+    onSecondaryContainer = NightText,
+    tertiary = NightPeach,
+    onTertiary = PeachInk,
+    tertiaryContainer = NightPeachContainer,
+    onTertiaryContainer = NightText,
+    background = NightBackground,
+    onBackground = NightText,
+    surface = NightBackground,
+    onSurface = NightText,
+    surfaceVariant = NightSurfaceHigh,
+    onSurfaceVariant = NightTextVariant,
+    surfaceContainerLowest = NightSurfaceLowest,
+    surfaceContainerLow = NightSurfaceLow,
+    surfaceContainer = NightSurface,
+    surfaceContainerHigh = NightSurfaceHigh,
+    surfaceContainerHighest = NightSurfaceHighest,
+    outline = NightLine,
+    outlineVariant = NightLineVariant,
+    error = NightDanger,
+    onError = ClayDangerInk,
+    errorContainer = NightDangerContainer,
+    onErrorContainer = ClayDangerSoft
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+    primary = SageStrong,
     onPrimary = Color.White,
+    primaryContainer = SageSoft,
+    onPrimaryContainer = SageInk,
+    secondary = PeachStrong,
     onSecondary = Color.White,
+    secondaryContainer = PeachSoft,
+    onSecondaryContainer = PeachInk,
+    tertiary = PeachStrong,
     onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    tertiaryContainer = PeachSoft,
+    onTertiaryContainer = PeachInk,
+    background = SageBackground,
+    onBackground = SageInk,
+    surface = SageBackground,
+    onSurface = SageInk,
+    surfaceVariant = SageSurfaceHigh,
+    onSurfaceVariant = SageInkVariant,
+    surfaceContainerLowest = SageSurfaceLowest,
+    surfaceContainerLow = SageSurfaceLow,
+    surfaceContainer = SageSurface,
+    surfaceContainerHigh = SageSurfaceHigh,
+    surfaceContainerHighest = SageSurfaceHighest,
+    outline = SageLine,
+    outlineVariant = SageSurfaceHighest,
+    error = ClayDanger,
+    onError = Color.White,
+    errorContainer = ClayDangerSoft,
+    onErrorContainer = ClayDangerInk
 )
 
 @Composable
 fun AppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
