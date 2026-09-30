@@ -6,6 +6,7 @@ import com.example.livora.data.dictionary.DictionaryLookupRepository
 import com.example.livora.data.model.DictionaryEntry
 import com.example.livora.data.model.DictionaryLanguage
 import com.example.livora.data.model.LookupResult
+import com.example.livora.data.model.QuizMode
 import com.example.livora.data.model.QuizQuestion
 import com.example.livora.data.supabase.DictionaryDto
 import com.example.livora.data.supabase.DictionaryInsertDto
@@ -46,6 +47,7 @@ class DictionaryViewModel : ViewModel() {
     val quiz: StateFlow<List<QuizQuestion>> = _quiz.asStateFlow()
 
     private val pendingMutations = MutableStateFlow<Set<String>>(emptySet())
+    private var _quizMode: QuizMode = QuizMode.All
 
     init {
         refresh()
@@ -143,6 +145,8 @@ class DictionaryViewModel : ViewModel() {
                         descriptionId = descriptionId.trim(),
                         example = example.trim(),
                         synonyms = synonyms.map { it.trim() }.filter { it.isNotBlank() }.joinToString(", "),
+                        correctCount = 0,
+                        wrongCount = 0,
                         createdAt = System.currentTimeMillis()
                     )
                 )
@@ -195,6 +199,8 @@ class DictionaryViewModel : ViewModel() {
                         descriptionId = entry.descriptionId,
                         example = entry.example,
                         synonyms = entry.synonyms.joinToString(", "),
+                        correctCount = entry.correctCount,
+                        wrongCount = entry.wrongCount,
                         createdAt = entry.createdAt
                     )
                 )
@@ -208,10 +214,22 @@ class DictionaryViewModel : ViewModel() {
         }
     }
 
-    fun startQuiz() {
-        val quizzable = _entries.value.filter { it.translation.isNotBlank() }
-        val questions = quizzable.shuffled().mapNotNull { entry ->
-            val distractors = quizzable
+    fun startQuiz(mode: QuizMode = QuizMode.All) {
+        _quizMode = mode
+        val pool = _entries.value.filter { it.translation.isNotBlank() }
+        val selected = when (mode) {
+            QuizMode.All -> pool.shuffled()
+            QuizMode.Hardest -> {
+                val withMistakes = pool.filter { it.wrongCount > 0 }
+                val ordered = if (withMistakes.isNotEmpty()) withMistakes else pool
+                ordered.sortedWith(
+                    compareByDescending<DictionaryEntry> { it.wrongCount }
+                        .thenByDescending { it.attempts }
+                )
+            }
+        }
+        val questions = selected.mapNotNull { entry ->
+            val distractors = pool
                 .filter { it.id != entry.id && !it.translation.equals(entry.translation, ignoreCase = true) }
                 .map { it.translation }
                 .distinct()
@@ -231,7 +249,27 @@ class DictionaryViewModel : ViewModel() {
         _quiz.value = questions
     }
 
+    fun restartQuiz() = startQuiz(_quizMode)
+
+    fun recordAnswer(entryId: String, isCorrect: Boolean) {
+        val entry = _entries.value.firstOrNull { it.id == entryId } ?: return
+        val newCorrect = entry.correctCount + if (isCorrect) 1 else 0
+        val newWrong = entry.wrongCount + if (isCorrect) 0 else 1
+        _entries.update { list ->
+            list.map { if (it.id == entryId) it.copy(correctCount = newCorrect, wrongCount = newWrong) else it }
+        }
+        viewModelScope.launch {
+            try {
+                repository.updateStats(entryId, newCorrect, newWrong)
+            } catch (t: Throwable) {
+                Logger.debug(TAG, "recordAnswer failed: ${t.message}")
+            }
+        }
+    }
+
     fun canQuiz(): Boolean = _entries.value.count { it.translation.isNotBlank() } >= 2
+
+    fun hardestCount(): Int = _entries.value.count { it.translation.isNotBlank() && it.wrongCount > 0 }
 
     private fun DictionaryDto.toEntry(): DictionaryEntry = DictionaryEntry(
         id = id,
@@ -242,6 +280,8 @@ class DictionaryViewModel : ViewModel() {
         descriptionId = descriptionId,
         example = example,
         synonyms = synonyms.split(",").map { it.trim() }.filter { it.isNotBlank() },
+        correctCount = correctCount,
+        wrongCount = wrongCount,
         createdAt = createdAt
     )
 

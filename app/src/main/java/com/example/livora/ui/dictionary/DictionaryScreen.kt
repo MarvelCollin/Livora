@@ -24,8 +24,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Quiz
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -56,6 +59,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.livora.data.model.DictionaryEntry
 import com.example.livora.data.model.DictionaryLanguage
+import com.example.livora.data.model.QuizMode
+import com.example.livora.ui.components.Design
 import com.example.livora.ui.components.SkeletonBox
 import com.example.livora.ui.components.SkeletonLine
 import com.example.livora.ui.components.Tag
@@ -71,6 +76,7 @@ fun DictionaryScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val selectedLanguage by viewModel.selectedLanguage.collectAsState()
     var isAdding by rememberSaveable { mutableStateOf(false) }
+    var showQuizChooser by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -82,8 +88,7 @@ fun DictionaryScreen(
                     IconButton(
                         onClick = {
                             if (viewModel.canQuiz()) {
-                                viewModel.startQuiz()
-                                onOpenQuiz()
+                                showQuizChooser = true
                             }
                         }
                     ) {
@@ -168,6 +173,109 @@ fun DictionaryScreen(
                     viewModel.clearLookup()
                     isAdding = false
                 }
+            )
+        }
+    }
+
+    if (showQuizChooser) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { showQuizChooser = false },
+            sheetState = sheetState,
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            QuizChooser(
+                totalWords = entries.count { it.translation.isNotBlank() },
+                hardestWords = viewModel.hardestCount(),
+                onPick = { mode ->
+                    viewModel.startQuiz(mode)
+                    showQuizChooser = false
+                    onOpenQuiz()
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun QuizChooser(
+    totalWords: Int,
+    hardestWords: Int,
+    onPick: (QuizMode) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(top = 8.dp, bottom = 28.dp)
+    ) {
+        Text(
+            text = "Start a quiz",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(14.dp))
+        QuizModeCard(
+            title = "All words",
+            description = "$totalWords words · random order",
+            enabled = totalWords >= 2,
+            onClick = { onPick(QuizMode.All) }
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        QuizModeCard(
+            title = "Hardest first",
+            description = if (hardestWords > 0)
+                "$hardestWords words you miss most"
+            else
+                "No mistakes yet · uses all words",
+            enabled = totalWords >= 2,
+            onClick = { onPick(QuizMode.Hardest) }
+        )
+    }
+}
+
+@Composable
+private fun QuizModeCard(
+    title: String,
+    description: String,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick),
+        shape = Design.cardShape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = Design.cardElevation)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Design.cardPadding),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.4f)
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = description,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
+            }
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
             )
         }
     }
@@ -507,6 +615,26 @@ private fun EntryRow(
                     }
                 }
             }
+            if (entry.attempts > 0) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    DifficultyTag(entry = entry)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "✓ ${entry.correctCount}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "✗ ${entry.wrongCount}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                    )
+                }
+            }
         }
         IconButton(
             onClick = onDelete,
@@ -519,6 +647,28 @@ private fun EntryRow(
             )
         }
     }
+}
+
+@Composable
+private fun DifficultyTag(entry: DictionaryEntry) {
+    val label = when {
+        entry.attempts < 2 -> "New"
+        entry.accuracy >= 0.8f -> "Easy"
+        entry.accuracy >= 0.5f -> "Medium"
+        else -> "Hard"
+    }
+    Text(
+        text = label,
+        fontSize = 10.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+        modifier = Modifier
+            .background(
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
+                shape = RoundedCornerShape(50)
+            )
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+    )
 }
 
 @Composable

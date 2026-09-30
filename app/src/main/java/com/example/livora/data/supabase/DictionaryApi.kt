@@ -5,6 +5,7 @@ import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Headers
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Query
 
@@ -17,6 +18,8 @@ data class DictionaryDto(
     @SerializedName("description_id") val descriptionId: String = "",
     @SerializedName("example") val example: String = "",
     @SerializedName("synonyms") val synonyms: String = "",
+    @SerializedName("correct_count") val correctCount: Int = 0,
+    @SerializedName("wrong_count") val wrongCount: Int = 0,
     @SerializedName("created_at") val createdAt: Long
 )
 
@@ -29,7 +32,14 @@ data class DictionaryInsertDto(
     @SerializedName("description_id") val descriptionId: String,
     @SerializedName("example") val example: String,
     @SerializedName("synonyms") val synonyms: String,
+    @SerializedName("correct_count") val correctCount: Int,
+    @SerializedName("wrong_count") val wrongCount: Int,
     @SerializedName("created_at") val createdAt: Long
+)
+
+data class DictionaryStatsUpdateDto(
+    @SerializedName("correct_count") val correctCount: Int,
+    @SerializedName("wrong_count") val wrongCount: Int
 )
 
 interface DictionaryApi {
@@ -43,6 +53,12 @@ interface DictionaryApi {
     @Headers("Prefer: return=representation")
     @POST("dictionary_entries")
     suspend fun insert(@Body body: DictionaryInsertDto): List<DictionaryDto>
+
+    @PATCH("dictionary_entries")
+    suspend fun updateStats(
+        @Query("id") idFilter: String,
+        @Body body: DictionaryStatsUpdateDto
+    )
 
     @DELETE("dictionary_entries")
     suspend fun delete(@Query("id") idFilter: String)

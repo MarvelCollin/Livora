@@ -9,8 +9,15 @@ data class DictionaryEntry(
     val descriptionId: String = "",
     val example: String = "",
     val synonyms: List<String> = emptyList(),
+    val correctCount: Int = 0,
+    val wrongCount: Int = 0,
     val createdAt: Long = System.currentTimeMillis()
-)
+) {
+    val attempts: Int get() = correctCount + wrongCount
+    val accuracy: Float get() = if (attempts == 0) 0f else correctCount.toFloat() / attempts.toFloat()
+}
+
+enum class QuizMode { All, Hardest }
 
 enum class DictionaryLanguage(val code: String, val label: String) {
     English("en", "English"),

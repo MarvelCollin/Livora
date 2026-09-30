@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -38,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -118,7 +120,7 @@ fun DictionaryQuizScreen(
                 score = score,
                 total = quiz.size,
                 onRestart = {
-                    viewModel.startQuiz()
+                    viewModel.restartQuiz()
                     index = 0
                     score = 0
                     finished = false
@@ -142,6 +144,8 @@ fun DictionaryQuizScreen(
                 .padding(horizontal = 20.dp)
         ) {
             Spacer(modifier = Modifier.height(16.dp))
+            QuizProgress(current = index + 1, total = quiz.size)
+            Spacer(modifier = Modifier.height(20.dp))
             Text(
                 text = "What is the Indonesian for",
                 fontSize = 13.sp,
@@ -176,7 +180,9 @@ fun DictionaryQuizScreen(
                     onClick = {
                         if (selected == null) {
                             selected = i
-                            if (i == question.correctIndex) score++
+                            val isCorrect = i == question.correctIndex
+                            if (isCorrect) score++
+                            viewModel.recordAnswer(question.entry.id, isCorrect)
                         }
                     }
                 )
@@ -212,6 +218,47 @@ fun DictionaryQuizScreen(
             }
 
             Spacer(modifier = Modifier.height(30.dp))
+        }
+    }
+}
+
+@Composable
+private fun QuizProgress(current: Int, total: Int) {
+    val ratio = if (total > 0) current.toFloat() / total.toFloat() else 0f
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Progress",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            )
+            Text(
+                text = "$current / $total",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(50))
+                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(ratio)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.onSurface)
+            )
         }
     }
 }

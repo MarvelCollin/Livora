@@ -11,6 +11,10 @@ class DictionaryRepository {
     suspend fun insert(dto: DictionaryInsertDto): DictionaryDto =
         call { api.insert(dto) }.first()
 
+    suspend fun updateStats(id: String, correctCount: Int, wrongCount: Int) {
+        call { api.updateStats("eq.$id", DictionaryStatsUpdateDto(correctCount, wrongCount)) }
+    }
+
     suspend fun delete(id: String) {
         call { api.delete("eq.$id") }
     }
