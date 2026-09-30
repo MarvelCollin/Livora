@@ -11,3 +11,14 @@ sealed class Screen(val route: String) {
         fun create(todoId: String) = "todo_detail/$todoId"
     }
 }
+
+object ToolRoutes {
+    const val QR = "tools/qr"
+    const val DOCUMENTS = "tools/documents"
+    const val DOCUMENT = "tools/documents/{id}"
+    const val USAGE = "tools/usage"
+    const val CLEANER = "tools/cleaner"
+    const val CLEANER_REVIEW = "tools/cleaner/review"
+
+    fun document(id: Int) = "tools/documents/$id"
+}
