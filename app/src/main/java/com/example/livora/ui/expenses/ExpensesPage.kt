@@ -1,5 +1,6 @@
 package com.example.livora.ui.expenses
 
+import com.example.livora.ui.components.GrowBar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -36,6 +37,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import com.example.livora.ui.components.ChartSlot
+import com.example.livora.ui.components.ColorKey
+import com.example.livora.ui.components.chartColor
+import com.example.livora.ui.components.chartNeutral
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -127,9 +134,22 @@ fun ExpensesPage(addRequests: Flow<Unit>) {
                 Column(modifier = Modifier.padding(horizontal = Design.screenHorizontalPadding)) {
                     SectionLabel(text = "Where it went")
                     val top = ExpenseSamples.categories.maxOf { it.second }
-                    ExpenseSamples.categories.forEachIndexed { index, (name, amount) ->
-                        CategoryBar(name = name, amount = amount, fraction = amount.toFloat() / top, strong = index == 0)
+                    ExpenseSamples.categories.forEach { (name, amount) ->
+                        CategoryBar(
+                            name = name,
+                            amount = amount,
+                            fraction = amount.toFloat() / top,
+                            color = categoryColor(name),
+                            selected = query.equals(name, ignoreCase = true),
+                            onClick = { query = if (query.equals(name, ignoreCase = true)) "" else name }
+                        )
                     }
+                    Text(
+                        text = "Tap a category to see only its transactions.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
                 }
             }
 
@@ -204,12 +224,14 @@ fun ExpensesPage(addRequests: Flow<Unit>) {
             days.forEach { (day, rows) ->
                 item(key = "day-$day") { DayHeader(day = day, total = rows.sumOf { it.amount }) }
                 items(rows, key = { it.id }) { item ->
-                    TransactionRow(item)
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = Design.screenHorizontalPadding),
-                        color = MaterialTheme.colorScheme.outlineVariant,
-                        thickness = 0.5.dp
-                    )
+                    Column(modifier = Modifier.animateItem()) {
+                        TransactionRow(item)
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = Design.screenHorizontalPadding),
+                            color = MaterialTheme.colorScheme.outlineVariant,
+                            thickness = 0.5.dp
+                        )
+                    }
                 }
             }
             item(key = "end") { Spacer(modifier = Modifier.height(24.dp)) }
@@ -240,20 +262,7 @@ private fun BudgetLine(spent: Long, budget: Long) {
             )
         }
         Spacer(modifier = Modifier.height(6.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(6.dp)
-                .clip(RoundedCornerShape(3.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(fraction)
-                    .height(6.dp)
-                    .background(MaterialTheme.colorScheme.primary)
-            )
-        }
+        GrowBar(fraction = fraction, color = MaterialTheme.colorScheme.primary, height = 6.dp)
         Text(
             text = "${formatRupiah((budget - spent).coerceAtLeast(0))} left this month",
             fontSize = 12.sp,
@@ -264,40 +273,49 @@ private fun BudgetLine(spent: Long, budget: Long) {
 }
 
 @Composable
-private fun CategoryBar(name: String, amount: Long, fraction: Float, strong: Boolean) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-        Row(modifier = Modifier.fillMaxWidth()) {
+private fun categoryColor(name: String): Color = when (name) {
+    "Food" -> chartColor(ChartSlot.Orange)
+    "Groceries" -> chartColor(ChartSlot.Aqua)
+    "Transport" -> chartColor(ChartSlot.Blue)
+    "Bills" -> chartColor(ChartSlot.Violet)
+    "Fun" -> chartColor(ChartSlot.Magenta)
+    else -> chartNeutral()
+}
+
+@Composable
+private fun CategoryBar(
+    name: String,
+    amount: Long,
+    fraction: Float,
+    color: Color,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(vertical = 6.dp)
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            ColorKey(color = color)
             Text(
                 text = name,
                 fontSize = 14.sp,
-                fontWeight = if (strong) FontWeight.SemiBold else FontWeight.Normal,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f).padding(start = 8.dp)
             )
             Text(
                 text = formatRupiah(amount),
                 fontSize = 14.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
                 color = MaterialTheme.colorScheme.onSurface
             )
         }
         Spacer(modifier = Modifier.height(4.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(4.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(fraction.coerceIn(0.02f, 1f))
-                    .height(4.dp)
-                    .background(
-                        if (strong) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)
-                    )
-            )
-        }
+        GrowBar(fraction = fraction.coerceIn(0.02f, 1f), color = color)
     }
 }
 
@@ -342,12 +360,15 @@ private fun TransactionRow(item: Transaction) {
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            Text(
-                text = "${item.category}, ${item.account}",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 2.dp)
-            )
+            Row(modifier = Modifier.padding(top = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                ColorKey(color = categoryColor(item.category))
+                Text(
+                    text = "${item.category}, ${item.account}",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 6.dp)
+                )
+            }
         }
         Text(
             text = signedRupiah(item.amount),

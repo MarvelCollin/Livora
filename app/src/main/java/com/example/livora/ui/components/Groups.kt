@@ -1,5 +1,6 @@
 package com.example.livora.ui.components
 
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,6 +44,7 @@ fun NavRow(
     description: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
     value: (@Composable () -> Unit)? = null
 ) {
     Column(modifier = modifier) {
@@ -54,6 +56,14 @@ fun NavRow(
                 .padding(vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (icon != null) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(end = 16.dp).size(24.dp)
+                )
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = title,

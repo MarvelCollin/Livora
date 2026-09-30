@@ -1,5 +1,11 @@
 package com.example.livora.ui.tools
 
+import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.DocumentScanner
+import androidx.compose.material.icons.filled.CleaningServices
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -50,12 +56,14 @@ fun ToolsScreen(
             SectionLabel(text = "Scan and create", modifier = Modifier.padding(top = 8.dp))
             NavRow(
                 title = "QR codes",
+                icon = Icons.Default.QrCode2,
                 description = "Scan a code or make your own",
                 onClick = { onOpenRoute(ToolRoutes.QR) },
                 value = { Tag("Preview") }
             )
             NavRow(
                 title = "Documents",
+                icon = Icons.Default.DocumentScanner,
                 description = "Scan pages and save them as PDF",
                 onClick = { onOpenRoute(ToolRoutes.DOCUMENTS) },
                 value = { Tag("Preview") }
@@ -64,6 +72,7 @@ fun ToolsScreen(
             SectionLabel(text = "Private")
             NavRow(
                 title = "Password vault",
+                icon = Icons.Default.Lock,
                 description = "Passwords protected by your fingerprint or phone lock",
                 onClick = onOpenVault,
                 value = {
@@ -79,12 +88,14 @@ fun ToolsScreen(
             SectionLabel(text = "Phone care")
             NavRow(
                 title = "Storage cleaner",
+                icon = Icons.Default.CleaningServices,
                 description = "Swipe through photos and videos to free space",
                 onClick = { onOpenRoute(ToolRoutes.CLEANER) },
                 value = { Tag("Preview") }
             )
             NavRow(
                 title = "App usage",
+                icon = Icons.Default.BarChart,
                 description = "Screen time and apps you never open",
                 onClick = { onOpenRoute(ToolRoutes.USAGE) },
                 value = { Tag("Preview") }

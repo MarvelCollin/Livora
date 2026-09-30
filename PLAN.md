@@ -119,7 +119,7 @@ The app must stay small, start fast and stay smooth as tools are added. These ru
 |--------|--------|---------------------|-------|
 | Release APK size | as small as possible, alert on any jump over 500 KB | 8.77 MB. Debug build is 19.4 MB. App code is 1.4 MB compressed, the rest is the TensorFlow Lite native library added for face recognition (4.5 MB arm64 plus 2.6 MB armv7). Dropping armv7 saves about 2.6 MB | |
 | Cold start to first frame | under 500 ms | 322 to 387 ms over 4 runs on the Redmi Note 14 Pro+, 507 ms on the first run after install | |
-| Scroll jank on long lists | under 5 percent slow frames | 1.9 percent janky, median frame 5 ms (home screen only, long lists not yet measured) | |
+| Scroll jank on long lists | under 5 percent slow frames | 1.9 percent janky, median frame 5 ms (home screen only, long lists not yet measured) | 1.4 percent janky, median 9 ms, 99th percentile 28 ms on a release build, after motion and charts were added (tab swipes, usage chart drag, list scrolls, 1,354 frames). A debug build of the same run shows 6.2 percent, so always judge jank on release |
 | Idle memory | under 150 MB | 88 MB total PSS on the home screen | |
 | Background scan | no visible battery drain, paused on low battery | not built yet | |
 
@@ -339,6 +339,9 @@ Includes the swipe review for photos and videos, and every cleaner feature that 
 - [ ] Checked on the real phone with adb, screenshots reviewed
 - [ ] `/uiux review` run on the new screens
 - [ ] APK size and cold start checked against the budget in section 2b
+- [ ] Motion uses the tokens in `Motion.kt` (150 to 480 ms, emphasized easing), reads animated values inside `graphicsLayer` or draw lambdas so nothing recomposes per frame, and frame timing is checked on a release build against the 5 percent target
+- [ ] Charts use `ChartColors.kt` in fixed slot order (validated with the dataviz script on the light and dark surfaces), show details on touch, and list every value in a legend or row so the tooltip never gates information
+- [ ] Icons are bare and inline with their text, and images are real content from the phone (photos, app icons), never decorative art
 - [ ] Committed and pushed to `main` with a single line `feat:` or `fix:` message
 
 ## 12. Carry-over from earlier work

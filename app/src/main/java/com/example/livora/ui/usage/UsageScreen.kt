@@ -1,6 +1,13 @@
 package com.example.livora.ui.usage
 
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Arrangement
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import com.example.livora.ui.components.SkeletonBox
+import androidx.compose.runtime.produceState
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import com.example.livora.ui.components.GrowBar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -8,19 +15,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,18 +35,23 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.livora.data.apps.AppInfo
+import com.example.livora.data.apps.InstalledApps
+import com.example.livora.ui.components.AppIcon
 import com.example.livora.ui.components.BackButton
+import com.example.livora.ui.components.BarChart
+import com.example.livora.ui.components.BarPoint
+import com.example.livora.ui.components.ChartSlot
 import com.example.livora.ui.components.ChoiceOption
 import com.example.livora.ui.components.ChoiceRow
 import com.example.livora.ui.components.Design
@@ -49,35 +59,87 @@ import com.example.livora.ui.components.Headline
 import com.example.livora.ui.components.PreviewNotice
 import com.example.livora.ui.components.SectionLabel
 import com.example.livora.ui.components.TopBar
+import com.example.livora.ui.components.chartColor
 import com.example.livora.ui.components.showPreviewOnly
 import com.example.livora.ui.people.EmptyBlock
 import com.example.livora.ui.people.LinkButton
 
 private enum class UsageRange { Day, Week, Month }
 
-private class AppTime(val name: String, val minutes: Int)
-private class UnusedApp(val name: String, val lastOpened: String, val size: String)
-
-private val apps = listOf(
-    AppTime("Instagram", 65),
-    AppTime("YouTube", 48),
-    AppTime("WhatsApp", 36),
-    AppTime("Chrome", 22),
-    AppTime("Livora", 9)
+private class RangeData(
+    val period: String,
+    val headlineLabel: String,
+    val headline: String,
+    val context: String,
+    val points: List<BarPoint>,
+    val axis: List<String?>,
+    val hint: String,
+    val factor: Int,
+    val description: String
 )
 
-private val unused = listOf(
-    UnusedApp("Old Maps Offline", "12 Aug 2026", "312 MB"),
-    UnusedApp("Puzzle Quest", "3 Jul 2026", "184 MB"),
-    UnusedApp("Scanner Lite", "19 Jun 2026", "46 MB")
-)
+private val topMinutes = listOf(65, 48, 36, 22, 9)
+private val unusedSizes = listOf("312 MB", "184 MB", "46 MB")
+private val unusedDates = listOf("12 Aug 2026", "3 Jul 2026", "19 Jun 2026")
 
 private val hourly = listOf(0, 0, 0, 0, 0, 0, 4, 12, 9, 6, 3, 8, 14, 10, 5, 7, 11, 18, 24, 38, 48, 30, 12, 3)
+private val weekly = listOf(172, 210, 178, 240, 196, 268, 192)
+private val weekNames = listOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")
+private val monthly = List(30) { 120 + ((it * 37 + 11) % 150) }
+
+private fun formatMinutes(minutes: Int): String =
+    if (minutes >= 60) "${minutes / 60} h ${minutes % 60} min" else "$minutes min"
+
+private fun dataFor(range: UsageRange): RangeData = when (range) {
+    UsageRange.Day -> RangeData(
+        period = "Today, 30 Sep",
+        headlineLabel = "Screen time",
+        headline = "3 h 12 min",
+        context = "22 min more than yesterday",
+        points = hourly.mapIndexed { hour, minutes ->
+            BarPoint(minutes.toFloat(), "%02d:00 to %02d:00".format(hour, (hour + 1) % 24), formatMinutes(minutes))
+        },
+        axis = List(24) { if (it in listOf(0, 6, 12, 18, 23)) "$it" else null },
+        hint = "Touch or drag along the bars to see each hour.",
+        factor = 1,
+        description = "Bar chart of minutes per hour today. Busiest at 20:00 with 48 minutes."
+    )
+    UsageRange.Week -> RangeData(
+        period = "This week, 27 Sep to 3 Oct",
+        headlineLabel = "Daily average",
+        headline = "3 h 34 min",
+        context = "18 min less than last week",
+        points = weekly.mapIndexed { day, minutes -> BarPoint(minutes.toFloat(), weekNames[day], formatMinutes(minutes)) },
+        axis = weekNames.map { it.take(3) },
+        hint = "Touch or drag along the bars to see each day.",
+        factor = 7,
+        description = "Bar chart of screen time for each day this week. Saturday is the highest with 4 hours 28 minutes."
+    )
+    UsageRange.Month -> RangeData(
+        period = "September 2026",
+        headlineLabel = "Daily average",
+        headline = "3 h 27 min",
+        context = "9 min more than August",
+        points = monthly.mapIndexed { day, minutes -> BarPoint(minutes.toFloat(), "${day + 1} Sep", formatMinutes(minutes)) },
+        axis = List(30) { if (it in listOf(0, 7, 14, 21, 28)) "${it + 1}" else null },
+        hint = "Touch or drag along the bars to see each day.",
+        factor = 28,
+        description = "Bar chart of screen time for each day of September."
+    )
+}
 
 @Composable
 fun UsageScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
     var granted by rememberSaveable { mutableStateOf(false) }
     var range by rememberSaveable { mutableStateOf(UsageRange.Day) }
+    val loaded by produceState<List<AppInfo>?>(null) {
+        value = withContext(Dispatchers.Default) { InstalledApps.launcherApps(context) }
+    }
+    val apps = loaded.orEmpty()
+    val top = apps.take(topMinutes.size)
+    val unused = apps.drop(topMinutes.size).take(unusedSizes.size)
+    val data = remember(range) { dataFor(range) }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -92,6 +154,16 @@ fun UsageScreen(onBack: () -> Unit) {
         if (!granted) {
             Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
                 PreviewNotice()
+                if (top.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        top.take(4).forEach { app ->
+                            AppIcon(packageName = app.packageName, label = app.label, size = 44.dp)
+                        }
+                    }
+                }
                 EmptyBlock(
                     title = "Allow usage access",
                     body = "Livora reads how long each app is on screen so it can show your screen time. The numbers stay on this phone. You turn this on in system settings, and you can turn it off there at any time.",
@@ -127,11 +199,7 @@ fun UsageScreen(onBack: () -> Unit) {
                                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous period", tint = MaterialTheme.colorScheme.onSurface)
                             }
                             Text(
-                                text = when (range) {
-                                    UsageRange.Day -> "Today, 30 Sep"
-                                    UsageRange.Week -> "This week, 28 Sep to 4 Oct"
-                                    UsageRange.Month -> "September 2026"
-                                },
+                                text = data.period,
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface,
@@ -149,15 +217,16 @@ fun UsageScreen(onBack: () -> Unit) {
                 }
                 item(key = "headline") {
                     Column(modifier = Modifier.padding(horizontal = Design.screenHorizontalPadding)) {
-                        Headline(
-                            label = "Screen time",
-                            value = "3 h 12 min",
-                            context = "22 min more than yesterday"
-                        )
+                        Headline(label = data.headlineLabel, value = data.headline, context = data.context)
                         Spacer(modifier = Modifier.height(16.dp))
-                        HourlyChart(values = hourly)
+                        BarChart(
+                            points = data.points,
+                            axisLabels = data.axis,
+                            color = chartColor(ChartSlot.Blue),
+                            description = data.description
+                        )
                         Text(
-                            text = "Busiest at 20:00 with 48 min. Bars show minutes per hour.",
+                            text = data.hint,
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp)
@@ -165,23 +234,45 @@ fun UsageScreen(onBack: () -> Unit) {
                     }
                 }
                 item(key = "apps-label") {
-                    SectionLabel(text = "Most used apps", modifier = Modifier.padding(horizontal = Design.screenHorizontalPadding))
+                    SectionLabel(
+                        text = if (range == UsageRange.Day) "Most used apps" else "Most used apps, total",
+                        modifier = Modifier.padding(horizontal = Design.screenHorizontalPadding)
+                    )
                 }
-                items(apps.size, key = { "app-$it" }) { index ->
-                    AppRow(rank = index + 1, app = apps[index], top = apps.first().minutes)
-                }
-                item(key = "unused-label") {
-                    Column(modifier = Modifier.padding(horizontal = Design.screenHorizontalPadding)) {
-                        SectionLabel(text = "Not opened in 30 days")
+                if (loaded == null) {
+                    items(topMinutes.size, key = { "app-skeleton-$it" }) { AppRowSkeleton() }
+                } else if (top.isEmpty()) {
+                    item(key = "no-apps") {
                         Text(
-                            text = "Removing these frees 542 MB. Your data in them is deleted with the app.",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = "No launchable apps were found on this phone.",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = Design.screenHorizontalPadding, vertical = 12.dp)
                         )
                     }
                 }
-                items(unused.size, key = { "unused-$it" }) { index ->
-                    UnusedRow(app = unused[index])
+                items(top.size, key = { "app-${top[it].packageName}" }) { index ->
+                    AppRow(
+                        rank = index + 1,
+                        app = top[index],
+                        minutes = topMinutes[index] * data.factor,
+                        peak = topMinutes.first() * data.factor
+                    )
+                }
+                if (unused.isNotEmpty()) {
+                    item(key = "unused-label") {
+                        Column(modifier = Modifier.padding(horizontal = Design.screenHorizontalPadding)) {
+                            SectionLabel(text = "Not opened in 30 days")
+                            Text(
+                                text = "Removing these frees ${unused.indices.sumOf { unusedSizes[it].substringBefore(' ').toInt() }} MB. Your data in them is deleted with the app.",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    items(unused.size, key = { "unused-${unused[it].packageName}" }) { index ->
+                        UnusedRow(app = unused[index], lastOpened = unusedDates[index], size = unusedSizes[index])
+                    }
                 }
                 item(key = "end") { Spacer(modifier = Modifier.height(24.dp)) }
             }
@@ -189,94 +280,42 @@ fun UsageScreen(onBack: () -> Unit) {
     }
 }
 
-private fun formatMinutes(minutes: Int): String =
-    if (minutes >= 60) "${minutes / 60} h ${minutes % 60} min" else "$minutes min"
-
 @Composable
-private fun HourlyChart(values: List<Int>) {
-    val strong = MaterialTheme.colorScheme.primary
-    val soft = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
-    val peak = values.indices.maxByOrNull { values[it] } ?: 0
-    val top = (values.maxOrNull() ?: 1).coerceAtLeast(1)
-    Column {
-        Canvas(modifier = Modifier.fillMaxWidth().height(96.dp)) {
-            val slot = size.width / values.size
-            val bar = slot * 0.62f
-            values.forEachIndexed { hour, minutes ->
-                val h = (size.height * minutes / top).coerceAtLeast(if (minutes > 0) 3f else 1.5f)
-                drawRoundRect(
-                    color = if (hour == peak) strong else soft,
-                    topLeft = Offset(hour * slot + (slot - bar) / 2, size.height - h),
-                    size = Size(bar, h),
-                    cornerRadius = CornerRadius(2f)
-                )
-            }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween
-        ) {
-            listOf("0", "6", "12", "18", "24").forEach { label ->
-                Text(
-                    text = label,
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun AppRow(rank: Int, app: AppTime, top: Int) {
+private fun AppRow(rank: Int, app: AppInfo, minutes: Int, peak: Int) {
     Column {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 64.dp)
+                .heightIn(min = 68.dp)
                 .padding(horizontal = Design.screenHorizontalPadding, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Default.Apps,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(24.dp)
-            )
-            Column(modifier = Modifier.weight(1f).padding(horizontal = 14.dp)) {
+            AppIcon(packageName = app.packageName, label = app.label, size = 40.dp)
+            Column(modifier = Modifier.weight(1f).padding(start = 14.dp)) {
                 Row {
                     Text(
-                        text = "$rank. ${app.name}",
+                        text = app.label,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
                         modifier = Modifier.weight(1f)
                     )
                     Text(
-                        text = formatMinutes(app.minutes),
+                        text = formatMinutes(minutes),
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
                 Spacer(modifier = Modifier.height(6.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(4.dp)
-                        .clip(RoundedCornerShape(2.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(app.minutes.toFloat() / top)
-                            .height(4.dp)
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = if (rank == 1) 1f else 0.5f))
-                    )
-                }
+                GrowBar(
+                    fraction = minutes.toFloat() / peak,
+                    color = chartColor(ChartSlot.Blue).copy(alpha = if (rank == 1) 1f else 0.55f)
+                )
             }
         }
         HorizontalDivider(
-            modifier = Modifier.padding(start = 62.dp, end = Design.screenHorizontalPadding),
+            modifier = Modifier.padding(start = 70.dp, end = Design.screenHorizontalPadding),
             color = MaterialTheme.colorScheme.outlineVariant,
             thickness = 0.5.dp
         )
@@ -284,24 +323,44 @@ private fun AppRow(rank: Int, app: AppTime, top: Int) {
 }
 
 @Composable
-private fun UnusedRow(app: UnusedApp) {
+private fun AppRowSkeleton() {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 68.dp)
+            .padding(horizontal = Design.screenHorizontalPadding, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SkeletonBox(modifier = Modifier.size(40.dp), shape = RoundedCornerShape(10.dp))
+        Column(modifier = Modifier.weight(1f).padding(start = 14.dp)) {
+            SkeletonBox(modifier = Modifier.width(120.dp).height(14.dp), shape = RoundedCornerShape(7.dp))
+            Spacer(modifier = Modifier.height(10.dp))
+            SkeletonBox(modifier = Modifier.fillMaxWidth().height(4.dp), shape = RoundedCornerShape(2.dp))
+        }
+    }
+}
+
+@Composable
+private fun UnusedRow(app: AppInfo, lastOpened: String, size: String) {
     Column {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 68.dp)
+                .heightIn(min = 72.dp)
                 .padding(horizontal = Design.screenHorizontalPadding, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            AppIcon(packageName = app.packageName, label = app.label, size = 40.dp)
+            Column(modifier = Modifier.weight(1f).padding(start = 14.dp)) {
                 Text(
-                    text = app.name,
+                    text = app.label,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1
                 )
                 Text(
-                    text = "Last opened ${app.lastOpened}, ${app.size}",
+                    text = "Last opened $lastOpened, $size",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -309,7 +368,7 @@ private fun UnusedRow(app: UnusedApp) {
             LinkButton(text = "Uninstall", onClick = { showPreviewOnly() })
         }
         HorizontalDivider(
-            modifier = Modifier.padding(horizontal = Design.screenHorizontalPadding),
+            modifier = Modifier.padding(start = 70.dp, end = Design.screenHorizontalPadding),
             color = MaterialTheme.colorScheme.outlineVariant,
             thickness = 0.5.dp
         )

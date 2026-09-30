@@ -1,5 +1,18 @@
 package com.example.livora.ui.cleaner
 
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import com.example.livora.ui.people.PhotoThumb
+import com.example.livora.ui.components.SkeletonBox
+import com.example.livora.data.people.media.MediaImages
+import com.example.livora.data.people.media.MediaAccess
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.runtime.produceState
+import android.text.format.DateUtils
+import android.content.Context
+import com.example.livora.ui.components.statusGood
+import com.example.livora.ui.components.SuccessCheck
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -63,10 +76,33 @@ private class ReviewItem(
     val size: String,
     val mb: Float,
     val detail: String,
-    val video: Boolean = false
+    val video: Boolean = false,
+    val mediaId: Long? = null
 )
 
-private val reviewItems = listOf(
+private fun formatBytes(bytes: Long): String {
+    val mb = bytes / 1_048_576f
+    return if (mb >= 1f) "%.1f MB".format(mb) else "${(bytes / 1024).coerceAtLeast(1)} KB"
+}
+
+private fun loadReal(context: Context): List<ReviewItem> {
+    if (!MediaAccess.hasAnyAccess(context)) return emptyList()
+    return MediaImages.queryAll(context)
+        .sortedByDescending { it.size }
+        .take(8)
+        .map { image ->
+            ReviewItem(
+                name = image.displayName ?: "Photo ${image.id}",
+                date = DateUtils.formatDateTime(context, image.sortDate, DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_YEAR),
+                size = formatBytes(image.size),
+                mb = image.size / 1_048_576f,
+                detail = "${image.width} x ${image.height}, ${image.bucketName.ifBlank { "Photos" }}",
+                mediaId = image.id
+            )
+        }
+}
+
+private val sampleItems = listOf(
     ReviewItem("IMG_4821.jpg", "12 Mar 2026", "3.4 MB", 3.4f, "4032 x 3024, Camera"),
     ReviewItem("Screenshot_2026-09-28.png", "28 Sep 2026", "1.1 MB", 1.1f, "1220 x 2712, Screenshots"),
     ReviewItem("VID_0093.mp4", "2 Sep 2026", "48.6 MB", 48.6f, "1080p, 0:42, Camera", video = true),
@@ -79,23 +115,39 @@ private val reviewItems = listOf(
 
 @Composable
 fun CleanerReviewScreen(onBack: () -> Unit) {
+    val context = LocalContext.current
     var log by rememberSaveable { mutableStateOf("") }
+    val loaded by produceState<List<ReviewItem>?>(null) {
+        val real = withContext(Dispatchers.IO) { loadReal(context) }
+        value = real.ifEmpty { sampleItems }
+    }
+    val items = loaded
     val index = log.length
-    val done = index >= reviewItems.size
+    val done = items != null && index >= items.size
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopBar(
                 title = "Swipe review",
-                subtitle = if (done) "All reviewed" else "${index + 1} of ${reviewItems.size}",
+                subtitle = when {
+                    items == null -> "Getting your photos"
+                    done -> "All reviewed"
+                    else -> "${index + 1} of ${items.size}"
+                },
                 navigationIcon = { BackButton(onBack) }
             )
         }
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            if (done) {
+            if (items == null) {
+                SkeletonBox(
+                    modifier = Modifier.weight(1f).fillMaxWidth().padding(16.dp),
+                    shape = RoundedCornerShape(16.dp)
+                )
+            } else if (done) {
                 Summary(
+                    items = items,
                     log = log,
                     onUndo = { log = log.dropLast(1) },
                     onRestart = { log = "" },
@@ -103,12 +155,13 @@ fun CleanerReviewScreen(onBack: () -> Unit) {
                 )
             } else {
                 Text(
-                    text = "Preview with sample photos. Nothing is deleted.",
+                    text = if (items.any { it.mediaId != null }) "Preview with your own photos, largest first. Nothing is deleted." else "Preview with sample photos. Nothing is deleted.",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = Design.screenHorizontalPadding, vertical = 8.dp)
                 )
                 ReviewStack(
+                    items = items,
                     index = index,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     onDecision = { keep -> log += if (keep) "K" else "T" },
@@ -122,6 +175,7 @@ fun CleanerReviewScreen(onBack: () -> Unit) {
 
 @Composable
 private fun ReviewStack(
+    items: List<ReviewItem>,
     index: Int,
     canUndo: Boolean,
     onDecision: (Boolean) -> Unit,
@@ -149,9 +203,9 @@ private fun ReviewStack(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                if (index + 1 < reviewItems.size) {
+                if (index + 1 < items.size) {
                     ReviewCard(
-                        item = reviewItems[index + 1],
+                        item = items[index + 1],
                         modifier = Modifier.fillMaxSize().graphicsLayer {
                             scaleX = 0.93f
                             translationY = 30f
@@ -159,7 +213,7 @@ private fun ReviewStack(
                     )
                 }
                 ReviewCard(
-                    item = reviewItems[index],
+                    item = items[index],
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
@@ -267,7 +321,17 @@ private fun ReviewCard(item: ReviewItem, modifier: Modifier = Modifier) {
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
     ) {
         Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            PhotoArt(seed = item.name.length, modifier = Modifier.fillMaxSize())
+            if (item.mediaId != null) {
+                PhotoThumb(
+                    mediaId = item.mediaId,
+                    sizePx = 1080,
+                    modifier = Modifier.fillMaxSize(),
+                    shape = RectangleShape,
+                    description = "Photo ${item.name}"
+                )
+            } else {
+                PhotoArt(seed = item.name.length, modifier = Modifier.fillMaxSize())
+            }
             if (item.video) {
                 Tag(text = "Video", modifier = Modifier.align(Alignment.TopStart).padding(12.dp))
             }
@@ -324,16 +388,18 @@ private fun PhotoArt(seed: Int, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun Summary(log: String, onUndo: () -> Unit, onRestart: () -> Unit, onBack: () -> Unit) {
+private fun Summary(items: List<ReviewItem>, log: String, onUndo: () -> Unit, onRestart: () -> Unit, onBack: () -> Unit) {
     val kept = log.count { it == 'K' }
     val trashed = log.count { it == 'T' }
-    val freed = reviewItems.filterIndexed { i, _ -> log.getOrNull(i) == 'T' }.sumOf { it.mb.toDouble() }
+    val freed = items.filterIndexed { i, _ -> log.getOrNull(i) == 'T' }.sumOf { it.mb.toDouble() }
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 24.dp)
             .padding(top = 32.dp)
     ) {
+        SuccessCheck(color = statusGood(), size = 72.dp)
+        Spacer(modifier = Modifier.height(16.dp))
         Text(
             text = "All done for now",
             fontSize = 24.sp,
@@ -341,7 +407,7 @@ private fun Summary(log: String, onUndo: () -> Unit, onRestart: () -> Unit, onBa
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
-            text = "You reviewed ${reviewItems.size} files. You kept $kept and marked $trashed for the trash.",
+            text = "You reviewed ${items.size} files. You kept $kept and marked $trashed for the trash.",
             fontSize = 15.sp,
             lineHeight = 22.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
