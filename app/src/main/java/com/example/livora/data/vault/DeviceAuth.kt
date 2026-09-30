@@ -135,6 +135,10 @@ class KeystoreKeyWrapper(
             generate(strongBox = true)
         } catch (e: StrongBoxUnavailableException) {
             generate(strongBox = false)
+        } catch (e: java.security.ProviderException) {
+            generate(strongBox = false)
+        } catch (e: java.security.InvalidAlgorithmParameterException) {
+            generate(strongBox = false)
         }
     }
 
