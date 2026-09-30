@@ -1,142 +1,199 @@
 package com.example.livora.ui.ac
 
 import android.app.Application
+import android.content.SharedPreferences
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.livora.data.ir.AcBrand
+import com.example.livora.data.ir.AcBrands
+import com.example.livora.data.ir.AcCapabilities
+import com.example.livora.data.ir.AcChange
+import com.example.livora.data.ir.AcProtocol
+import com.example.livora.data.ir.AcRemote
+import com.example.livora.data.ir.AcSettingsStore
+import com.example.livora.data.ir.AcTimer
 import com.example.livora.data.ir.IrBlasterController
-import com.example.livora.data.ir.AcIrEncoder
+import com.example.livora.data.ir.IrSignal
 import com.example.livora.data.model.AcMode
 import com.example.livora.data.model.AcState
 import com.example.livora.data.model.FanSpeed
 import com.example.livora.data.model.SwingMode
+import com.example.livora.util.Logger
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-import com.example.livora.util.Logger
 import kotlinx.coroutines.launch
 
 class AcViewModel(application: Application) : AndroidViewModel(application) {
 
     private val irController = IrBlasterController(application)
+    private val store = AcSettingsStore(application)
+    private val transmitQueue = Channel<List<IrSignal>>(Channel.UNLIMITED)
 
-    private val _acState = MutableStateFlow(AcState())
-    val acState: StateFlow<AcState> = _acState.asStateFlow()
+    private var protocol: AcProtocol
+
+    private val _remote = MutableStateFlow(store.loadRemote())
+    val remote: StateFlow<AcRemote> = _remote.asStateFlow()
+
+    private val _capabilities: MutableStateFlow<AcCapabilities>
+    val capabilities: StateFlow<AcCapabilities>
+
+    private val _acState: MutableStateFlow<AcState>
+    val acState: StateFlow<AcState>
+
+    private val _transmitFailed = MutableStateFlow(false)
+    val transmitFailed: StateFlow<Boolean> = _transmitFailed.asStateFlow()
 
     val isIrAvailable: Boolean get() = irController.isAvailable
 
+    val currentBrand: AcBrand get() = AcBrands.find(_remote.value.brandId)
+
+    private val storeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+        val stored = loadStoredState()
+        if (stored != _acState.value) _acState.value = stored
+    }
+
     init {
-        Logger.debug(TAG, "AcViewModel created. isIrAvailable=$isIrAvailable")
+        protocol = createProtocol(_remote.value)
+        _capabilities = MutableStateFlow(protocol.capabilities)
+        capabilities = _capabilities.asStateFlow()
+        _acState = MutableStateFlow(loadStoredState())
+        acState = _acState.asStateFlow()
+
+        viewModelScope.launch(Dispatchers.IO) {
+            for (signals in transmitQueue) {
+                _transmitFailed.value = !irController.transmit(signals)
+            }
+        }
+        store.registerChangeListener(storeListener)
+        Logger.debug(TAG, "AcViewModel created. isIrAvailable=$isIrAvailable brand=${_remote.value.brandId}")
     }
 
-    private fun transmitState(state: AcState) {
-        Logger.debug(TAG, "transmitState temp=${state.temperature} mode=${state.mode} fan=${state.fanSpeed}")
-        viewModelScope.launch(Dispatchers.IO) {
-            val (freq, pattern) = AcIrEncoder.encodeState(state)
-            irController.transmit(freq, pattern)
-        }
+    override fun onCleared() {
+        store.unregisterChangeListener(storeListener)
+        transmitQueue.close()
+        super.onCleared()
     }
 
-    private fun transmitPowerOff() {
-        Logger.debug(TAG, "transmitPowerOff POWER OFF")
-        viewModelScope.launch(Dispatchers.IO) {
-            val (freq, pattern) = AcIrEncoder.encodePowerOff()
-            irController.transmit(freq, pattern)
-        }
+    fun selectRemote(brandId: String, modelIndex: Int) {
+        val remote = AcRemote(brandId, modelIndex)
+        store.saveRemote(remote)
+        _remote.value = remote
+        protocol = createProtocol(remote)
+        _capabilities.value = protocol.capabilities
+        val sanitized = protocol.capabilities.sanitize(_acState.value)
+        _acState.value = sanitized
+        store.saveState(sanitized)
+    }
+
+    fun sendTestSignal(brandId: String, modelIndex: Int) {
+        val testProtocol = AcBrands.find(brandId).createProtocol(modelIndex)
+        val testState = testProtocol.capabilities.sanitize(
+            AcState(isPoweredOn = true, temperature = 24, mode = AcMode.COOL, fanSpeed = FanSpeed.AUTO)
+        )
+        transmitQueue.trySend(testProtocol.encode(testState, AcState(isPoweredOn = false), AcChange.POWER))
     }
 
     fun togglePower() {
-        _acState.update { it.copy(isPoweredOn = !it.isPoweredOn) }
-        val current = _acState.value
-        Logger.debug(TAG, "togglePower -> isPoweredOn=${current.isPoweredOn}")
-        if (current.isPoweredOn) transmitState(current) else transmitPowerOff()
+        setPower(!_acState.value.isPoweredOn)
     }
 
-    fun powerOn() {
-        if (!_acState.value.isPoweredOn) {
-            _acState.update { it.copy(isPoweredOn = true) }
-            transmitState(_acState.value)
-        }
-    }
+    fun powerOn() = setPower(true)
 
-    fun powerOff() {
-        if (_acState.value.isPoweredOn) {
-            _acState.update { it.copy(isPoweredOn = false) }
-            transmitPowerOff()
+    fun powerOff() = setPower(false)
+
+    fun applyScene(temperature: Int, mode: AcMode) {
+        commitChange(AcChange.POWER) {
+            it.copy(isPoweredOn = true, temperature = temperature, mode = mode)
         }
     }
 
     fun setTemperature(temp: Int) {
-        _acState.update { it.copy(temperature = temp.coerceIn(AcState.MIN_TEMP, AcState.MAX_TEMP)) }
-        if (_acState.value.isPoweredOn) transmitState(_acState.value)
+        commitChange(AcChange.TEMPERATURE) { it.copy(temperature = temp) }
     }
 
     fun increaseTemperature() {
-        _acState.update { state ->
-            if (state.temperature < AcState.MAX_TEMP) state.copy(temperature = state.temperature + 1)
-            else state
-        }
-        Logger.debug(TAG, "increaseTemperature -> temp=${_acState.value.temperature} isPoweredOn=${_acState.value.isPoweredOn}")
-        if (_acState.value.isPoweredOn) transmitState(_acState.value)
+        commitChange(AcChange.TEMPERATURE) { it.copy(temperature = it.temperature + 1) }
     }
 
     fun decreaseTemperature() {
-        _acState.update { state ->
-            if (state.temperature > AcState.MIN_TEMP) state.copy(temperature = state.temperature - 1)
-            else state
-        }
-        Logger.debug(TAG, "decreaseTemperature -> temp=${_acState.value.temperature} isPoweredOn=${_acState.value.isPoweredOn}")
-        if (_acState.value.isPoweredOn) transmitState(_acState.value)
+        commitChange(AcChange.TEMPERATURE) { it.copy(temperature = it.temperature - 1) }
     }
 
     fun setMode(mode: AcMode) {
-        _acState.update { it.copy(mode = mode) }
-        Logger.debug(TAG, "setMode -> mode=$mode isPoweredOn=${_acState.value.isPoweredOn}")
-        if (_acState.value.isPoweredOn) transmitState(_acState.value)
+        commitChange(AcChange.MODE) { it.copy(mode = mode) }
     }
 
     fun setFanSpeed(speed: FanSpeed) {
-        _acState.update { it.copy(fanSpeed = speed) }
-        Logger.debug(TAG, "setFanSpeed -> speed=$speed isPoweredOn=${_acState.value.isPoweredOn}")
-        if (_acState.value.isPoweredOn) transmitState(_acState.value)
+        commitChange(AcChange.FAN) { it.copy(fanSpeed = speed) }
     }
 
     fun setSwingMode(swing: SwingMode) {
-        _acState.update { it.copy(swingMode = swing) }
+        commitChange(AcChange.SWING) { it.copy(swingMode = swing) }
     }
 
     fun toggleSleepMode() {
-        _acState.update { it.copy(isSleepMode = !it.isSleepMode) }
+        commitChange(AcChange.SLEEP) { it.copy(isSleepMode = !it.isSleepMode) }
     }
 
     fun toggleEnergySaving() {
-        _acState.update { it.copy(isEnergySaving = !it.isEnergySaving) }
+        commitChange(AcChange.ECO) { it.copy(isEnergySaving = !it.isEnergySaving) }
     }
 
     fun toggleDisplay() {
-        _acState.update { it.copy(isDisplayOn = !it.isDisplayOn) }
+        commitChange(AcChange.DISPLAY) { it.copy(isDisplayOn = !it.isDisplayOn) }
     }
 
-    fun setTimer(hours: Int) {
-        _acState.update { it.copy(timerHours = hours.coerceIn(0, 24)) }
+    fun setTimerHours(hours: Int) {
+        val context = getApplication<Application>()
+        val clamped = hours.coerceIn(0, MAX_TIMER_HOURS)
+        val endsAt = if (clamped == 0) 0L else System.currentTimeMillis() + clamped * HOUR_MILLIS
+        val next = _acState.value.copy(timerEndsAtMillis = endsAt)
+        _acState.value = next
+        store.saveState(next)
+        if (endsAt == 0L) AcTimer.cancel(context) else AcTimer.schedule(context, endsAt)
     }
 
-    fun increaseTimer() {
-        _acState.update { state ->
-            if (state.timerHours < 24) state.copy(timerHours = state.timerHours + 1)
-            else state
+    private fun setPower(on: Boolean) {
+        if (!on) clearTimer()
+        commitChange(AcChange.POWER) { it.copy(isPoweredOn = on, timerEndsAtMillis = if (on) it.timerEndsAtMillis else 0L) }
+    }
+
+    private fun clearTimer() {
+        if (_acState.value.timerEndsAtMillis > 0L) AcTimer.cancel(getApplication())
+    }
+
+    private fun commitChange(change: AcChange, transform: (AcState) -> AcState) {
+        val previous = _acState.value
+        val next = _capabilities.value.sanitize(transform(previous))
+        val isToggle = change == AcChange.SWING || change == AcChange.SLEEP ||
+            change == AcChange.ECO || change == AcChange.DISPLAY
+        if (isToggle && next == previous) return
+        _acState.value = next
+        store.saveState(next)
+        if (!next.isPoweredOn && change != AcChange.POWER) return
+        val signals = protocol.encode(next, previous, change)
+        Logger.debug(TAG, "apply change=$change signals=${signals.size} state=$next")
+        if (signals.isNotEmpty()) transmitQueue.trySend(signals)
+    }
+
+    private fun loadStoredState(): AcState {
+        val stored = _capabilities.value.sanitize(store.loadState())
+        return if (stored.timerEndsAtMillis in 1..System.currentTimeMillis()) {
+            stored.copy(timerEndsAtMillis = 0L)
+        } else {
+            stored
         }
     }
 
-    fun decreaseTimer() {
-        _acState.update { state ->
-            if (state.timerHours > 0) state.copy(timerHours = state.timerHours - 1)
-            else state
-        }
-    }
+    private fun createProtocol(remote: AcRemote): AcProtocol =
+        AcBrands.find(remote.brandId).createProtocol(remote.modelIndex)
 
     companion object {
         private const val TAG = "Livora.AcViewModel"
+        private const val MAX_TIMER_HOURS = 12
+        private const val HOUR_MILLIS = 3_600_000L
     }
 }

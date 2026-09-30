@@ -5,11 +5,14 @@ enum class AcMode {
 }
 
 enum class FanSpeed {
-    LOW, MEDIUM, HIGH, AUTO
+    QUIET, LOW, MEDIUM, HIGH, AUTO
 }
 
 enum class SwingMode {
-    OFF, VERTICAL, HORIZONTAL, BOTH
+    OFF, VERTICAL, HORIZONTAL, BOTH;
+
+    val hasVertical: Boolean get() = this == VERTICAL || this == BOTH
+    val hasHorizontal: Boolean get() = this == HORIZONTAL || this == BOTH
 }
 
 data class AcState(
@@ -21,8 +24,10 @@ data class AcState(
     val isSleepMode: Boolean = false,
     val isEnergySaving: Boolean = false,
     val isDisplayOn: Boolean = true,
-    val timerHours: Int = 0
+    val timerEndsAtMillis: Long = 0L
 ) {
+    val hasTimer: Boolean get() = timerEndsAtMillis > 0L
+
     companion object {
         const val MIN_TEMP = 16
         const val MAX_TEMP = 30
