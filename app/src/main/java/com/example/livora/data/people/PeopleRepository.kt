@@ -79,6 +79,14 @@ class SuggestionSet(
     fun atThreshold(threshold: Float): List<Suggestion> = items.filter { it.score >= threshold }
 }
 
+class MoveAllPlan(
+    val person: PersonSummary,
+    val folder: com.example.livora.data.people.media.FolderInfo,
+    val mediaIds: List<Long>,
+    val known: Int,
+    val suggestions: List<Suggestion>
+)
+
 class FaceStateSnapshot(val faceId: Long, val personId: Long?, val locked: Boolean)
 
 class UndoToken(val restore: suspend () -> Unit)
@@ -123,6 +131,18 @@ class PeopleRepository(
                 mediaIds.map { AiMoveEntity(it, personId, it, AiMoveKind.MOVE, previous[it].orEmpty(), toPath, now) }
             )
         }
+
+    suspend fun planMoveAll(
+        person: PersonSummary,
+        folder: com.example.livora.data.people.media.FolderInfo
+    ): MoveAllPlan = withContext(Dispatchers.IO) {
+        val already = MediaImages.idsInRelativePath(context, folder.relativePath)
+        val own = mediaIdsOfPerson(person.id).filter { it !in already }
+        val set = suggestions(person.id)
+        val ownSet = own.toHashSet()
+        val similar = set.atThreshold(set.effectiveThreshold).filter { it.mediaId !in already && it.mediaId !in ownSet }
+        MoveAllPlan(person, folder, (own + similar.map { it.mediaId }).distinct(), own.size, similar)
+    }
 
     suspend fun dropAiMoves(mediaIds: List<Long>) = withContext(Dispatchers.IO) {
         for (chunk in mediaIds.chunked(400)) database.aiMoves().delete(chunk)

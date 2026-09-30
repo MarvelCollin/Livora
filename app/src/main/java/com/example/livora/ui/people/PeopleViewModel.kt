@@ -6,6 +6,12 @@ import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.example.livora.data.people.IndexStatus
+import com.example.livora.data.people.MoveAllPlan
+import com.example.livora.data.people.UndoToken
+import com.example.livora.data.people.db.LinkMode
+import com.example.livora.data.people.media.FolderInfo
+import com.example.livora.data.people.media.MediaImages
+import com.example.livora.data.people.media.MediaWriter
 import com.example.livora.data.people.PeopleServices
 import com.example.livora.data.people.db.PersonKind
 import com.example.livora.data.people.db.PersonSummary
@@ -29,6 +35,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 sealed interface PeopleListState {
     data object Loading : PeopleListState
@@ -209,6 +216,66 @@ class PeopleViewModel(application: Application) : AndroidViewModel(application) 
                 )
                 refreshMergeSuggestions()
             }
+        }
+    }
+
+    private val moveAllState = MutableStateFlow<MoveAllPlan?>(null)
+    val moveAllPlan: StateFlow<MoveAllPlan?> = moveAllState.asStateFlow()
+
+    fun prepareMoveAll(person: PersonSummary, folder: FolderInfo) {
+        viewModelScope.launch {
+            val plan = repository.planMoveAll(person, folder)
+            if (plan.mediaIds.isEmpty()) {
+                Toaster.info("There are no photos of ${person.name.orEmpty()} to move yet. Check a folder for them first.")
+            } else {
+                moveAllState.value = plan
+            }
+        }
+    }
+
+    fun cancelMoveAll() {
+        moveAllState.value = null
+    }
+
+    fun confirmMoveAll() {
+        val plan = moveAllState.value ?: return
+        moveAllState.value = null
+        viewModelScope.launch {
+            val previous = withContext(Dispatchers.IO) {
+                MediaImages.queryByIds(getApplication(), plan.mediaIds).associate { it.id to it.relativePath }
+            }
+            ConsentBroker.ask(MediaWriter.writeRequest(getApplication(), plan.mediaIds), viewModelScope) {
+                val path = plan.folder.relativePath
+                val moved = MediaWriter.applyMove(getApplication(), plan.mediaIds, path)
+                repository.syncPhotoDates(plan.mediaIds)
+                repository.recordAiMoves(plan.person.id, plan.mediaIds, previous, path)
+                val undo = if (plan.suggestions.isEmpty()) null else repository.confirm(plan.person.id, plan.suggestions)
+                val entity = repository.person(plan.person.id)
+                if (entity != null && entity.linkedFolderPath == null) {
+                    repository.linkFolder(plan.person.id, path, plan.folder.name, LinkMode.REVIEW)
+                }
+                services.folders.refresh()
+                Toaster.show(
+                    message = "Moved $moved ${if (moved == 1) "photo" else "photos"} of ${plan.person.name.orEmpty()} to ${plan.folder.name}",
+                    type = ToastType.Success,
+                    durationMs = 8000,
+                    actionLabel = "Undo",
+                    onAction = { undoMoveAll(plan, previous, undo) }
+                )
+            }
+        }
+    }
+
+    private fun undoMoveAll(plan: MoveAllPlan, previous: Map<Long, String>, undo: UndoToken?) {
+        ConsentBroker.ask(MediaWriter.writeRequest(getApplication(), plan.mediaIds), viewModelScope) {
+            for ((path, group) in plan.mediaIds.groupBy { previous[it] ?: "Pictures/" }) {
+                MediaWriter.applyMove(getApplication(), group, path)
+            }
+            repository.syncPhotoDates(plan.mediaIds)
+            repository.dropAiMoves(plan.mediaIds)
+            undo?.restore()
+            services.folders.refresh()
+            Toaster.success("Moved the photos back")
         }
     }
 

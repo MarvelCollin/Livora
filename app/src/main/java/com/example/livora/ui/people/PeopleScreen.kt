@@ -105,12 +105,15 @@ fun PeopleScreen(
     val photoSelected by galleryViewModel.selected.collectAsState()
     val photoRows by galleryViewModel.rows.collectAsState()
     val photos by galleryViewModel.images.collectAsState()
+    val aiLabels by galleryViewModel.aiLabels.collectAsState()
+    val moveAll by viewModel.moveAllPlan.collectAsState()
     var segment by rememberSaveable { mutableStateOf(0) }
     var menuOpen by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<PersonSummary?>(null) }
     var creatingFolder by remember { mutableStateOf(false) }
     var picker by remember { mutableStateOf<PickerMode?>(null) }
     var choosingFolder by remember { mutableStateOf(false) }
+    var movingPerson by remember { mutableStateOf<PersonSummary?>(null) }
     val selecting = selected.isNotEmpty()
     val selectingPhotos = photoSelected.isNotEmpty() && segment == 0
 
@@ -299,6 +302,7 @@ fun PeopleScreen(
                         onOpen = onOpenPhoto,
                         onToggle = { galleryViewModel.toggle(it) },
                         onToggleGroup = { galleryViewModel.toggleGroup(it) },
+                        aiLabels = aiLabels,
                         topContent = {
                             if (access == AccessLevel.Partial) PartialAccessNotice(onOpenSettings = { openSettings() })
                         },
@@ -326,6 +330,7 @@ fun PeopleScreen(
                         onOpenPerson = onOpenPerson,
                         onToggle = { viewModel.toggleSelect(it) },
                         onRename = { renaming = it },
+                        onMoveAll = { movingPerson = it },
                         onStart = { startScanWithPrompt() },
                         onAllowAll = { openSettings() },
                         onAddPerson = { choosingFolder = true },
@@ -344,6 +349,34 @@ fun PeopleScreen(
                 }
             }
         }
+    }
+
+    val mover = movingPerson
+    if (mover != null) {
+        FolderPickerSheet(
+            title = "Move photos of ${mover.name.orEmpty()} to",
+            folders = galleryViewModel.folderList(),
+            onPick = { folder ->
+                movingPerson = null
+                viewModel.prepareMoveAll(mover, folder)
+            },
+            onCreate = { folderName ->
+                movingPerson = null
+                galleryViewModel.createFolderAnd(folderName) { folder -> viewModel.prepareMoveAll(mover, folder) }
+            },
+            onDismiss = { movingPerson = null }
+        )
+    }
+    val plan = moveAll
+    if (plan != null) {
+        val count = plan.mediaIds.size
+        ConfirmDialog(
+            title = "Move $count ${if (count == 1) "photo" else "photos"} of ${plan.person.name.orEmpty()}?",
+            body = "${plan.known} already sorted to them and ${plan.suggestions.size} that look similar go to ${plan.folder.name}. A photo with other people leaves its current folder too. Undo it right after, or mark wrong ones later when you open the folder.",
+            confirm = "Move photos",
+            onConfirm = { viewModel.confirmMoveAll() },
+            onDismiss = { viewModel.cancelMoveAll() }
+        )
     }
 
     if (choosingFolder) {
@@ -417,6 +450,7 @@ private fun PeopleList(
     onOpenPerson: (Long) -> Unit,
     onToggle: (Long) -> Unit,
     onRename: (PersonSummary) -> Unit,
+    onMoveAll: (PersonSummary) -> Unit,
     onStart: () -> Unit,
     onAllowAll: () -> Unit,
     onAddPerson: () -> Unit,
@@ -558,7 +592,8 @@ private fun PeopleList(
                         isSelected = person.id in selected,
                         onOpen = { if (selecting) onToggle(person.id) else onOpenPerson(person.id) },
                         onSelect = { onToggle(person.id) },
-                        onRename = { onRename(person) }
+                        onRename = { onRename(person) },
+                        onMoveAll = { onMoveAll(person) }
                     )
                     HorizontalDivider(
                         modifier = Modifier.padding(start = 86.dp),
@@ -667,7 +702,8 @@ private fun PersonRow(
     isSelected: Boolean,
     onOpen: () -> Unit,
     onSelect: () -> Unit,
-    onRename: () -> Unit
+    onRename: () -> Unit,
+    onMoveAll: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -714,6 +750,8 @@ private fun PersonRow(
         }
         if (selecting) {
             SelectMark(selected = isSelected, description = if (isSelected) "Selected" else "Not selected")
+        } else if (person.name != null) {
+            LinkButton(text = "Move photos", onClick = onMoveAll)
         }
     }
 }
