@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Handyman
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +31,7 @@ import com.example.livora.ui.bulb.BulbViewModel
 import com.example.livora.ui.dictionary.DictionaryScreen
 import com.example.livora.ui.dictionary.DictionaryViewModel
 import com.example.livora.ui.home.HomeScreen
+import com.example.livora.ui.people.PeopleTab
 import com.example.livora.ui.todo.TodoScreen
 import com.example.livora.ui.tools.ToolsScreen
 import com.example.livora.ui.todo.TodoViewModel
@@ -38,7 +40,8 @@ private enum class MainTab(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Default.Home),
     Tasks("Tasks", Icons.Default.Checklist),
     Dictionary("Dictionary", Icons.Default.Translate),
-    Tools("Tools", Icons.Default.Handyman)
+    Tools("Tools", Icons.Default.Handyman),
+    People("People", Icons.Default.People)
 }
 
 @Composable
@@ -51,7 +54,8 @@ fun MainScreen(
     onNavigateToBulb: () -> Unit,
     onOpenTodoDetail: (String) -> Unit,
     onOpenQuiz: () -> Unit,
-    onOpenVault: () -> Unit
+    onOpenVault: () -> Unit,
+    onOpenPeopleRoute: (String) -> Unit
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val tabs = MainTab.entries
@@ -113,6 +117,7 @@ fun MainScreen(
                     onOpenQuiz = onOpenQuiz
                 )
                 MainTab.Tools -> ToolsScreen(onOpenVault = onOpenVault)
+                MainTab.People -> PeopleTab(onNavigate = onOpenPeopleRoute)
             }
         }
     }
