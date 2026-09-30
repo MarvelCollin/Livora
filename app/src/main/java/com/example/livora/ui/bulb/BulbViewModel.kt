@@ -190,33 +190,6 @@ class BulbViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun processVoiceCommand(text: String) {
-        val lower = text.lowercase()
-        Logger.debug(TAG, "Bulb voice command: $lower")
-        when {
-            lower.contains("light") && (lower.contains("on") || lower.contains("turn on")) -> {
-                if (!_bulbState.value.isPoweredOn) togglePower()
-            }
-            lower.contains("light") && (lower.contains("off") || lower.contains("turn off")) -> {
-                if (_bulbState.value.isPoweredOn) togglePower()
-            }
-            lower.contains("bright") && lower.contains("up") -> increaseBrightness()
-            lower.contains("bright") && lower.contains("down") -> decreaseBrightness()
-            lower.contains("warm") -> setColorTemperature(2700)
-            lower.contains("cool") && lower.contains("white") -> setColorTemperature(6500)
-            lower.contains("daylight") -> setColorTemperature(5000)
-            else -> {
-                val brightnessMatch = Regex("(\\d+)\\s*(%|percent)").find(lower)
-                if (brightnessMatch != null) {
-                    val value = brightnessMatch.groupValues[1].toIntOrNull()
-                    if (value != null) {
-                        setBrightness(value.coerceIn(BulbState.MIN_BRIGHTNESS, BulbState.MAX_BRIGHTNESS))
-                    }
-                }
-            }
-        }
-    }
-
     companion object {
         private const val TAG = "Livora.BulbViewModel"
         private const val PREFS_NAME = "livora_bulb_prefs"

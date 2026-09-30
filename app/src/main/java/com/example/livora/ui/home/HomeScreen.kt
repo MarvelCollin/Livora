@@ -1,14 +1,5 @@
 package com.example.livora.ui.home
 
-import android.Manifest
-import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -32,8 +23,6 @@ import androidx.compose.material.icons.filled.AcUnit
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.Card
@@ -45,21 +34,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import com.example.livora.data.model.AcMode
 import com.example.livora.data.model.BulbScene
 import com.example.livora.data.model.TodoStats
@@ -71,11 +54,8 @@ import com.example.livora.ui.components.DeviceCard
 import com.example.livora.ui.components.SkeletonBox
 import com.example.livora.ui.components.SkeletonLine
 import com.example.livora.ui.components.TaskTimerChip
-import com.example.livora.ui.components.VoiceListeningOverlay
 import com.example.livora.ui.todo.TodoViewModel
 import com.example.livora.ui.todo.scheduleSummary
-import com.example.livora.util.VoiceRecognitionManager
-import com.example.livora.util.WakeWordListener
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -98,13 +78,6 @@ fun HomeScreen(
     val runningTimers by todoViewModel.runningTimers.collectAsState()
     val todoLoading by todoViewModel.isLoading.collectAsState()
 
-    val context = LocalContext.current
-    val voiceManager = remember { VoiceRecognitionManager(context) }
-    val wakeWordListener = remember { WakeWordListener(context) }
-    var isListening by remember { mutableStateOf(false) }
-    var partialText by remember { mutableStateOf("") }
-    var isWakeWordActive by remember { mutableStateOf(false) }
-
     val activateNormalMode = {
         acViewModel.setTemperature(20)
         acViewModel.setMode(AcMode.COOL)
@@ -126,72 +99,6 @@ fun HomeScreen(
         bulbViewModel.powerOff()
     }
 
-    val processQuickVoiceCommand: (String) -> Unit = { text ->
-        val lower = text.lowercase()
-        when {
-            lower.contains("normal") -> activateNormalMode()
-            lower.contains("sleep") -> activateSleepMode()
-            lower.contains("out") || lower.contains("leave") -> activateOutMode()
-        }
-    }
-
-    val startVoiceListening = {
-        voiceManager.startListening(
-            onResult = { text ->
-                processQuickVoiceCommand(text)
-                acViewModel.processVoiceCommand(text)
-                bulbViewModel.processVoiceCommand(text)
-            },
-            onPartialResult = { partial -> partialText = partial },
-            onListeningStarted = { isListening = true },
-            onListeningEnded = {
-                isListening = false
-                partialText = ""
-            }
-        )
-    }
-
-    fun restartWakeWordLoop() {
-        if (!isWakeWordActive) return
-        wakeWordListener.start {
-            wakeWordListener.stop()
-            voiceManager.startListening(
-                onResult = { text ->
-                    processQuickVoiceCommand(text)
-                    acViewModel.processVoiceCommand(text)
-                    bulbViewModel.processVoiceCommand(text)
-                },
-                onPartialResult = { partial -> partialText = partial },
-                onListeningStarted = { isListening = true },
-                onListeningEnded = {
-                    isListening = false
-                    partialText = ""
-                    restartWakeWordLoop()
-                }
-            )
-        }
-    }
-
-    DisposableEffect(Unit) {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            isWakeWordActive = true
-            restartWakeWordLoop()
-        }
-        onDispose {
-            wakeWordListener.destroy()
-            voiceManager.destroy()
-        }
-    }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            startVoiceListening()
-            isWakeWordActive = true
-        }
-    }
-
     val doneCount = stats.count { it.isDoneCurrentInterval }
     val totalCount = stats.size
     val pending = stats.filterNot { it.isDoneCurrentInterval }
@@ -203,46 +110,7 @@ fun HomeScreen(
             topBar = {
                 TopBar(
                     title = greeting(),
-                    subtitle = today(),
-                    actions = {
-                        IconButton(onClick = {
-                            if (ContextCompat.checkSelfPermission(
-                                    context, Manifest.permission.RECORD_AUDIO
-                                ) == PackageManager.PERMISSION_GRANTED
-                            ) {
-                                if (isListening) {
-                                    voiceManager.stopListening()
-                                    isListening = false
-                                    partialText = ""
-                                    restartWakeWordLoop()
-                                } else {
-                                    wakeWordListener.stop()
-                                    voiceManager.startListening(
-                                        onResult = { text ->
-                                            processQuickVoiceCommand(text)
-                                            acViewModel.processVoiceCommand(text)
-                                            bulbViewModel.processVoiceCommand(text)
-                                        },
-                                        onPartialResult = { partial -> partialText = partial },
-                                        onListeningStarted = { isListening = true },
-                                        onListeningEnded = {
-                                            isListening = false
-                                            partialText = ""
-                                            restartWakeWordLoop()
-                                        }
-                                    )
-                                }
-                            } else {
-                                permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                            }
-                        }) {
-                            Icon(
-                                imageVector = if (isListening) Icons.Default.MicOff else Icons.Default.Mic,
-                                contentDescription = null,
-                                tint = if (isListening) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
+                    subtitle = today()
                 )
             }
         ) { innerPadding ->
@@ -374,22 +242,6 @@ fun HomeScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
             }
-        }
-
-        AnimatedVisibility(
-            visible = isListening,
-            enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
-            exit = fadeOut() + slideOutVertically(targetOffsetY = { it })
-        ) {
-            VoiceListeningOverlay(
-                partialText = partialText,
-                onDismiss = {
-                    voiceManager.stopListening()
-                    isListening = false
-                    partialText = ""
-                    restartWakeWordLoop()
-                }
-            )
         }
     }
 }

@@ -1,14 +1,5 @@
 package com.example.livora.ui.bulb
 
-import android.Manifest
-import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,8 +27,6 @@ import androidx.compose.material.icons.filled.Brightness7
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Lightbulb
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
@@ -67,12 +56,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import com.example.livora.data.model.Bulb
 import com.example.livora.data.model.BulbState
 import com.example.livora.data.model.BulbScene
@@ -80,8 +67,6 @@ import com.example.livora.ui.components.Design
 import com.example.livora.ui.components.Section
 import com.example.livora.ui.components.SelectChip
 import com.example.livora.ui.components.TopBar
-import com.example.livora.ui.components.VoiceListeningOverlay
-import com.example.livora.util.VoiceRecognitionManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -94,119 +79,54 @@ fun BulbControllerScreen(
     val discoveredBulbs by viewModel.discoveredBulbs.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
     val isAddingBulb by viewModel.isAddingBulb.collectAsState()
-    val context = LocalContext.current
-    val voiceManager = remember { VoiceRecognitionManager(context) }
-    var isListening by remember { mutableStateOf(false) }
-    var partialText by remember { mutableStateOf("") }
 
-    DisposableEffect(Unit) {
-        onDispose { voiceManager.destroy() }
-    }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            voiceManager.startListening(
-                onResult = { text -> viewModel.processVoiceCommand(text) },
-                onPartialResult = { partial -> partialText = partial },
-                onListeningStarted = { isListening = true },
-                onListeningEnded = { isListening = false; partialText = "" }
-            )
-        }
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        Scaffold(
-            topBar = {
-                TopBar(
-                    title = "Smart bulb",
-                    subtitle = if (connectedBulb != null) "WiZ · ${connectedBulb!!.ip}" else "WiZ Downlight",
-                    navigationIcon = {
-                        IconButton(onClick = {
-                            viewModel.cancelBulbSetup()
-                            onBack()
-                        }) {
+    Scaffold(
+        topBar = {
+            TopBar(
+                title = "Smart bulb",
+                subtitle = if (connectedBulb != null) "WiZ · ${connectedBulb!!.ip}" else "WiZ Downlight",
+                navigationIcon = {
+                    IconButton(onClick = {
+                        viewModel.cancelBulbSetup()
+                        onBack()
+                    }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        )
+                    }
+                },
+                actions = {
+                    if (connectedBulb != null && !isAddingBulb) {
+                        IconButton(onClick = { viewModel.refreshBulbState() }) {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                            )
-                        }
-                    },
-                    actions = {
-                        if (connectedBulb != null && !isAddingBulb) {
-                            IconButton(onClick = { viewModel.refreshBulbState() }) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = null
-                                )
-                            }
-                        }
-                        IconButton(onClick = {
-                            if (ContextCompat.checkSelfPermission(
-                                    context, Manifest.permission.RECORD_AUDIO
-                                ) == PackageManager.PERMISSION_GRANTED
-                            ) {
-                                if (isListening) {
-                                    voiceManager.stopListening()
-                                    isListening = false
-                                    partialText = ""
-                                } else {
-                                    voiceManager.startListening(
-                                        onResult = { text -> viewModel.processVoiceCommand(text) },
-                                        onPartialResult = { partial -> partialText = partial },
-                                        onListeningStarted = { isListening = true },
-                                        onListeningEnded = { isListening = false; partialText = "" }
-                                    )
-                                }
-                            } else {
-                                permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                            }
-                        }) {
-                            Icon(
-                                imageVector = if (isListening) Icons.Default.MicOff else Icons.Default.Mic,
-                                contentDescription = null,
-                                tint = if (isListening) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = null
                             )
                         }
                     }
-                )
-            }
-        ) { innerPadding ->
-            if (connectedBulb == null || isAddingBulb) {
-                DiscoveryContent(
-                    discoveredBulbs = discoveredBulbs,
-                    isScanning = isScanning,
-                    onScan = { viewModel.scanForBulbs() },
-                    onSelectBulb = { viewModel.connectToBulb(it) },
-                    modifier = Modifier.padding(innerPadding)
-                )
-            } else {
-                BulbControlContent(
-                    state = bulbState,
-                    onTogglePower = viewModel::togglePower,
-                    onBrightnessChange = viewModel::setBrightness,
-                    onColorTempChange = viewModel::setColorTemperature,
-                    onSetRgb = viewModel::setRgbColor,
-                    onSetScene = viewModel::setScene,
-                    modifier = Modifier.padding(innerPadding)
-                )
-            }
-        }
-
-        AnimatedVisibility(
-            visible = isListening,
-            enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
-            exit = fadeOut() + slideOutVertically(targetOffsetY = { it })
-        ) {
-            VoiceListeningOverlay(
-                partialText = partialText,
-                onDismiss = {
-                    voiceManager.stopListening()
-                    isListening = false
-                    partialText = ""
                 }
+            )
+        }
+    ) { innerPadding ->
+        if (connectedBulb == null || isAddingBulb) {
+            DiscoveryContent(
+                discoveredBulbs = discoveredBulbs,
+                isScanning = isScanning,
+                onScan = { viewModel.scanForBulbs() },
+                onSelectBulb = { viewModel.connectToBulb(it) },
+                modifier = Modifier.padding(innerPadding)
+            )
+        } else {
+            BulbControlContent(
+                state = bulbState,
+                onTogglePower = viewModel::togglePower,
+                onBrightnessChange = viewModel::setBrightness,
+                onColorTempChange = viewModel::setColorTemperature,
+                onSetRgb = viewModel::setRgbColor,
+                onSetScene = viewModel::setScene,
+                modifier = Modifier.padding(innerPadding)
             )
         }
     }
