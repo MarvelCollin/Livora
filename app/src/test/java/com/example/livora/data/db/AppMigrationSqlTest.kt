@@ -136,8 +136,20 @@ class AppMigrationSqlTest {
     }
 
     @Test
-    fun seedRowsMatchTheCurrentSchema() {
+    fun versionFourToFiveAddsTheQrHistory() {
         createFrom(4)
+        assertMatchesSchema(4)
+        exec("INSERT INTO cleaner_kept (fileKey, keptAt) VALUES ('i:5', 100)")
+        AppMigrationSql.V4_TO_V5.forEach { exec(it) }
+        assertMatchesSchema(5)
+        assertEquals("i:5", scalar("SELECT fileKey FROM cleaner_kept"))
+        exec("INSERT INTO qr_history (value, kind, scannedAt, fromPhoto) VALUES ('https://a.b', 'Website', 5, 0)")
+        assertEquals("1", scalar("SELECT id FROM qr_history"))
+    }
+
+    @Test
+    fun seedRowsMatchTheCurrentSchema() {
+        createFrom(5)
         AppSeed.SQL.forEach { exec(it) }
         assertEquals("12", scalar("SELECT COUNT(*) FROM expense_categories"))
         assertEquals("3", scalar("SELECT COUNT(*) FROM expense_accounts"))

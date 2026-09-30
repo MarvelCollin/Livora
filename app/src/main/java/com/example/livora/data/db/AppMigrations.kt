@@ -28,6 +28,10 @@ object AppMigrationSql {
     val V3_TO_V4 = listOf(
         "CREATE TABLE IF NOT EXISTS `cleaner_kept` (`fileKey` TEXT NOT NULL, `keptAt` INTEGER NOT NULL, PRIMARY KEY(`fileKey`))"
     )
+
+    val V4_TO_V5 = listOf(
+        "CREATE TABLE IF NOT EXISTS `qr_history` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `value` TEXT NOT NULL, `kind` TEXT NOT NULL, `scannedAt` INTEGER NOT NULL, `fromPhoto` INTEGER NOT NULL)"
+    )
 }
 
 object AppMigrations {
@@ -50,5 +54,11 @@ object AppMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+    val MIGRATION_4_5 = object : Migration(4, 5) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            AppMigrationSql.V4_TO_V5.forEach { db.execSQL(it) }
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
 }

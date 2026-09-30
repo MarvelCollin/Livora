@@ -15,7 +15,8 @@ Effort sizes are relative: S is small, M is medium, L is large, XL is the bigges
 - [x] Expenses is a real tool with its own database, charts, categories with icons and CSV export, see section 5
 - [x] App usage is a real tool with real screen time, charts and unused apps, see section 7
 - [x] The Storage cleaner is a real tool with real storage numbers, duplicates, screenshots, big files and swipe review with system trash, see section 9
-- [x] UI previews with sample data exist for QR codes and Documents. They do not work yet, see section 0b
+- [x] QR codes is a real tool with camera scanning, photo scanning, real code generation and history, see section 4
+- [x] A UI preview with sample data exists for Documents. It does not work yet, see section 0b
 
 ## 0b. Navigation and where every tool lives
 
@@ -36,7 +37,6 @@ Rules for this structure:
 
 Status of the UI previews (sample data only, no real function behind them):
 - [x] Tools hub with grouped rows
-- [x] QR codes: Scan tab with history and a safe result sheet, Create tab with a live preview
 - [x] Documents: searchable library with sort, document page grid
 - [ ] Replace each preview with the real tool, in the order of section 10
 
@@ -170,21 +170,21 @@ Highest risk tool, so the security design came before any screen. No custom cryp
 **Approach.** Google code scanner from Play services (`play-services-code-scanner`). It has its own scanning screen, needs no camera permission, and adds almost nothing to the APK. Fall back to CameraX plus unbundled ML Kit only if a custom scan screen is wanted later. ZXing core (Apache 2.0) for generating codes.
 
 **Scan**
-- [ ] Launch the Google code scanner from the QR tool, with the result shown in the app's own screen
-- [ ] Scan from a gallery image through the system photo picker
-- [ ] Recognize all common formats: QR, EAN, UPC, Code 128, Data Matrix
-- [ ] Result parsing by type: URL, Wi-Fi, contact card, phone, SMS, email, location, calendar event, plain text (pure functions with unit tests)
-- [ ] Safety: never auto open links, show the full address with the host emphasized, warn on plain http and shortened links
-- [ ] Wi-Fi result offers to join the network
-- [ ] History in Room: search, favorite, swipe to delete with undo
-- [ ] Empty state, and a clear message if Play services is missing
+- [x] Launch the Google code scanner from the QR tool, with the result shown in the app's own sheet
+- [x] Scan from a gallery image through the system photo picker (ZXing reads it, no permission needed)
+- [x] Recognize all common formats: QR, EAN, UPC, Code 128, Data Matrix
+- [x] Result parsing by type: URL, Wi-Fi, contact card, phone, SMS, email, location, plain text (pure functions with unit tests). Calendar events are still open
+- [x] Safety: never auto open links, show the full address with the host emphasized, warn on plain http, shortened links, @ tricks, look-alike characters and bare IP addresses
+- [x] Wi-Fi result offers to add the network on Android 11 and newer, and copies the password on older versions
+- [ ] History in Room: search, favorite, swipe to delete with undo. History, delete and clear are done
+- [x] Empty state, and a clear message if Play services is missing
 
 **Generate**
-- [ ] Types: text, URL, Wi-Fi, contact, email, phone, SMS, location
-- [ ] Options: error correction level, size, foreground and background color with a contrast check
-- [ ] Preview updates as you type
-- [ ] Save PNG to `Pictures/Livora` through MediaStore, share sheet, copy
-- [ ] Round trip test: generate then decode returns the same text
+- [x] Types: text, URL, Wi-Fi, contact, email, phone, SMS, location
+- [ ] Options: error correction level, size, foreground and background color with a contrast check. Error correction is done, colors stay dark on white so codes always scan
+- [x] Preview updates as you type
+- [x] Save PNG to `Pictures/Livora` through MediaStore, share sheet, copy
+- [x] Round trip test: generate then decode returns the same text, at every error correction level
 
 ## 5. Expenses Tracker (L)
 

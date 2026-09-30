@@ -58,8 +58,7 @@ fun ToolsScreen(
                 title = "QR codes",
                 icon = Icons.Default.QrCode2,
                 description = "Scan a code or make your own",
-                onClick = { onOpenRoute(ToolRoutes.QR) },
-                value = { Tag("Preview") }
+                onClick = { onOpenRoute(ToolRoutes.QR) }
             )
             NavRow(
                 title = "Documents",

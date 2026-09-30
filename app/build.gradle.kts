@@ -96,6 +96,8 @@ dependencies {
     implementation(libs.androidx.paging.compose)
     implementation(libs.litert)
     coreLibraryDesugaring(libs.desugar.jdk.libs)
+    implementation(libs.zxing.core)
+    implementation(libs.code.scanner)
     testImplementation(libs.junit)
     testImplementation(libs.sqlite.jdbc)
     testImplementation("org.json:json:20240303")
