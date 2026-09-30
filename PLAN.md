@@ -10,13 +10,41 @@ Effort sizes are relative: S is small, M is medium, L is large, XL is the bigges
 - [x] AC remote with 17 brands, checked against real remote captures, 20 degree default on power on
 - [x] Cerulean and marigold theme with dark mode, no gradients, 48dp touch targets
 - [x] App icon and brand files in `branding/`
-- [ ] People (face grouping) is being built by a background agent, see section 8
+- [x] People (face grouping) lives in the Gallery tab as Photos, Albums and People, see section 8
+- [x] Navigation is grouped into four tabs, see section 0b
+- [x] UI previews with sample data exist for QR codes, Expenses, Documents, App usage and the Storage cleaner with swipe review. None of them work yet, see section 0b
+
+## 0b. Navigation and where every tool lives
+
+Four bottom tabs, each a place a person can name. Each tab with parts keeps them as swipeable segments under one fixed title, and a swipe changes the segment first, then the tab at the edge.
+
+| Tab | What is inside | Why it is grouped this way |
+|-----|----------------|----------------------------|
+| Home | AC, bulb and scenes | The thing used most, kept devices only |
+| Daily | Tasks, Dictionary, Expenses as segments | Things you check every day and log a little at a time |
+| Gallery | Photos, Albums, People as segments | Everything about your pictures, including the viewer and moving photos |
+| Tools | A hub with three groups. Scan and create: QR codes, Documents. Private: Password vault. Phone care: Storage cleaner, App usage | Rarely opened helpers, each one row with a short description |
+
+Rules for this structure:
+- No more than five bottom tabs, and the current tab is marked with a filled marker and its label, not color alone
+- A page title matches the tab or row that opened it, and every page below a tab has a Back button
+- New tools go into an existing Tools group, they do not get a new tab
+- Screens with sample data say so in a line under the title, so nothing pretends to work
+
+Status of the UI previews (sample data only, no real function behind them):
+- [x] Tools hub with grouped rows
+- [x] QR codes: Scan tab with history and a safe result sheet, Create tab with a live preview
+- [x] Expenses: month headline, budget, where it went, searchable list grouped by day, add sheet with keypad
+- [x] Documents: searchable library with sort, document page grid
+- [x] App usage: permission screen, screen time with hourly chart, most used apps, unused apps
+- [x] Storage cleaner: overview with space breakdown, swipe review card stack with undo and end summary
+- [ ] Replace each preview with the real tool, in the order of section 10
 
 ## 1. Decisions to confirm first
 
 Each has a recommended default. Work follows the default unless you say otherwise.
 
-- [ ] **Navigation.** Add a fourth bottom tab called Tools that lists all seven tools as plain rows (name, one line of description, a live value such as "Vault, 12 items"). Home stays devices only. Default: yes.
+- [x] **Navigation.** Decided: four bottom tabs, Home, Daily, Gallery and Tools, as described in section 0b. Tools is a grouped hub of plain rows (name, one line of description, a live value such as "Vault, 12 items"). Home stays devices only.
 - [ ] **All files access for the cleaner.** Android 11+ hides other apps' files and the Downloads root from normal apps. Full cleaner features (old APKs, big downloads, empty folders) need the `MANAGE_EXTERNAL_STORAGE` permission. Fine for a personal sideloaded app, not accepted on Play Store. Default: ask for it as an optional "Full cleaner mode" and keep a media only mode without it.
 - [ ] **Expenses storage.** Local Room database only, or sync through Supabase like tasks. Default: local only, with encrypted export and import. Money data should not leave the phone by accident.
 - [x] **Vault unlock.** Decided: your fingerprint or phone lock unlocks it, with a recovery code as the way back after a phone reset.
@@ -35,7 +63,7 @@ Everything below depends on it, so it goes before any single tool.
 - [ ] Skip CameraX for now, both QR scanning and document scanning run through Play services screens
 - [ ] One `AppDatabase` for expenses, QR history, document index, review decisions. The vault gets its own encrypted store (see section 3)
 - [ ] Simple `AppContainer` object for repositories, matching the current style with no DI framework
-- [ ] Tools hub tab and routes in `MainScreen.kt`, `AppNavHost.kt`, `Screen.kt`
+- [x] Tools hub tab and routes in `MainScreen.kt`, `AppNavHost.kt`, `Screen.kt`
 - [ ] Static app shortcuts on long press of the launcher icon: Scan QR, Scan document, Add expense
 - [ ] Shared UI pieces: `PermissionGate` (explains why, shows request button, handles denied and partial access), `EmptyState`, `ListRow`, `SegmentedControl`, undo message through the existing `Toaster` action support
 - [ ] `<queries>` entry for launcher apps so app lists work without the restricted all packages permission

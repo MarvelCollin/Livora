@@ -43,6 +43,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.flow.Flow
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -70,7 +71,9 @@ import com.example.livora.ui.components.TopBar
 @Composable
 fun DictionaryScreen(
     viewModel: DictionaryViewModel,
-    onOpenQuiz: () -> Unit
+    onOpenQuiz: () -> Unit,
+    addRequests: Flow<Unit>,
+    quizRequests: Flow<Unit>
 ) {
     val entries by viewModel.entries.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
@@ -78,82 +81,53 @@ fun DictionaryScreen(
     var isAdding by rememberSaveable { mutableStateOf(false) }
     var showQuizChooser by rememberSaveable { mutableStateOf(false) }
 
-    Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            TopBar(
-                title = "Dictionary",
-                subtitle = "Translate to Indonesian & quiz",
-                actions = {
-                    IconButton(
-                        onClick = {
-                            if (viewModel.canQuiz()) {
-                                showQuizChooser = true
-                            }
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Quiz,
-                            contentDescription = "Start quiz",
-                            tint = if (viewModel.canQuiz())
-                                MaterialTheme.colorScheme.onSurface
-                            else
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                        )
-                    }
-                    IconButton(onClick = {
-                        viewModel.clearLookup()
-                        isAdding = true
-                    }) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Add word",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
+    LaunchedEffect(addRequests) {
+        addRequests.collect {
+            viewModel.clearLookup()
+            isAdding = true
+        }
+    }
+    LaunchedEffect(quizRequests) {
+        quizRequests.collect { if (viewModel.canQuiz()) showQuizChooser = true }
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 4.dp)
+    ) {
+        item {
+            Spacer(modifier = Modifier.height(8.dp))
+            LanguageRow(
+                selected = selectedLanguage,
+                onSelect = { viewModel.selectLanguage(it) }
             )
+            Spacer(modifier = Modifier.height(8.dp))
         }
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 4.dp)
-        ) {
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                LanguageRow(
-                    selected = selectedLanguage,
-                    onSelect = { viewModel.selectLanguage(it) }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-            }
 
-            if (isLoading && entries.isEmpty()) {
-                items(6) { DictionaryRowSkeleton() }
-            }
-
-            if (entries.isEmpty() && !isLoading) {
-                item { EmptyState(onAdd = { isAdding = true }) }
-            }
-
-            itemsIndexed(entries) { index, entry ->
-                EntryRow(
-                    entry = entry,
-                    onDelete = { viewModel.deleteEntry(entry) }
-                )
-                if (index < entries.lastIndex) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f),
-                        thickness = 0.5.dp
-                    )
-                }
-            }
-
-            item { Spacer(modifier = Modifier.height(24.dp)) }
+        if (isLoading && entries.isEmpty()) {
+            items(6) { DictionaryRowSkeleton() }
         }
+
+        if (entries.isEmpty() && !isLoading) {
+            item { EmptyState(onAdd = { isAdding = true }) }
+        }
+
+        itemsIndexed(entries) { index, entry ->
+            EntryRow(
+                entry = entry,
+                onDelete = { viewModel.deleteEntry(entry) }
+            )
+            if (index < entries.lastIndex) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f),
+                    thickness = 0.5.dp
+                )
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 
     if (isAdding) {

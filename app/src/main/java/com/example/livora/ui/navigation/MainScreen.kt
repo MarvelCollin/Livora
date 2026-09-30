@@ -6,11 +6,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Handyman
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -30,11 +29,10 @@ import androidx.compose.ui.unit.sp
 import com.example.livora.ui.ac.AcViewModel
 import com.example.livora.ui.bulb.BulbViewModel
 import com.example.livora.ui.components.LocalSwipeLock
-import com.example.livora.ui.dictionary.DictionaryScreen
+import com.example.livora.ui.daily.DailyScreen
 import com.example.livora.ui.dictionary.DictionaryViewModel
 import com.example.livora.ui.home.HomeScreen
 import com.example.livora.ui.people.GalleryTab
-import com.example.livora.ui.todo.TodoScreen
 import com.example.livora.ui.tools.ToolsScreen
 import com.example.livora.ui.todo.TodoViewModel
 import kotlinx.coroutines.launch
@@ -42,10 +40,9 @@ import kotlin.math.abs
 
 private enum class MainTab(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Default.Home),
-    Tasks("Tasks", Icons.Default.Checklist),
-    Dictionary("Dictionary", Icons.Default.Translate),
-    Tools("Tools", Icons.Default.Handyman),
-    Gallery("Gallery", Icons.Default.PhotoLibrary)
+    Daily("Daily", Icons.Default.Today),
+    Gallery("Gallery", Icons.Default.PhotoLibrary),
+    Tools("Tools", Icons.Default.Handyman)
 }
 
 @Composable
@@ -59,7 +56,8 @@ fun MainScreen(
     onOpenTodoDetail: (String) -> Unit,
     onOpenQuiz: () -> Unit,
     onOpenVault: () -> Unit,
-    onOpenPeopleRoute: (String) -> Unit
+    onOpenPeopleRoute: (String) -> Unit,
+    onOpenToolRoute: (String) -> Unit
 ) {
     val tabs = MainTab.entries
     val pagerState = rememberPagerState { tabs.size }
@@ -128,16 +126,17 @@ fun MainScreen(
                         onNavigateToAc = onNavigateToAc,
                         onNavigateToBulb = onNavigateToBulb
                     )
-                    MainTab.Tasks -> TodoScreen(
-                        viewModel = todoViewModel,
-                        onOpenDetail = onOpenTodoDetail
-                    )
-                    MainTab.Dictionary -> DictionaryScreen(
-                        viewModel = dictionaryViewModel,
+                    MainTab.Daily -> DailyScreen(
+                        todoViewModel = todoViewModel,
+                        dictionaryViewModel = dictionaryViewModel,
+                        onOpenTodoDetail = onOpenTodoDetail,
                         onOpenQuiz = onOpenQuiz
                     )
-                    MainTab.Tools -> ToolsScreen(onOpenVault = onOpenVault)
                     MainTab.Gallery -> GalleryTab(onNavigate = onOpenPeopleRoute)
+                    MainTab.Tools -> ToolsScreen(
+                        onOpenVault = onOpenVault,
+                        onOpenRoute = onOpenToolRoute
+                    )
                 }
             }
         }

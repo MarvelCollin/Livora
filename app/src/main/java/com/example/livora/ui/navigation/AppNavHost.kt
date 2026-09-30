@@ -11,11 +11,17 @@ import com.example.livora.ui.ac.AcControllerScreen
 import com.example.livora.ui.ac.AcViewModel
 import com.example.livora.ui.bulb.BulbControllerScreen
 import com.example.livora.ui.bulb.BulbViewModel
+import com.example.livora.ui.cleaner.CleanerReviewScreen
+import com.example.livora.ui.cleaner.CleanerScreen
+import com.example.livora.ui.docs.DocumentDetailScreen
+import com.example.livora.ui.docs.DocumentsScreen
 import com.example.livora.ui.dictionary.DictionaryQuizScreen
 import com.example.livora.ui.dictionary.DictionaryViewModel
 import com.example.livora.ui.people.peopleGraph
+import com.example.livora.ui.qr.QrScreen
 import com.example.livora.ui.todo.TodoDetailScreen
 import com.example.livora.ui.todo.TodoViewModel
+import com.example.livora.ui.usage.UsageScreen
 import com.example.livora.ui.vault.VaultScreen
 
 @Composable
@@ -40,7 +46,8 @@ fun AppNavHost(navController: NavHostController) {
                 onOpenTodoDetail = { id -> navController.navigate(Screen.TodoDetail.create(id)) },
                 onOpenQuiz = { navController.navigate(Screen.DictionaryQuiz.route) },
                 onOpenVault = { navController.navigate(Screen.Vault.route) },
-                onOpenPeopleRoute = { navController.navigate(it) }
+                onOpenPeopleRoute = { navController.navigate(it) },
+                onOpenToolRoute = { navController.navigate(it) }
             )
         }
         composable(Screen.AcController.route) {
@@ -55,6 +62,30 @@ fun AppNavHost(navController: NavHostController) {
                 onBack = { navController.popBackStack() }
             )
         }
+        composable(ToolRoutes.QR) { QrScreen(onBack = { navController.popBackStack() }) }
+        composable(ToolRoutes.DOCUMENTS) {
+            DocumentsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenDocument = { navController.navigate(ToolRoutes.document(it)) }
+            )
+        }
+        composable(
+            route = ToolRoutes.DOCUMENT,
+            arguments = listOf(navArgument("id") { type = NavType.IntType })
+        ) { entry ->
+            DocumentDetailScreen(
+                id = entry.arguments?.getInt("id") ?: 1,
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable(ToolRoutes.USAGE) { UsageScreen(onBack = { navController.popBackStack() }) }
+        composable(ToolRoutes.CLEANER) {
+            CleanerScreen(
+                onBack = { navController.popBackStack() },
+                onOpenReview = { navController.navigate(ToolRoutes.CLEANER_REVIEW) }
+            )
+        }
+        composable(ToolRoutes.CLEANER_REVIEW) { CleanerReviewScreen(onBack = { navController.popBackStack() }) }
         peopleGraph(navController)
         composable(Screen.Vault.route) {
             VaultScreen(onBack = { navController.popBackStack() })

@@ -43,6 +43,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.flow.Flow
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -72,7 +73,7 @@ import com.example.livora.ui.components.TopBar
 fun TodoScreen(
     viewModel: TodoViewModel,
     onOpenDetail: (String) -> Unit,
-    onBack: (() -> Unit)? = null
+    addRequests: Flow<Unit>
 ) {
     val stats by viewModel.stats.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
@@ -81,120 +82,93 @@ fun TodoScreen(
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
     val editingTodo = stats.firstOrNull { it.todo.id == editingId }?.todo
 
-    Scaffold(
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        topBar = {
-            TopBar(
-                title = "Tasks",
-                subtitle = "Routines and streaks",
-                navigationIcon = {
-                    if (onBack != null) {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                            )
-                        }
-                    }
-                },
-                actions = {
-                    IconButton(onClick = {
-                        editingId = null
-                        isEditing = true
-                    }) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Add routine",
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-            )
+    LaunchedEffect(addRequests) {
+        addRequests.collect {
+            editingId = null
+            isEditing = true
         }
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 4.dp)
-        ) {
-            item { Spacer(modifier = Modifier.height(4.dp)) }
+    }
 
-            if (isEditing) {
-                item {
-                    TodoForm(
-                        todo = editingTodo,
-                        onSave = { title, notes, intervalValue, intervalUnit, timeOfDay, durationValue, durationUnit, hasTimer ->
-                            if (viewModel.upsertTodo(
-                                    editingTodo,
-                                    title,
-                                    notes,
-                                    intervalValue,
-                                    intervalUnit,
-                                    timeOfDay,
-                                    durationValue,
-                                    durationUnit,
-                                    hasTimer
-                                )
-                            ) {
-                                isEditing = false
-                                editingId = null
-                            }
-                        },
-                        onCancel = {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 4.dp)
+    ) {
+        item { Spacer(modifier = Modifier.height(4.dp)) }
+
+        if (isEditing) {
+            item {
+                TodoForm(
+                    todo = editingTodo,
+                    onSave = { title, notes, intervalValue, intervalUnit, timeOfDay, durationValue, durationUnit, hasTimer ->
+                        if (viewModel.upsertTodo(
+                                editingTodo,
+                                title,
+                                notes,
+                                intervalValue,
+                                intervalUnit,
+                                timeOfDay,
+                                durationValue,
+                                durationUnit,
+                                hasTimer
+                            )
+                        ) {
                             isEditing = false
                             editingId = null
                         }
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                        thickness = 0.5.dp
-                    )
-                }
-            }
-
-            if (stats.isEmpty() && !isEditing && isLoading) {
-                items(5) { TodoRowSkeleton() }
-            }
-
-            if (stats.isEmpty() && !isEditing && !isLoading) {
-                item {
-                    EmptyState(
-                        onAdd = {
-                            editingId = null
-                            isEditing = true
-                        }
-                    )
-                }
-            }
-
-            itemsIndexed(stats) { index, item ->
-                TodoRow(
-                    stats = item,
-                    remainingMs = runningTimers[item.todo.id],
-                    onToggle = { viewModel.toggleCurrentInterval(item.todo.id) },
-                    onStartTimer = { viewModel.startTimer(item.todo.id) },
-                    onCancelTimer = { viewModel.cancelTimer(item.todo.id) },
-                    onEdit = {
-                        editingId = item.todo.id
-                        isEditing = true
                     },
-                    onDelete = { viewModel.deleteTodo(item.todo) },
-                    onOpen = { onOpenDetail(item.todo.id) }
+                    onCancel = {
+                        isEditing = false
+                        editingId = null
+                    }
                 )
-                if (index < stats.lastIndex) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f),
-                        thickness = 0.5.dp
-                    )
-                }
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    thickness = 0.5.dp
+                )
             }
-
-            item { Spacer(modifier = Modifier.height(24.dp)) }
         }
+
+        if (stats.isEmpty() && !isEditing && isLoading) {
+            items(5) { TodoRowSkeleton() }
+        }
+
+        if (stats.isEmpty() && !isEditing && !isLoading) {
+            item {
+                EmptyState(
+                    onAdd = {
+                        editingId = null
+                        isEditing = true
+                    }
+                )
+            }
+        }
+
+        itemsIndexed(stats) { index, item ->
+            TodoRow(
+                stats = item,
+                remainingMs = runningTimers[item.todo.id],
+                onToggle = { viewModel.toggleCurrentInterval(item.todo.id) },
+                onStartTimer = { viewModel.startTimer(item.todo.id) },
+                onCancelTimer = { viewModel.cancelTimer(item.todo.id) },
+                onEdit = {
+                    editingId = item.todo.id
+                    isEditing = true
+                },
+                onDelete = { viewModel.deleteTodo(item.todo) },
+                onOpen = { onOpenDetail(item.todo.id) }
+            )
+            if (index < stats.lastIndex) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f),
+                    thickness = 0.5.dp
+                )
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(24.dp)) }
     }
 }
 
