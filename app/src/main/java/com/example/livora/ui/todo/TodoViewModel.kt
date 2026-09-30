@@ -45,6 +45,9 @@ class TodoViewModel : ViewModel() {
     private val _dailyActivity = MutableStateFlow<List<DayActivity>>(emptyList())
     val dailyActivity: StateFlow<List<DayActivity>> = _dailyActivity.asStateFlow()
 
+    private val _heatmap = MutableStateFlow<List<DayActivity>>(emptyList())
+    val heatmap: StateFlow<List<DayActivity>> = _heatmap.asStateFlow()
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
@@ -258,6 +261,45 @@ class TodoViewModel : ViewModel() {
                 .thenByDescending { it.todo.createdAt }
         )
         _dailyActivity.value = computeDailyActivity()
+        _heatmap.value = computeHeatmap()
+    }
+
+    private fun computeHeatmap(): List<DayActivity> {
+        val durationByTodo = _todos.value.associate { it.id to durationMinutes(it) }
+        val today = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val todayStart = today.timeInMillis
+        val cursor = (today.clone() as Calendar).apply {
+            firstDayOfWeek = Calendar.MONDAY
+            set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+            add(Calendar.DAY_OF_YEAR, -(HEATMAP_WEEKS - 1) * 7)
+        }
+        val labelFormat = SimpleDateFormat("EEE, d MMM", Locale.getDefault())
+        val byDay = _completions.value.groupBy { completion ->
+            Calendar.getInstance().apply {
+                timeInMillis = completion.completedAt
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+        }
+        return (0 until HEATMAP_WEEKS * 7).map {
+            val dayStart = cursor.timeInMillis
+            val done = byDay[dayStart].orEmpty()
+            cursor.add(Calendar.DAY_OF_YEAR, 1)
+            DayActivity(
+                dayStart = dayStart,
+                label = labelFormat.format(dayStart),
+                tasks = done.size,
+                minutes = done.sumOf { durationByTodo[it.todoId] ?: 0 },
+                isToday = dayStart == todayStart
+            )
+        }
     }
 
     private fun computeDailyActivity(): List<DayActivity> {
@@ -312,5 +354,6 @@ class TodoViewModel : ViewModel() {
 
     private companion object {
         const val TAG = "TodoViewModel"
+        const val HEATMAP_WEEKS = 5
     }
 }

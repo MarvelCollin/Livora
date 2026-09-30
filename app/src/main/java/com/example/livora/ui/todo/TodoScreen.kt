@@ -1,6 +1,8 @@
 package com.example.livora.ui.todo
 
+import com.example.livora.ui.components.ChartSlot
 import com.example.livora.ui.components.Motion
+import com.example.livora.ui.components.chartColor
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -39,6 +41,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
@@ -92,6 +95,8 @@ fun TodoScreen(
     addRequests: Flow<Unit>
 ) {
     val stats by viewModel.stats.collectAsState()
+    val daily by viewModel.dailyActivity.collectAsState()
+    val heat by viewModel.heatmap.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val runningTimers by viewModel.runningTimers.collectAsState()
     var isEditing by rememberSaveable { mutableStateOf(false) }
@@ -146,6 +151,10 @@ fun TodoScreen(
             }
         }
 
+        if (stats.isNotEmpty() && !isEditing) {
+            item(key = "overview") { TaskOverview(stats = stats, daily = daily, heat = heat) }
+        }
+
         if (stats.isEmpty() && !isEditing && isLoading) {
             items(5) { TodoRowSkeleton() }
         }
@@ -163,6 +172,13 @@ fun TodoScreen(
 
         itemsIndexed(stats, key = { _, it -> it.todo.id }) { index, item ->
             Column(modifier = Modifier.animateItem()) {
+            val previousDone = stats.getOrNull(index - 1)?.isDoneCurrentInterval
+            if (index == 0 || previousDone != item.isDoneCurrentInterval) {
+                GroupLabel(
+                    text = if (item.isDoneCurrentInterval) "Done for now" else "To do",
+                    count = stats.count { it.isDoneCurrentInterval == item.isDoneCurrentInterval }
+                )
+            }
             TodoRow(
                 stats = item,
                 remainingMs = runningTimers[item.todo.id],
@@ -287,11 +303,20 @@ private fun TodoRow(
             Spacer(modifier = Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 StreakDots(stats = stats)
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(10.dp))
+                if (stats.currentStreak > 0) {
+                    Icon(
+                        imageVector = Icons.Filled.LocalFireDepartment,
+                        contentDescription = null,
+                        tint = chartColor(ChartSlot.Orange),
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(3.dp))
+                }
                 Text(
                     text = streakSummary(stats),
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
             if (stats.todo.hasTimer && !stats.isDoneCurrentInterval) {
@@ -334,7 +359,7 @@ private fun StreakDots(stats: TodoStats) {
         if (visible.isEmpty()) {
             Box(
                 modifier = Modifier
-                    .size(6.dp)
+                    .size(8.dp)
                     .background(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
                         shape = RoundedCornerShape(50)
@@ -344,7 +369,7 @@ private fun StreakDots(stats: TodoStats) {
             visible.forEach { interval ->
                 Box(
                     modifier = Modifier
-                        .size(6.dp)
+                        .size(8.dp)
                         .background(
                             color = if (interval.isDone)
                                 MaterialTheme.colorScheme.primary
@@ -360,11 +385,23 @@ private fun StreakDots(stats: TodoStats) {
 
 private fun streakSummary(stats: TodoStats): String {
     val streak = stats.currentStreak
-    return when {
+    val base = when {
         streak <= 0 -> "No streak yet"
         streak == 1 -> "1 in a row"
         else -> "$streak in a row"
     }
+    return if (stats.bestStreak > streak && stats.bestStreak > 1) "$base, best ${stats.bestStreak}" else base
+}
+
+@Composable
+private fun GroupLabel(text: String, count: Int) {
+    Text(
+        text = "$text, $count",
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 2.dp)
+    )
 }
 
 internal fun scheduleSummary(todo: Todo): String {
