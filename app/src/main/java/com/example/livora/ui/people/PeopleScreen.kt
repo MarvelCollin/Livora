@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -106,7 +107,6 @@ fun PeopleScreen(
     val photoRows by galleryViewModel.rows.collectAsState()
     val photos by galleryViewModel.images.collectAsState()
     val aiLabels by galleryViewModel.aiLabels.collectAsState()
-    val moveAll by viewModel.moveAllPlan.collectAsState()
     var segment by rememberSaveable { mutableStateOf(0) }
     var menuOpen by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<PersonSummary?>(null) }
@@ -114,6 +114,7 @@ fun PeopleScreen(
     var picker by remember { mutableStateOf<PickerMode?>(null) }
     var choosingFolder by remember { mutableStateOf(false) }
     var movingPerson by remember { mutableStateOf<PersonSummary?>(null) }
+    var changingPerson by remember { mutableStateOf<PersonSummary?>(null) }
     val selecting = selected.isNotEmpty()
     val selectingPhotos = photoSelected.isNotEmpty() && segment == 0
 
@@ -330,7 +331,10 @@ fun PeopleScreen(
                         onOpenPerson = onOpenPerson,
                         onToggle = { viewModel.toggleSelect(it) },
                         onRename = { renaming = it },
-                        onMoveAll = { movingPerson = it },
+                        onMoveAll = { person ->
+                            if (person.linkedFolderName != null) viewModel.moveToLinked(person) else movingPerson = person
+                        },
+                        onChangeFolder = { changingPerson = it },
                         onStart = { startScanWithPrompt() },
                         onAllowAll = { openSettings() },
                         onAddPerson = { choosingFolder = true },
@@ -358,24 +362,29 @@ fun PeopleScreen(
             folders = galleryViewModel.folderList(),
             onPick = { folder ->
                 movingPerson = null
-                viewModel.prepareMoveAll(mover, folder)
+                viewModel.moveTo(mover, folder)
             },
             onCreate = { folderName ->
                 movingPerson = null
-                galleryViewModel.createFolderAnd(folderName) { folder -> viewModel.prepareMoveAll(mover, folder) }
+                galleryViewModel.createFolderAnd(folderName) { folder -> viewModel.moveTo(mover, folder) }
             },
             onDismiss = { movingPerson = null }
         )
     }
-    val plan = moveAll
-    if (plan != null) {
-        val count = plan.mediaIds.size
-        ConfirmDialog(
-            title = "Move $count ${if (count == 1) "photo" else "photos"} of ${plan.person.name.orEmpty()}?",
-            body = "${plan.known} already sorted to them and ${plan.suggestions.size} that look similar go to ${plan.folder.name}. A photo with other people leaves its current folder too. Undo it right after, or mark wrong ones later when you open the folder.",
-            confirm = "Move photos",
-            onConfirm = { viewModel.confirmMoveAll() },
-            onDismiss = { viewModel.cancelMoveAll() }
+    val changer = changingPerson
+    if (changer != null) {
+        FolderPickerSheet(
+            title = "Change the folder for ${changer.name.orEmpty()}",
+            folders = galleryViewModel.folderList(),
+            onPick = { folder ->
+                changingPerson = null
+                viewModel.changeFolder(changer, folder)
+            },
+            onCreate = { folderName ->
+                changingPerson = null
+                galleryViewModel.createFolderAnd(folderName) { folder -> viewModel.changeFolder(changer, folder) }
+            },
+            onDismiss = { changingPerson = null }
         )
     }
 
@@ -451,6 +460,7 @@ private fun PeopleList(
     onToggle: (Long) -> Unit,
     onRename: (PersonSummary) -> Unit,
     onMoveAll: (PersonSummary) -> Unit,
+    onChangeFolder: (PersonSummary) -> Unit,
     onStart: () -> Unit,
     onAllowAll: () -> Unit,
     onAddPerson: () -> Unit,
@@ -593,7 +603,8 @@ private fun PeopleList(
                         onOpen = { if (selecting) onToggle(person.id) else onOpenPerson(person.id) },
                         onSelect = { onToggle(person.id) },
                         onRename = { onRename(person) },
-                        onMoveAll = { onMoveAll(person) }
+                        onMoveAll = { onMoveAll(person) },
+                        onChangeFolder = { onChangeFolder(person) }
                     )
                     HorizontalDivider(
                         modifier = Modifier.padding(start = 86.dp),
@@ -703,7 +714,8 @@ private fun PersonRow(
     onOpen: () -> Unit,
     onSelect: () -> Unit,
     onRename: () -> Unit,
-    onMoveAll: () -> Unit
+    onMoveAll: () -> Unit,
+    onChangeFolder: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -751,7 +763,33 @@ private fun PersonRow(
         if (selecting) {
             SelectMark(selected = isSelected, description = if (isSelected) "Selected" else "Not selected")
         } else if (person.name != null) {
-            LinkButton(text = "Move photos", onClick = onMoveAll)
+            val target = person.linkedFolderName
+            LinkButton(
+                text = if (target != null) "Move to $target" else "Move photos",
+                onClick = onMoveAll,
+                modifier = Modifier.widthIn(max = 150.dp)
+            )
+            if (target != null) {
+                var menuOpen by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "Change the folder for ${person.name}",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Change folder") },
+                            onClick = {
+                                menuOpen = false
+                                onChangeFolder()
+                            }
+                        )
+                    }
+                }
+            }
         }
     }
 }

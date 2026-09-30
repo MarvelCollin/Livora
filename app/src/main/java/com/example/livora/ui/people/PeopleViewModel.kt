@@ -6,11 +6,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.example.livora.data.people.IndexStatus
-import com.example.livora.data.people.MoveAllPlan
-import com.example.livora.data.people.UndoToken
 import com.example.livora.data.people.db.LinkMode
 import com.example.livora.data.people.media.FolderInfo
-import com.example.livora.data.people.media.MediaImages
 import com.example.livora.data.people.media.MediaWriter
 import com.example.livora.data.people.PeopleServices
 import com.example.livora.data.people.db.PersonKind
@@ -219,63 +216,61 @@ class PeopleViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    private val moveAllState = MutableStateFlow<MoveAllPlan?>(null)
-    val moveAllPlan: StateFlow<MoveAllPlan?> = moveAllState.asStateFlow()
-
-    fun prepareMoveAll(person: PersonSummary, folder: FolderInfo) {
+    fun moveToLinked(person: PersonSummary) {
         viewModelScope.launch {
-            val plan = repository.planMoveAll(person, folder)
-            if (plan.mediaIds.isEmpty()) {
-                Toaster.info("There are no photos of ${person.name.orEmpty()} to move yet. Check a folder for them first.")
-            } else {
-                moveAllState.value = plan
+            val entity = repository.person(person.id)
+            val path = entity?.linkedFolderPath
+            if (entity == null || path == null) {
+                Toaster.error("Choose a folder first")
+                return@launch
             }
+            runMove(person, path, entity.linkedFolderName ?: "the folder")
         }
     }
 
-    fun cancelMoveAll() {
-        moveAllState.value = null
-    }
-
-    fun confirmMoveAll() {
-        val plan = moveAllState.value ?: return
-        moveAllState.value = null
+    fun moveTo(person: PersonSummary, folder: FolderInfo) {
         viewModelScope.launch {
-            val previous = withContext(Dispatchers.IO) {
-                MediaImages.queryByIds(getApplication(), plan.mediaIds).associate { it.id to it.relativePath }
-            }
-            ConsentBroker.ask(MediaWriter.writeRequest(getApplication(), plan.mediaIds), viewModelScope) {
-                val path = plan.folder.relativePath
-                val moved = MediaWriter.applyMove(getApplication(), plan.mediaIds, path)
-                repository.syncPhotoDates(plan.mediaIds)
-                repository.recordAiMoves(plan.person.id, plan.mediaIds, previous, path)
-                val undo = if (plan.suggestions.isEmpty()) null else repository.confirm(plan.person.id, plan.suggestions)
-                val entity = repository.person(plan.person.id)
-                if (entity != null && entity.linkedFolderPath == null) {
-                    repository.linkFolder(plan.person.id, path, plan.folder.name, LinkMode.REVIEW)
-                }
-                services.folders.refresh()
-                Toaster.show(
-                    message = "Moved $moved ${if (moved == 1) "photo" else "photos"} of ${plan.person.name.orEmpty()} to ${plan.folder.name}",
-                    type = ToastType.Success,
-                    durationMs = 8000,
-                    actionLabel = "Undo",
-                    onAction = { undoMoveAll(plan, previous, undo) }
-                )
-            }
+            repository.linkFolder(person.id, folder.relativePath, folder.name, LinkMode.REVIEW)
+            runMove(person, folder.relativePath, folder.name)
         }
     }
 
-    private fun undoMoveAll(plan: MoveAllPlan, previous: Map<Long, String>, undo: UndoToken?) {
+    fun changeFolder(person: PersonSummary, folder: FolderInfo) {
+        viewModelScope.launch {
+            repository.linkFolder(person.id, folder.relativePath, folder.name, LinkMode.REVIEW)
+            Toaster.success("Photos of ${person.name.orEmpty()} now go to ${folder.name}")
+        }
+    }
+
+    private suspend fun runMove(person: PersonSummary, path: String, folderName: String) {
+        val plan = repository.planMoveAll(person, path)
+        if (plan.mediaIds.isEmpty()) {
+            Toaster.info("No photos of ${person.name.orEmpty()} are outside $folderName right now. Check a folder for them first.")
+            return
+        }
         ConsentBroker.ask(MediaWriter.writeRequest(getApplication(), plan.mediaIds), viewModelScope) {
-            for ((path, group) in plan.mediaIds.groupBy { previous[it] ?: "Pictures/" }) {
-                MediaWriter.applyMove(getApplication(), group, path)
-            }
-            repository.syncPhotoDates(plan.mediaIds)
-            repository.dropAiMoves(plan.mediaIds)
-            undo?.restore()
+            val outcome = repository.moveToFolder(person.id, plan.mediaIds, path)
             services.folders.refresh()
-            Toaster.success("Moved the photos back")
+            if (outcome.done == 0) {
+                Toaster.error("The photos could not be moved")
+                return@ask
+            }
+            val handled = outcome.sources
+            val okSuggestions = plan.suggestions.filter { it.mediaId in handled }
+            val undo = if (okSuggestions.isEmpty()) null else repository.confirm(person.id, okSuggestions)
+            Toaster.show(
+                message = outcome.message(folderName),
+                type = ToastType.Success,
+                durationMs = 9000,
+                actionLabel = "Undo",
+                onAction = {
+                    MoveUndo.run(getApplication(), viewModelScope, repository, person.id, outcome) {
+                        undo?.restore()
+                        services.folders.refresh()
+                        Toaster.success("Moved the photos back")
+                    }
+                }
+            )
         }
     }
 
