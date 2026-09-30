@@ -13,7 +13,8 @@ Effort sizes are relative: S is small, M is medium, L is large, XL is the bigges
 - [x] People (face grouping) lives in the Gallery tab as Photos, Albums and People, see section 8
 - [x] Navigation is grouped into four tabs, see section 0b
 - [x] Expenses is a real tool with its own database, charts, categories with icons and CSV export, see section 5
-- [x] UI previews with sample data exist for QR codes, Documents, App usage and the Storage cleaner with swipe review. They do not work yet, see section 0b
+- [x] App usage is a real tool with real screen time, charts and unused apps, see section 7
+- [x] UI previews with sample data exist for QR codes, Documents and the Storage cleaner with swipe review. They do not work yet, see section 0b
 
 ## 0b. Navigation and where every tool lives
 
@@ -36,7 +37,6 @@ Status of the UI previews (sample data only, no real function behind them):
 - [x] Tools hub with grouped rows
 - [x] QR codes: Scan tab with history and a safe result sheet, Create tab with a live preview
 - [x] Documents: searchable library with sort, document page grid
-- [x] App usage: permission screen, screen time with hourly chart, most used apps, unused apps
 - [x] Storage cleaner: overview with space breakdown, swipe review card stack with undo and end summary
 - [ ] Replace each preview with the real tool, in the order of section 10
 
@@ -225,12 +225,12 @@ Highest risk tool, so the security design came before any screen. No custom cryp
 
 **Approach.** `UsageStatsManager` events. Screen time is computed from foreground and background events, the way the system Digital Wellbeing does, because the daily summary values are less accurate. The system only keeps a short window, so a daily WorkManager job saves totals into Room for long term charts.
 
-- [ ] Permission gate that opens the system Usage access screen and rechecks on return
-- [ ] Today view: total screen time, hourly bar chart, ranked app list with the real app icons
-- [ ] Range switch: day, week, month, with previous and next
-- [ ] App detail: trend, launches, last used
-- [ ] Daily snapshot job into Room for history
-- [ ] Unused apps list (not opened for 30 days) with app size from `StorageStatsManager`, feeds the storage cleaner
+- [x] Permission gate that opens the system Usage access screen and rechecks on return
+- [x] Today view: total screen time, hourly bar chart, ranked app list with the real app icons
+- [x] Range switch: day, week, month, with previous and next
+- [x] App detail sheet: share of screen time, average per day, last opened, open, app info and uninstall. Trend and launches are still open
+- [x] Snapshot job into Room every 12 hours for history beyond what Android keeps, and a refresh on every visit
+- [x] Unused apps list (not opened for 30 days) with app size from `StorageStatsManager`. Feeding the storage cleaner is still open
 - [ ] Optional daily limit per app with a reminder notification (polling based, so mark it approximate)
 - [ ] Later: mobile and Wi-Fi data per app with `NetworkStatsManager`
 - [ ] Not possible for third party apps and not planned: per app battery use

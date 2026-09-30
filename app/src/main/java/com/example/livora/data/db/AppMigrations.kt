@@ -19,6 +19,11 @@ object AppMigrationSql {
         "UPDATE `expense_categories` SET `iconKey` = 'freelance' WHERE `name` = 'Freelance'",
         "UPDATE `expense_categories` SET `iconKey` = 'income' WHERE `name` = 'Other income'"
     )
+
+    val V2_TO_V3 = listOf(
+        "CREATE TABLE IF NOT EXISTS `usage_days` (`day` INTEGER NOT NULL, `packageName` TEXT NOT NULL, `millis` INTEGER NOT NULL, PRIMARY KEY(`day`, `packageName`))",
+        "CREATE TABLE IF NOT EXISTS `usage_hours` (`hourStart` INTEGER NOT NULL, `millis` INTEGER NOT NULL, PRIMARY KEY(`hourStart`))"
+    )
 }
 
 object AppMigrations {
@@ -29,5 +34,11 @@ object AppMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2)
+    val MIGRATION_2_3 = object : Migration(2, 3) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            AppMigrationSql.V2_TO_V3.forEach { db.execSQL(it) }
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
 }

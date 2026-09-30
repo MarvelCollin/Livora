@@ -97,8 +97,7 @@ fun ToolsScreen(
                 title = "App usage",
                 icon = Icons.Default.BarChart,
                 description = "Screen time and apps you never open",
-                onClick = { onOpenRoute(ToolRoutes.USAGE) },
-                value = { Tag("Preview") }
+                onClick = { onOpenRoute(ToolRoutes.USAGE) }
             )
         }
     }

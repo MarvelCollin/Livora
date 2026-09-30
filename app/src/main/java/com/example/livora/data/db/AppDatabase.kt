@@ -13,15 +13,20 @@ import com.example.livora.data.expenses.ExpenseCategoryDao
 import com.example.livora.data.expenses.ExpenseCategoryEntity
 import com.example.livora.data.expenses.ExpenseDao
 import com.example.livora.data.expenses.ExpenseEntity
+import com.example.livora.data.usage.UsageDao
+import com.example.livora.data.usage.UsageDayEntity
+import com.example.livora.data.usage.UsageHourEntity
 
 @Database(
     entities = [
         ExpenseEntity::class,
         ExpenseCategoryEntity::class,
         ExpenseAccountEntity::class,
-        ExpenseBudgetEntity::class
+        ExpenseBudgetEntity::class,
+        UsageDayEntity::class,
+        UsageHourEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -30,6 +35,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun categories(): ExpenseCategoryDao
     abstract fun accounts(): ExpenseAccountDao
     abstract fun budgets(): ExpenseBudgetDao
+    abstract fun usage(): UsageDao
 
     companion object {
 

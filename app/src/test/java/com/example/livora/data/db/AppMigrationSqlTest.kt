@@ -111,8 +111,21 @@ class AppMigrationSqlTest {
     }
 
     @Test
-    fun seedRowsMatchTheCurrentSchema() {
+    fun versionTwoToThreeAddsUsageTables() {
         createFrom(2)
+        assertMatchesSchema(2)
+        exec("INSERT INTO expense_accounts (id, name, position) VALUES (1, 'Cash', 0)")
+        AppMigrationSql.V2_TO_V3.forEach { exec(it) }
+        assertMatchesSchema(3)
+        assertEquals("Cash", scalar("SELECT name FROM expense_accounts WHERE id = 1"))
+        exec("INSERT INTO usage_days (day, packageName, millis) VALUES (20000, 'a.b', 1000)")
+        exec("INSERT INTO usage_hours (hourStart, millis) VALUES (480000, 500)")
+        assertEquals("1000", scalar("SELECT millis FROM usage_days WHERE packageName = 'a.b'"))
+    }
+
+    @Test
+    fun seedRowsMatchTheCurrentSchema() {
+        createFrom(3)
         AppSeed.SQL.forEach { exec(it) }
         assertEquals("12", scalar("SELECT COUNT(*) FROM expense_categories"))
         assertEquals("3", scalar("SELECT COUNT(*) FROM expense_accounts"))
