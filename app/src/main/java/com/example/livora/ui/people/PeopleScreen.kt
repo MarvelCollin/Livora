@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -48,6 +50,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -74,7 +78,9 @@ import com.example.livora.data.people.media.AccessLevel
 import com.example.livora.data.people.media.MediaAccess
 import com.example.livora.data.people.scan.ScanPhase
 import com.example.livora.data.people.scan.ScanProgress
+import com.example.livora.ui.components.LocalSwipeLock
 import com.example.livora.ui.components.TopBar
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -107,7 +113,9 @@ fun PeopleScreen(
     val photoRows by galleryViewModel.rows.collectAsState()
     val photos by galleryViewModel.images.collectAsState()
     val aiLabels by galleryViewModel.aiLabels.collectAsState()
-    var segment by rememberSaveable { mutableStateOf(0) }
+    val segmentPager = rememberPagerState { 3 }
+    val segment = segmentPager.currentPage
+    val scope = rememberCoroutineScope()
     var menuOpen by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<PersonSummary?>(null) }
     var creatingFolder by remember { mutableStateOf(false) }
@@ -121,6 +129,15 @@ fun PeopleScreen(
     BackHandler(enabled = selecting) { viewModel.clearSelection() }
     BackHandler(enabled = selectingPhotos) { galleryViewModel.clearSelection() }
     ConsentEffect(galleryViewModel.consent)
+
+    val swipeLock = LocalSwipeLock.current
+    val locked = selecting || selectingPhotos
+    LaunchedEffect(locked) { swipeLock?.value = locked }
+    DisposableEffect(Unit) { onDispose { swipeLock?.value = false } }
+    LaunchedEffect(segment) {
+        viewModel.clearSelection()
+        galleryViewModel.clearSelection()
+    }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -289,14 +306,16 @@ fun PeopleScreen(
                 SegmentTabs(
                     labels = listOf("Photos", "Albums", "People"),
                     selected = segment,
-                    onSelect = {
-                        viewModel.clearSelection()
-                        galleryViewModel.clearSelection()
-                        segment = it
-                    }
+                    onSelect = { scope.launch { segmentPager.animateScrollToPage(it) } }
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
-                if (segment == 0) {
+                HorizontalPager(
+                    state = segmentPager,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    userScrollEnabled = !locked,
+                    key = { it }
+                ) { page ->
+                if (page == 0) {
                     GalleryGrid(
                         rows = photoRows,
                         selected = photoSelected,
@@ -314,7 +333,7 @@ fun PeopleScreen(
                             )
                         }
                     )
-                } else if (segment == 2) {
+                } else if (page == 2) {
                     PeopleList(
                         access = access,
                         people = people,
@@ -350,6 +369,7 @@ fun PeopleScreen(
                         creating = creatingFolder,
                         onCreatingChange = { creatingFolder = it }
                     )
+                }
                 }
             }
         }
