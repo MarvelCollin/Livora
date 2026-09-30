@@ -8,7 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Handyman
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -31,7 +31,7 @@ import com.example.livora.ui.bulb.BulbViewModel
 import com.example.livora.ui.dictionary.DictionaryScreen
 import com.example.livora.ui.dictionary.DictionaryViewModel
 import com.example.livora.ui.home.HomeScreen
-import com.example.livora.ui.people.PeopleTab
+import com.example.livora.ui.people.GalleryTab
 import com.example.livora.ui.todo.TodoScreen
 import com.example.livora.ui.tools.ToolsScreen
 import com.example.livora.ui.todo.TodoViewModel
@@ -41,7 +41,7 @@ private enum class MainTab(val label: String, val icon: ImageVector) {
     Tasks("Tasks", Icons.Default.Checklist),
     Dictionary("Dictionary", Icons.Default.Translate),
     Tools("Tools", Icons.Default.Handyman),
-    People("People", Icons.Default.People)
+    Gallery("Gallery", Icons.Default.PhotoLibrary)
 }
 
 @Composable
@@ -117,7 +117,7 @@ fun MainScreen(
                     onOpenQuiz = onOpenQuiz
                 )
                 MainTab.Tools -> ToolsScreen(onOpenVault = onOpenVault)
-                MainTab.People -> PeopleTab(onNavigate = onOpenPeopleRoute)
+                MainTab.Gallery -> GalleryTab(onNavigate = onOpenPeopleRoute)
             }
         }
     }

@@ -80,6 +80,8 @@ import com.example.livora.ui.components.TopBar
 fun PeopleScreen(
     viewModel: PeopleViewModel,
     foldersViewModel: FoldersViewModel,
+    galleryViewModel: FolderDetailViewModel,
+    onOpenPhoto: (Long) -> Unit,
     onOpenPerson: (Long) -> Unit,
     onOpenFolder: (String) -> Unit,
     onAddPerson: () -> Unit,
@@ -100,13 +102,20 @@ fun PeopleScreen(
     val status by viewModel.status.collectAsState()
     val mergeCount by viewModel.mergeSuggestionCount.collectAsState()
     val minPhotos by viewModel.minPhotos.collectAsState()
+    val photoSelected by galleryViewModel.selected.collectAsState()
+    val photoRows by galleryViewModel.rows.collectAsState()
+    val photos by galleryViewModel.images.collectAsState()
     var segment by rememberSaveable { mutableStateOf(0) }
     var menuOpen by remember { mutableStateOf(false) }
     var renaming by remember { mutableStateOf<PersonSummary?>(null) }
     var creatingFolder by remember { mutableStateOf(false) }
+    var picker by remember { mutableStateOf<PickerMode?>(null) }
     val selecting = selected.isNotEmpty()
+    val selectingPhotos = photoSelected.isNotEmpty() && segment == 0
 
     BackHandler(enabled = selecting) { viewModel.clearSelection() }
+    BackHandler(enabled = selectingPhotos) { galleryViewModel.clearSelection() }
+    ConsentEffect(galleryViewModel.consent)
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -154,7 +163,27 @@ fun PeopleScreen(
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            if (selecting) {
+            if (selectingPhotos) {
+                TopBar(
+                    title = "${photoSelected.size} selected",
+                    navigationIcon = {
+                        IconButton(onClick = { galleryViewModel.clearSelection() }) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Clear selection",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    },
+                    actions = {
+                        LinkButton(
+                            text = "All",
+                            onClick = { galleryViewModel.selectAll() },
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                    }
+                )
+            } else if (selecting) {
                 TopBar(
                     title = "${selected.size} selected",
                     subtitle = if (selected.size < 2) "Pick at least two to merge" else null,
@@ -180,17 +209,23 @@ fun PeopleScreen(
                 )
             } else {
                 TopBar(
-                    title = "People",
-                    subtitle = "Photos are read on this phone and never uploaded",
+                    title = "Gallery",
+                    subtitle = when (segment) {
+                        0 -> if (photoRows == null) null else photosLabel(photos.size)
+                        1 -> "Folders on this phone"
+                        else -> "Photos are read on this phone and never uploaded"
+                    },
                     actions = {
-                        if (access != AccessLevel.None) {
-                            IconButton(onClick = { if (segment == 0) onAddPerson() else creatingFolder = true }) {
+                        if (access != AccessLevel.None && segment != 0) {
+                            IconButton(onClick = { if (segment == 2) onAddPerson() else creatingFolder = true }) {
                                 Icon(
                                     imageVector = Icons.Default.Add,
-                                    contentDescription = if (segment == 0) "Add a person from photos" else "New folder",
+                                    contentDescription = if (segment == 2) "Add a person from photos" else "New folder",
                                     tint = MaterialTheme.colorScheme.onSurface
                                 )
                             }
+                        }
+                        if (access != AccessLevel.None && segment == 2) {
                             Column {
                                 IconButton(onClick = { menuOpen = true }) {
                                     Icon(
@@ -228,27 +263,55 @@ fun PeopleScreen(
                     }
                 )
             }
+        },
+        bottomBar = {
+            if (selectingPhotos) {
+                PhotoSelectionBar(
+                    canModify = galleryViewModel.supportsConsent,
+                    onCopy = { picker = PickerMode.Copy },
+                    onMove = { picker = PickerMode.Move },
+                    onDelete = { galleryViewModel.trashSelected() }
+                )
+            }
         }
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             if (access == AccessLevel.None) {
                 EmptyBlock(
                     title = "Allow access to your photos",
-                    body = "Livora finds faces in your photos and groups them by person. It reads photos on this phone only. Nothing is uploaded, and the face data never leaves the app.",
+                    body = "Livora shows your photos so you can move or delete them, and finds the people in them. It reads photos on this phone only. Nothing is uploaded, and the face data never leaves the app.",
                     actionLabel = "Allow photo access",
                     onAction = { requestAccess() }
                 )
             } else {
                 SegmentTabs(
-                    labels = listOf("People", "Folders"),
+                    labels = listOf("Photos", "Albums", "People"),
                     selected = segment,
                     onSelect = {
                         viewModel.clearSelection()
+                        galleryViewModel.clearSelection()
                         segment = it
                     }
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
                 if (segment == 0) {
+                    GalleryGrid(
+                        rows = photoRows,
+                        selected = photoSelected,
+                        onOpen = onOpenPhoto,
+                        onToggle = { galleryViewModel.toggle(it) },
+                        onToggleGroup = { galleryViewModel.toggleGroup(it) },
+                        topContent = {
+                            if (access == AccessLevel.Partial) PartialAccessNotice(onOpenSettings = { openSettings() })
+                        },
+                        emptyContent = {
+                            EmptyBlock(
+                                title = "No photos on this phone yet",
+                                body = "Photos you take or save will show up here."
+                            )
+                        }
+                    )
+                } else if (segment == 2) {
                     PeopleList(
                         access = access,
                         people = people,
@@ -283,6 +346,25 @@ fun PeopleScreen(
                 }
             }
         }
+    }
+
+    val mode = picker
+    if (mode != null) {
+        FolderPickerSheet(
+            title = if (mode == PickerMode.Copy) "Copy to a folder" else "Move to a folder",
+            folders = galleryViewModel.folderList(),
+            onPick = { folder ->
+                picker = null
+                if (mode == PickerMode.Copy) galleryViewModel.copySelected(folder) else galleryViewModel.moveSelected(folder)
+            },
+            onCreate = { name ->
+                picker = null
+                galleryViewModel.createFolderAnd(name) { folder ->
+                    if (mode == PickerMode.Copy) galleryViewModel.copySelected(folder) else galleryViewModel.moveSelected(folder)
+                }
+            },
+            onDismiss = { picker = null }
+        )
     }
 
     val target = renaming
