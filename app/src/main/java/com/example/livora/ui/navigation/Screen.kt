@@ -22,5 +22,5 @@ object ToolRoutes {
 
     fun review(source: String) = "tools/cleaner/review/$source"
 
-    fun document(id: Int) = "tools/documents/$id"
+    fun document(id: Long) = "tools/documents/$id"
 }

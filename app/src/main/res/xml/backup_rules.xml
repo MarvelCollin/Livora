@@ -7,4 +7,5 @@
 -->
 <full-backup-content>
     <exclude domain="file" path="vault"/>
+    <exclude domain="file" path="documents"/>
 </full-backup-content>

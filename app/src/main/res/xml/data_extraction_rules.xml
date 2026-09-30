@@ -6,6 +6,7 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="file" path="vault"/>
+        <exclude domain="file" path="documents"/>
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="vault"/>

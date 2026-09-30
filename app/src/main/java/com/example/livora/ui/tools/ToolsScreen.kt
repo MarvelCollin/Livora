@@ -64,8 +64,7 @@ fun ToolsScreen(
                 title = "Documents",
                 icon = Icons.Default.DocumentScanner,
                 description = "Scan pages and save them as PDF",
-                onClick = { onOpenRoute(ToolRoutes.DOCUMENTS) },
-                value = { Tag("Preview") }
+                onClick = { onOpenRoute(ToolRoutes.DOCUMENTS) }
             )
 
             SectionLabel(text = "Private")

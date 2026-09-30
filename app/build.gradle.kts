@@ -98,6 +98,7 @@ dependencies {
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.zxing.core)
     implementation(libs.code.scanner)
+    implementation(libs.document.scanner)
     testImplementation(libs.junit)
     testImplementation(libs.sqlite.jdbc)
     testImplementation("org.json:json:20240303")

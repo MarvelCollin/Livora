@@ -32,6 +32,12 @@ object AppMigrationSql {
     val V4_TO_V5 = listOf(
         "CREATE TABLE IF NOT EXISTS `qr_history` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `value` TEXT NOT NULL, `kind` TEXT NOT NULL, `scannedAt` INTEGER NOT NULL, `fromPhoto` INTEGER NOT NULL)"
     )
+
+    val V5_TO_V6 = listOf(
+        "CREATE TABLE IF NOT EXISTS `documents` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `folder` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `pageCount` INTEGER NOT NULL, `sizeBytes` INTEGER NOT NULL)",
+        "CREATE TABLE IF NOT EXISTS `document_pages` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `documentId` INTEGER NOT NULL, `position` INTEGER NOT NULL, `fileName` TEXT NOT NULL)",
+        "CREATE INDEX IF NOT EXISTS `index_document_pages_documentId` ON `document_pages` (`documentId`)"
+    )
 }
 
 object AppMigrations {
@@ -60,5 +66,11 @@ object AppMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+    val MIGRATION_5_6 = object : Migration(5, 6) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            AppMigrationSql.V5_TO_V6.forEach { db.execSQL(it) }
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
 }

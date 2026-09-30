@@ -148,8 +148,21 @@ class AppMigrationSqlTest {
     }
 
     @Test
-    fun seedRowsMatchTheCurrentSchema() {
+    fun versionFiveToSixAddsDocuments() {
         createFrom(5)
+        assertMatchesSchema(5)
+        exec("INSERT INTO qr_history (value, kind, scannedAt, fromPhoto) VALUES ('x', 'Text', 5, 0)")
+        AppMigrationSql.V5_TO_V6.forEach { exec(it) }
+        assertMatchesSchema(6)
+        assertEquals("x", scalar("SELECT value FROM qr_history"))
+        exec("INSERT INTO documents (name, folder, createdAt, updatedAt, pageCount, sizeBytes) VALUES ('Rent', 'f1', 1, 1, 2, 3000)")
+        exec("INSERT INTO document_pages (documentId, position, fileName) VALUES (1, 0, 'p-1.jpg')")
+        assertEquals("p-1.jpg", scalar("SELECT fileName FROM document_pages WHERE documentId = 1"))
+    }
+
+    @Test
+    fun seedRowsMatchTheCurrentSchema() {
+        createFrom(6)
         AppSeed.SQL.forEach { exec(it) }
         assertEquals("12", scalar("SELECT COUNT(*) FROM expense_categories"))
         assertEquals("3", scalar("SELECT COUNT(*) FROM expense_accounts"))

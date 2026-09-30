@@ -88,12 +88,9 @@ fun AppNavHost(navController: NavHostController) {
         }
         composable(
             route = ToolRoutes.DOCUMENT,
-            arguments = listOf(navArgument("id") { type = NavType.IntType })
-        ) { entry ->
-            DocumentDetailScreen(
-                id = entry.arguments?.getInt("id") ?: 1,
-                onBack = { navController.popBackStack() }
-            )
+            arguments = listOf(navArgument("id") { type = NavType.LongType })
+        ) {
+            DocumentDetailScreen(onBack = { navController.popBackStack() })
         }
         composable(ToolRoutes.USAGE) { UsageScreen(onBack = { navController.popBackStack() }) }
         composable(ToolRoutes.CLEANER) {

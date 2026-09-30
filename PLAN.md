@@ -16,7 +16,7 @@ Effort sizes are relative: S is small, M is medium, L is large, XL is the bigges
 - [x] App usage is a real tool with real screen time, charts and unused apps, see section 7
 - [x] The Storage cleaner is a real tool with real storage numbers, duplicates, screenshots, big files and swipe review with system trash, see section 9
 - [x] QR codes is a real tool with camera scanning, photo scanning, real code generation and history, see section 4
-- [x] A UI preview with sample data exists for Documents. It does not work yet, see section 0b
+- [x] Documents is a real tool with the ML Kit scanner, a page library, page editing and PDF sharing, see section 6
 
 ## 0b. Navigation and where every tool lives
 
@@ -37,8 +37,7 @@ Rules for this structure:
 
 Status of the UI previews (sample data only, no real function behind them):
 - [x] Tools hub with grouped rows
-- [x] Documents: searchable library with sort, document page grid
-- [ ] Replace each preview with the real tool, in the order of section 10
+- [x] Every preview has been replaced with the real tool
 
 ## 1. Decisions to confirm first
 
@@ -209,16 +208,16 @@ Highest risk tool, so the security design came before any screen. No custom cryp
 
 **Approach.** ML Kit Document Scanner gives automatic edge detection, crop, rotate, filters and PDF output with no camera permission. Build the library, editing and export around it.
 
-- [ ] Scan entry point with page limit and gallery import enabled
-- [ ] Save result: keep page JPEGs plus the generated PDF in app storage
-- [ ] Room index: name, created date, page count, size, thumbnail
-- [ ] Library screen with search, sort and rename
-- [ ] Document detail: page grid, reorder, delete page, add page, rotate
-- [ ] Camera to PDF from existing images: pick many images, order them, make one PDF (`PdfDocument`)
+- [x] Scan entry point with page limit (20) and gallery import enabled
+- [x] Save result: page JPEGs in app storage (private, kept out of cloud backup). The PDF is built from the pages whenever it is shared or saved
+- [x] Room index: name, created date, page count, size, cover thumbnail
+- [x] Library screen with search, sort and rename
+- [x] Document detail: page grid, move earlier or later, delete page, add pages, rotate, zoomable viewer
+- [x] PDF from existing images: pick up to 20 images with the system picker and make one document. A small PDF writer embeds the JPEGs directly, so files stay compact
 - [ ] Merge two PDFs and split pages out
 - [ ] Compress option with a quality slider and a size preview
 - [ ] PDF preview with `PdfRenderer`
-- [ ] Share, and export to a chosen folder with the system file creator
+- [x] Share, and save to a chosen folder with the system file creator
 - [ ] Later: OCR copy text with ML Kit text recognition, password protected PDF with an Apache licensed library
 
 ## 7. App Usage Stats (M)
