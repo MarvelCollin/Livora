@@ -185,9 +185,9 @@ fun AcBrandSheet(
 
             Text(
                 text = if (testSent) {
-                    "The test turns the AC on at 24°C cool. Did it react?"
+                    "The test turns the AC on at 20°C cool. Did it react?"
                 } else {
-                    "The test turns the AC on at 24°C cool. Point the phone at the AC first."
+                    "The test turns the AC on at 20°C cool. Point the phone at the AC first."
                 },
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),

@@ -17,7 +17,7 @@ enum class SwingMode {
 
 data class AcState(
     val isPoweredOn: Boolean = false,
-    val temperature: Int = 24,
+    val temperature: Int = 20,
     val mode: AcMode = AcMode.COOL,
     val fanSpeed: FanSpeed = FanSpeed.AUTO,
     val swingMode: SwingMode = SwingMode.OFF,

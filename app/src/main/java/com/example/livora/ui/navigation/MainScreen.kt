@@ -97,10 +97,8 @@ fun MainScreen(
                 MainTab.Home -> HomeScreen(
                     acViewModel = acViewModel,
                     bulbViewModel = bulbViewModel,
-                    todoViewModel = todoViewModel,
                     onNavigateToAc = onNavigateToAc,
-                    onNavigateToBulb = onNavigateToBulb,
-                    onOpenTodoDetail = onOpenTodoDetail
+                    onNavigateToBulb = onNavigateToBulb
                 )
                 MainTab.Tasks -> TodoScreen(
                     viewModel = todoViewModel,

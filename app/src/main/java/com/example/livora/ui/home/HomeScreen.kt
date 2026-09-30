@@ -1,564 +1,417 @@
 package com.example.livora.ui.home
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bedtime
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.WbSunny
-import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.livora.data.ir.AcBrands
 import com.example.livora.data.model.AcMode
+import com.example.livora.data.model.AcState
 import com.example.livora.data.model.BulbScene
-import com.example.livora.data.model.TodoStats
+import com.example.livora.data.model.BulbState
 import com.example.livora.ui.ac.AcViewModel
 import com.example.livora.ui.bulb.BulbViewModel
 import com.example.livora.ui.components.Design
+import com.example.livora.ui.components.StepButton
+import com.example.livora.ui.components.Toaster
 import com.example.livora.ui.components.TopBar
-import com.example.livora.ui.components.DeviceCard
-import com.example.livora.ui.components.SkeletonBox
-import com.example.livora.ui.components.SkeletonLine
-import com.example.livora.ui.components.TaskTimerChip
-import com.example.livora.ui.todo.TodoViewModel
-import com.example.livora.ui.todo.scheduleSummary
-import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
-import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     acViewModel: AcViewModel,
     bulbViewModel: BulbViewModel,
-    todoViewModel: TodoViewModel,
     onNavigateToAc: () -> Unit,
-    onNavigateToBulb: () -> Unit,
-    onOpenTodoDetail: (String) -> Unit
+    onNavigateToBulb: () -> Unit
 ) {
     val acState by acViewModel.acState.collectAsState()
     val acRemote by acViewModel.remote.collectAsState()
+    val acCapabilities by acViewModel.capabilities.collectAsState()
     val bulbState by bulbViewModel.bulbState.collectAsState()
     val connectedBulb by bulbViewModel.connectedBulb.collectAsState()
-    val stats by todoViewModel.stats.collectAsState()
-    val runningTimers by todoViewModel.runningTimers.collectAsState()
-    val todoLoading by todoViewModel.isLoading.collectAsState()
 
-    val activateNormalMode = {
-        acViewModel.applyScene(20, AcMode.COOL)
-        bulbViewModel.powerOn()
-        bulbViewModel.setBrightness(100)
-        bulbViewModel.setScene(BulbScene.COOL_WHITE)
-    }
+    val bulbIsOn = bulbState.isPoweredOn && connectedBulb != null
+    val devicesOn = listOf(acState.isPoweredOn, bulbIsOn).count { it }
+    val brand = AcBrands.find(acRemote.brandId)
+    val model = brand.models[acRemote.modelIndex.coerceIn(0, brand.models.lastIndex)]
 
-    val activateSleepMode = {
-        acViewModel.applyScene(20, AcMode.COOL)
-        bulbViewModel.powerOff()
-    }
-
-    val activateOutMode = {
-        acViewModel.powerOff()
-        bulbViewModel.powerOff()
-    }
-
-    val doneCount = stats.count { it.isDoneCurrentInterval }
-    val totalCount = stats.size
-    val pending = stats.filterNot { it.isDoneCurrentInterval }
-    val activeStreaks = stats.count { it.currentStreak > 0 }
-    val bestStreak = stats.maxOfOrNull { it.currentStreak } ?: 0
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        Scaffold(
-            topBar = {
-                TopBar(
-                    title = greeting(),
-                    subtitle = today()
-                )
-            }
-        ) { innerPadding ->
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = Design.screenHorizontalPadding)
-            ) {
-                Spacer(modifier = Modifier.height(8.dp))
-
-                if (todoLoading && stats.isEmpty()) {
-                    TodayProgressSkeleton()
-                    Spacer(modifier = Modifier.height(20.dp))
-                    SectionLabel(text = "Up next")
-                    Spacer(modifier = Modifier.height(10.dp))
-                    repeat(3) {
-                        UpNextSkeleton()
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-                } else {
-                    TodayProgressCard(
-                        doneCount = doneCount,
-                        totalCount = totalCount,
-                        activeStreaks = activeStreaks,
-                        bestStreak = bestStreak
-                    )
-
-                    Spacer(modifier = Modifier.height(20.dp))
-
-                    SectionLabel(text = "Up next")
-                    Spacer(modifier = Modifier.height(10.dp))
-                    if (pending.isEmpty()) {
-                        AllClearCard(hasTasks = totalCount > 0)
-                    } else {
-                        pending.take(4).forEachIndexed { index, item ->
-                            UpNextRow(
-                                stats = item,
-                                remainingMs = runningTimers[item.todo.id],
-                                onToggle = { todoViewModel.toggleCurrentInterval(item.todo.id) },
-                                onStartTimer = { todoViewModel.startTimer(item.todo.id) },
-                                onCancelTimer = { todoViewModel.cancelTimer(item.todo.id) },
-                                onOpen = { onOpenTodoDetail(item.todo.id) }
-                            )
-                            if (index < pending.take(4).lastIndex) {
-                                Spacer(modifier = Modifier.height(8.dp))
-                            }
-                        }
-                    }
+    Scaffold(
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        topBar = {
+            TopBar(
+                title = greeting(),
+                subtitle = when (devicesOn) {
+                    0 -> "All devices are off"
+                    1 -> "1 of 2 devices on"
+                    else -> "Both devices are on"
                 }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                SectionLabel(text = "Quick modes")
-                Spacer(modifier = Modifier.height(10.dp))
-                QuickModeCard(
-                    title = "Normal",
-                    description = "AC 20°C cool · Bulb 100% cool white",
-                    icon = Icons.Default.WbSunny,
-                    onClick = { activateNormalMode() }
-                )
-                Spacer(modifier = Modifier.height(Design.sectionSpacing))
-                QuickModeCard(
-                    title = "Sleep",
-                    description = "AC 20°C cool · Bulb off",
-                    icon = Icons.Default.Bedtime,
-                    onClick = { activateSleepMode() }
-                )
-                Spacer(modifier = Modifier.height(Design.sectionSpacing))
-                QuickModeCard(
-                    title = "Out",
-                    description = "AC off · Bulb off",
-                    icon = Icons.AutoMirrored.Filled.Logout,
-                    onClick = { activateOutMode() }
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                SectionLabel(text = "Devices")
-                Spacer(modifier = Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        DeviceCard(
-                            name = "Air conditioner",
-                            brand = AcBrands.find(acRemote.brandId).name,
-                            isOn = acState.isPoweredOn,
-                            statusText = if (acState.isPoweredOn) "${acState.temperature}°C · ${acState.mode.name.lowercase().replaceFirstChar { it.uppercase() }}" else "Off",
-                            icon = { modifier ->
-                                Icon(
-                                    imageVector = Icons.Default.AcUnit,
-                                    contentDescription = null,
-                                    modifier = modifier,
-                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (acState.isPoweredOn) 0.85f else 0.35f)
-                                )
-                            },
-                            onTogglePower = { acViewModel.togglePower() },
-                            onClick = onNavigateToAc
-                        )
-                    }
-                    Box(modifier = Modifier.weight(1f)) {
-                        val bulbIsOn = bulbState.isPoweredOn && connectedBulb != null
-                        DeviceCard(
-                            name = "Smart bulb",
-                            brand = "WiZ",
-                            isOn = bulbIsOn,
-                            statusText = when {
-                                bulbIsOn -> "${bulbState.brightness}% · ${bulbState.colorTemp}K"
-                                connectedBulb != null -> "Off"
-                                else -> "Not connected"
-                            },
-                            icon = { modifier ->
-                                Icon(
-                                    imageVector = Icons.Default.Lightbulb,
-                                    contentDescription = null,
-                                    modifier = modifier,
-                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (bulbIsOn) 0.85f else 0.35f)
-                                )
-                            },
-                            onTogglePower = {
-                                if (connectedBulb != null) {
-                                    bulbViewModel.togglePower()
-                                }
-                            },
-                            onClick = onNavigateToBulb
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-            }
+            )
         }
-    }
-}
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = Design.screenHorizontalPadding)
+        ) {
+            Spacer(modifier = Modifier.height(8.dp))
 
-@Composable
-private fun TodayProgressCard(
-    doneCount: Int,
-    totalCount: Int,
-    activeStreaks: Int,
-    bestStreak: Int
-) {
-    val ratio = if (totalCount > 0) doneCount.toFloat() / totalCount.toFloat() else 0f
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = Design.cardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = Design.cardElevation)
-    ) {
-        Column(modifier = Modifier.padding(Design.cardPadding)) {
+            AcCard(
+                state = acState,
+                subtitle = "${brand.name} · ${model.label}",
+                minTemp = acCapabilities.minTemp,
+                maxTemp = acCapabilities.maxTemp,
+                hasIr = acViewModel.isIrAvailable,
+                onTogglePower = acViewModel::togglePower,
+                onLower = acViewModel::decreaseTemperature,
+                onRaise = acViewModel::increaseTemperature,
+                onOpen = onNavigateToAc
+            )
+
+            Spacer(modifier = Modifier.height(Design.sectionSpacing))
+
+            BulbCard(
+                state = bulbState,
+                isConnected = connectedBulb != null,
+                subtitle = connectedBulb?.let { "WiZ · ${it.ip}" } ?: "WiZ smart bulb",
+                onTogglePower = bulbViewModel::togglePower,
+                onLower = bulbViewModel::decreaseBrightness,
+                onRaise = bulbViewModel::increaseBrightness,
+                onOpen = onNavigateToBulb
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
             Text(
-                text = "Today's progress",
+                text = "Scenes",
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
             )
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = "$doneCount",
-                    fontSize = 36.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SceneButton(
+                    label = "Normal",
+                    detail = "AC 20°, bulb on",
+                    icon = Icons.Default.WbSunny,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        acViewModel.applyScene(20, AcMode.COOL)
+                        bulbViewModel.powerOn()
+                        bulbViewModel.setBrightness(100)
+                        bulbViewModel.setScene(BulbScene.COOL_WHITE)
+                        Toaster.success("Normal scene on")
+                    }
                 )
-                Text(
-                    text = " / $totalCount",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
-                    modifier = Modifier.padding(bottom = 4.dp)
+                SceneButton(
+                    label = "Sleep",
+                    detail = "AC 20°, bulb off",
+                    icon = Icons.Default.Bedtime,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        acViewModel.applyScene(20, AcMode.COOL)
+                        bulbViewModel.powerOff()
+                        Toaster.success("Sleep scene on")
+                    }
                 )
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = if (totalCount == 0) "No routines yet" else "${(ratio * 100).toInt()}% done",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
-                    modifier = Modifier.padding(bottom = 6.dp)
+                SceneButton(
+                    label = "Out",
+                    detail = "Everything off",
+                    icon = Icons.AutoMirrored.Filled.Logout,
+                    modifier = Modifier.weight(1f),
+                    onClick = {
+                        acViewModel.powerOff()
+                        bulbViewModel.powerOff()
+                        Toaster.success("Out scene on")
+                    }
                 )
             }
-            Spacer(modifier = Modifier.height(12.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f))
-            ) {
-                if (ratio > 0f) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(ratio)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(50))
-                            .background(MaterialTheme.colorScheme.onSurface)
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Row {
-                StatItem(value = "$activeStreaks", label = "Active streaks")
-                Spacer(modifier = Modifier.width(28.dp))
-                StatItem(value = "$bestStreak", label = "Longest streak")
-                Spacer(modifier = Modifier.width(28.dp))
-                StatItem(value = "${totalCount - doneCount}", label = "Remaining")
-            }
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
 
 @Composable
-private fun StatItem(value: String, label: String) {
-    Column {
-        Text(
-            text = value,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = label,
-            fontSize = 11.sp,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
-        )
-    }
-}
-
-@Composable
-private fun UpNextRow(
-    stats: TodoStats,
-    remainingMs: Long?,
-    onToggle: () -> Unit,
-    onStartTimer: () -> Unit,
-    onCancelTimer: () -> Unit,
+private fun AcCard(
+    state: AcState,
+    subtitle: String,
+    minTemp: Int,
+    maxTemp: Int,
+    hasIr: Boolean,
+    onTogglePower: () -> Unit,
+    onLower: () -> Unit,
+    onRaise: () -> Unit,
     onOpen: () -> Unit
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onOpen),
-        shape = Design.cardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = Design.cardElevation)
+    val summary = when {
+        !hasIr -> "No infrared blaster on this phone"
+        !state.isPoweredOn -> "Off"
+        else -> "${state.mode.label()} · Fan ${state.fanSpeed.name.lowercase()}"
+    }
+    DeviceCard(
+        name = "Air conditioner",
+        subtitle = subtitle,
+        isOn = state.isPoweredOn,
+        powerLabel = "air conditioner",
+        onTogglePower = onTogglePower,
+        onOpen = onOpen
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 6.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(
-                onClick = onToggle,
-                modifier = Modifier.size(48.dp)
-            ) {
-                Icon(
-                    imageVector = if (stats.isDoneCurrentInterval) Icons.Default.CheckCircle else Icons.Outlined.Circle,
-                    contentDescription = if (stats.isDoneCurrentInterval) "Mark not done" else "Mark done",
-                    tint = if (stats.isDoneCurrentInterval)
-                        MaterialTheme.colorScheme.onSurface
-                    else
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
-                )
-            }
-            Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = stats.todo.title,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    text = "${state.temperature}°",
+                    fontSize = 52.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (state.isPoweredOn) 1f else 0.35f)
                 )
-                Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = scheduleSummary(stats.todo),
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                    text = summary,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-            if (stats.todo.hasTimer) {
-                Spacer(modifier = Modifier.width(8.dp))
-                TaskTimerChip(
-                    remainingMs = remainingMs,
-                    onStart = onStartTimer,
-                    onCancel = onCancelTimer
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun AllClearCard(hasTasks: Boolean) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = Design.cardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = Design.cardElevation)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 18.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Default.CheckCircle,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            StepButton(
+                icon = Icons.Default.Remove,
+                description = "Lower temperature",
+                enabled = state.isPoweredOn && state.temperature > minTemp,
+                onClick = onLower
             )
             Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = if (hasTasks) "All caught up for now" else "Add a routine in Tasks to get started",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            StepButton(
+                icon = Icons.Default.Add,
+                description = "Raise temperature",
+                enabled = state.isPoweredOn && state.temperature < maxTemp,
+                onClick = onRaise
             )
         }
     }
 }
 
 @Composable
-private fun QuickModeCard(
-    title: String,
-    description: String,
-    icon: ImageVector,
-    onClick: () -> Unit
+private fun BulbCard(
+    state: BulbState,
+    isConnected: Boolean,
+    subtitle: String,
+    onTogglePower: () -> Unit,
+    onLower: () -> Unit,
+    onRaise: () -> Unit,
+    onOpen: () -> Unit
+) {
+    val isOn = isConnected && state.isPoweredOn
+    DeviceCard(
+        name = "Smart bulb",
+        subtitle = subtitle,
+        isOn = isOn,
+        powerLabel = "smart bulb",
+        powerEnabled = isConnected,
+        onTogglePower = onTogglePower,
+        onOpen = onOpen
+    ) {
+        if (!isConnected) {
+            Column {
+                Text(
+                    text = "Not connected",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Join the same Wi-Fi as the bulb, then scan for it.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onOpen,
+                    modifier = Modifier.heightIn(min = 48.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                ) {
+                    Text("Find bulb")
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "${state.brightness}%",
+                        fontSize = 52.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (isOn) 1f else 0.35f)
+                    )
+                    Text(
+                        text = if (isOn) "Brightness · ${state.colorTemp}K" else "Off",
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+                StepButton(
+                    icon = Icons.Default.Remove,
+                    description = "Dimmer",
+                    enabled = isOn && state.brightness > BulbState.MIN_BRIGHTNESS,
+                    onClick = onLower
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                StepButton(
+                    icon = Icons.Default.Add,
+                    description = "Brighter",
+                    enabled = isOn && state.brightness < BulbState.MAX_BRIGHTNESS,
+                    onClick = onRaise
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeviceCard(
+    name: String,
+    subtitle: String,
+    isOn: Boolean,
+    powerLabel: String,
+    onTogglePower: () -> Unit,
+    onOpen: () -> Unit,
+    powerEnabled: Boolean = true,
+    content: @Composable () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .clickable(role = Role.Button, onClick = onOpen),
         shape = Design.cardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = Design.cardElevation)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(Design.cardPadding),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
-            )
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = description,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text = text,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-        modifier = Modifier.fillMaxWidth()
-    )
-}
-
-@Composable
-private fun TodayProgressSkeleton() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = Design.cardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         elevation = CardDefaults.cardElevation(defaultElevation = Design.cardElevation)
     ) {
         Column(modifier = Modifier.padding(Design.cardPadding)) {
-            SkeletonLine(width = 110.dp, height = 12.dp)
-            Spacer(modifier = Modifier.height(14.dp))
-            SkeletonLine(width = 90.dp, height = 32.dp)
-            Spacer(modifier = Modifier.height(14.dp))
-            SkeletonBox(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp),
-                shape = RoundedCornerShape(50)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
-                repeat(3) {
-                    Column {
-                        SkeletonLine(width = 28.dp, height = 18.dp)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        SkeletonLine(width = 60.dp, height = 11.dp)
-                    }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = name,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = subtitle,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
+                Switch(
+                    checked = isOn,
+                    enabled = powerEnabled,
+                    onCheckedChange = { onTogglePower() },
+                    modifier = Modifier.semantics { contentDescription = "Power $powerLabel" },
+                    colors = SwitchDefaults.colors(
+                        checkedTrackColor = MaterialTheme.colorScheme.primary,
+                        checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                        uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                        uncheckedBorderColor = MaterialTheme.colorScheme.outline
+                    )
+                )
             }
+            Spacer(modifier = Modifier.height(16.dp))
+            content()
         }
     }
 }
 
 @Composable
-private fun UpNextSkeleton() {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
+private fun SceneButton(
+    label: String,
+    detail: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = 88.dp),
         shape = Design.cardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = Design.cardElevation)
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            SkeletonBox(
-                modifier = Modifier.size(28.dp),
-                shape = RoundedCornerShape(50)
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurface
             )
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                SkeletonLine(width = 140.dp, height = 15.dp)
-                Spacer(modifier = Modifier.height(6.dp))
-                SkeletonLine(width = 180.dp, height = 12.dp)
-            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = label,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = detail,
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+            )
         }
     }
 }
+
+private fun AcMode.label(): String = name.lowercase().replaceFirstChar { it.uppercase() }
 
 private fun greeting(): String {
     return when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
@@ -567,8 +420,4 @@ private fun greeting(): String {
         in 17..20 -> "Good evening"
         else -> "Good night"
     }
-}
-
-private fun today(): String {
-    return SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(Date())
 }

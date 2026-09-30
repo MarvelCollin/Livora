@@ -64,6 +64,9 @@ object Toaster {
         actionLabel: String? = null,
         onAction: (() -> Unit)? = null
     ): Long {
+        items.firstOrNull {
+            it.message == message && it.type == type && it.transitionState.targetState
+        }?.let { return it.id }
         val id = ++counter
         items.add(ToastItem(id, message, type, durationMs, actionLabel, onAction))
         while (items.size > MAX_VISIBLE) {
