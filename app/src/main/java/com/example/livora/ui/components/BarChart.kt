@@ -56,11 +56,12 @@ fun BarChart(
     color: Color,
     modifier: Modifier = Modifier,
     chartHeight: Dp = 120.dp,
-    description: String
+    description: String,
+    initialSelected: Int? = null
 ) {
     if (points.isEmpty()) return
     val peak = points.indices.maxByOrNull { points[it].value } ?: 0
-    var selected by remember(points) { mutableStateOf(peak) }
+    var selected by remember(points) { mutableStateOf((initialSelected ?: peak).coerceIn(0, points.lastIndex)) }
     val grow = remember(points) { Animatable(0f) }
     LaunchedEffect(points) { grow.animateTo(1f, tween(520, easing = FastOutSlowInEasing)) }
 

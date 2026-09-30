@@ -8,6 +8,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Quiz
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -43,6 +44,7 @@ fun DailyScreen(
     val wordAdd = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
     val quiz = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
     val expenseAdd = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
+    val expenseExport = remember { MutableSharedFlow<Unit>(extraBufferCapacity = 1) }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -84,12 +86,21 @@ fun DailyScreen(
                                     )
                                 }
                             }
-                            else -> IconButton(onClick = { expenseAdd.tryEmit(Unit) }) {
-                                Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = "Add expense",
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
+                            else -> {
+                                IconButton(onClick = { expenseExport.tryEmit(Unit) }) {
+                                    Icon(
+                                        imageVector = Icons.Default.FileDownload,
+                                        contentDescription = "Export expenses as CSV",
+                                        tint = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                IconButton(onClick = { expenseAdd.tryEmit(Unit) }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = "Add expense",
+                                        tint = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
                             }
                         }
                     }
@@ -122,7 +133,7 @@ fun DailyScreen(
                     addRequests = wordAdd,
                     quizRequests = quiz
                 )
-                else -> ExpensesPage(addRequests = expenseAdd)
+                else -> ExpensesPage(addRequests = expenseAdd, exportRequests = expenseExport)
             }
         }
     }

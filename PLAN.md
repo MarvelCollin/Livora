@@ -12,7 +12,8 @@ Effort sizes are relative: S is small, M is medium, L is large, XL is the bigges
 - [x] App icon and brand files in `branding/`
 - [x] People (face grouping) lives in the Gallery tab as Photos, Albums and People, see section 8
 - [x] Navigation is grouped into four tabs, see section 0b
-- [x] UI previews with sample data exist for QR codes, Expenses, Documents, App usage and the Storage cleaner with swipe review. None of them work yet, see section 0b
+- [x] Expenses is a real tool with its own database, charts, categories with icons and CSV export, see section 5
+- [x] UI previews with sample data exist for QR codes, Documents, App usage and the Storage cleaner with swipe review. They do not work yet, see section 0b
 
 ## 0b. Navigation and where every tool lives
 
@@ -34,7 +35,6 @@ Rules for this structure:
 Status of the UI previews (sample data only, no real function behind them):
 - [x] Tools hub with grouped rows
 - [x] QR codes: Scan tab with history and a safe result sheet, Create tab with a live preview
-- [x] Expenses: month headline, budget, where it went, searchable list grouped by day, add sheet with keypad
 - [x] Documents: searchable library with sort, document page grid
 - [x] App usage: permission screen, screen time with hourly chart, most used apps, unused apps
 - [x] Storage cleaner: overview with space breakdown, swipe review card stack with undo and end summary
@@ -46,7 +46,7 @@ Each has a recommended default. Work follows the default unless you say otherwis
 
 - [x] **Navigation.** Decided: four bottom tabs, Home, Daily, Gallery and Tools, as described in section 0b. Tools is a grouped hub of plain rows (name, one line of description, a live value such as "Vault, 12 items"). Home stays devices only.
 - [ ] **All files access for the cleaner.** Android 11+ hides other apps' files and the Downloads root from normal apps. Full cleaner features (old APKs, big downloads, empty folders) need the `MANAGE_EXTERNAL_STORAGE` permission. Fine for a personal sideloaded app, not accepted on Play Store. Default: ask for it as an optional "Full cleaner mode" and keep a media only mode without it.
-- [ ] **Expenses storage.** Local Room database only, or sync through Supabase like tasks. Default: local only, with encrypted export and import. Money data should not leave the phone by accident.
+- [x] **Expenses storage.** Decided: local Room database only, CSV export by the user. Money data does not leave the phone by accident. Import and encryption are still open.
 - [x] **Vault unlock.** Decided: your fingerprint or phone lock unlocks it, with a recovery code as the way back after a phone reset.
 - [ ] **Document scanner engine.** ML Kit Document Scanner (needs Google Play services, best quality, least code) or a custom camera and OpenCV pipeline. Default: ML Kit now, custom fallback only if a device lacks Play services.
 - [ ] **Default currency.** IDR with `id-ID` formatting. Default: yes.
@@ -56,12 +56,12 @@ Each has a recommended default. Work follows the default unless you say otherwis
 
 Everything below depends on it, so it goes before any single tool.
 
-- [ ] Add Room and KSP (KSP release that matches Kotlin 2.0.21) to `libs.versions.toml` and `app/build.gradle.kts` (M)
+- [x] Add Room and KSP (KSP release that matches Kotlin 2.0.21) to `libs.versions.toml` and `app/build.gradle.kts` (M)
 - [ ] Add Paging 3 with `paging-compose` for long lists
 - [ ] Add DataStore for settings, WorkManager for background jobs
 - [ ] Add Coil 3 (`coil-compose`, `coil-video`) for images and video thumbnails
 - [ ] Skip CameraX for now, both QR scanning and document scanning run through Play services screens
-- [ ] One `AppDatabase` for expenses, QR history, document index, review decisions. The vault gets its own encrypted store (see section 3)
+- [ ] One `AppDatabase` for expenses, QR history, document index, review decisions. Expenses are in it (version 2, exported schemas, migration test). The vault gets its own encrypted store (see section 3)
 - [ ] Simple `AppContainer` object for repositories, matching the current style with no DI framework
 - [x] Tools hub tab and routes in `MainScreen.kt`, `AppNavHost.kt`, `Screen.kt`
 - [ ] Static app shortcuts on long press of the launcher icon: Scan QR, Scan document, Add expense
@@ -190,18 +190,18 @@ Highest risk tool, so the security design came before any screen. No custom cryp
 
 **Approach.** Local Room database, amounts stored as `Long` in the smallest currency unit, Paging 3 for the transaction list, charts drawn with Compose Canvas.
 
-- [ ] Schema: transactions, categories, accounts, budgets, recurring rules, with migrations from day one (M)
-- [ ] Money helper: parse and format by currency, IDR without decimals, unit tests
-- [ ] Quick add sheet with a numeric keypad, category, account, note, date
-- [ ] Transaction list grouped by day with search and filters (category, account, type, date range, amount range) and an active filter line
-- [ ] Edit and delete with undo
-- [ ] Accounts and transfers between accounts
-- [ ] Categories with defaults for Indonesia (food, transport, bills, groceries and so on), user editable
-- [ ] Monthly summary: total in, total out, top categories, one clear headline number. No icon tile stat cards
-- [ ] Charts: category breakdown and daily trend, chart colors from the dataviz skill so they read in light and dark
-- [ ] Budgets per category with progress and an over budget alert notification
+- [x] Schema: transactions, categories, accounts, budgets, with migrations from day one. Recurring rules are still open (M)
+- [x] Money helper: IDR without decimals and dot grouping, compact form, unit tests
+- [x] Quick add sheet with a numeric keypad, category, account, note, date picker, expense or income
+- [x] Transaction list grouped by day with search, type filter and category filter, and an active filter line. Account, date range and amount range filters are still open
+- [x] Edit and delete with undo
+- [ ] Accounts and transfers between accounts. Accounts can be added, transfers are still open
+- [x] Categories with defaults for Indonesia and an icon each, new categories pick a color and an icon
+- [x] Monthly summary: spent, received, net, per day, biggest expense, comparison with last month at the same point, month end projection. No icon tile stat cards
+- [x] Charts: daily spending bars, category donut with legend, six month bars, all with touch tooltips and chart colors from the dataviz skill
+- [ ] Budgets per category with progress and an over budget alert notification. A monthly total budget with progress and daily allowance is done
 - [ ] Recurring transactions generated by WorkManager (unit test the recurrence rules)
-- [ ] CSV export and import
+- [ ] CSV import. CSV export is done
 - [ ] Receipt photo attach, using the document scanner once section 6 is done
 - [ ] Later: fill the amount from a receipt photo with ML Kit text recognition
 
