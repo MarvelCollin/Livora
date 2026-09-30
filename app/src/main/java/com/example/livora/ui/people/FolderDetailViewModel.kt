@@ -6,8 +6,6 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
-import androidx.paging.PagingData
-import androidx.paging.cachedIn
 import com.example.livora.data.people.FoldersState
 import com.example.livora.data.people.PeopleServices
 import com.example.livora.data.people.EnrollDraft
@@ -18,14 +16,23 @@ import com.example.livora.data.people.media.MediaImages
 import com.example.livora.data.people.media.MediaWriter
 import com.example.livora.ui.components.ToastType
 import com.example.livora.ui.components.Toaster
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class ConsentRequest(val sender: IntentSender, val onResult: (Boolean) -> Unit)
+
+object ConsentBroker {
+    val request = MutableStateFlow<ConsentRequest?>(null)
+}
 
 class FolderDetailViewModel(application: Application, handle: SavedStateHandle) : AndroidViewModel(application) {
 
@@ -44,20 +51,22 @@ class FolderDetailViewModel(application: Application, handle: SavedStateHandle) 
     private val selectedState = MutableStateFlow<Set<Long>>(emptySet())
     val selected: StateFlow<Set<Long>> = selectedState.asStateFlow()
 
-    private val consentState = MutableStateFlow<ConsentRequest?>(null)
+    private val consentState = ConsentBroker.request
     val consent: StateFlow<ConsentRequest?> = consentState.asStateFlow()
 
     private val leftState = MutableStateFlow(false)
     val left: StateFlow<Boolean> = leftState.asStateFlow()
 
-    private val bucketId: Long? = when {
-        key == ALL_PHOTOS_KEY -> null
-        key.startsWith("b:") -> key.removePrefix("b:").toLongOrNull()
-        else -> -1L
-    }
+    val images: StateFlow<List<MediaImage>> = folders.images
+        .map { imagesOfFolder(key, it) }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, imagesOfFolder(key, folders.images.value))
 
-    val photos: Flow<PagingData<MediaImage>> =
-        (if (bucketId == -1L) emptyFlow() else folders.photos(bucketId)).cachedIn(viewModelScope)
+    val rows: StateFlow<List<GalleryRow>?> = combine(
+        folders.state.map { it is FoldersState.Loading }.distinctUntilChanged(),
+        images
+    ) { loading, list ->
+        if (loading) null else GalleryGrouping.group(getApplication(), list)
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     init {
         reload()
@@ -85,8 +94,13 @@ class FolderDetailViewModel(application: Application, handle: SavedStateHandle) 
         selectedState.value = emptySet()
     }
 
-    fun selectAll(ids: List<Long>) {
-        selectedState.value = ids.toSet()
+    fun selectAll() {
+        selectedState.value = images.value.map { it.id }.toSet()
+    }
+
+    fun toggleGroup(ids: List<Long>) {
+        val current = selectedState.value
+        selectedState.value = if (current.containsAll(ids)) current - ids.toSet() else current + ids
     }
 
     fun copySelected(target: FolderInfo) {
@@ -153,7 +167,7 @@ class FolderDetailViewModel(application: Application, handle: SavedStateHandle) 
     fun trashSelected() {
         val ids = selectedState.value.toList()
         if (ids.isEmpty()) return
-        trash(ids, "Removed ${ids.size} ${if (ids.size == 1) "photo" else "photos"} to the trash")
+        trash(ids, "Moved ${ids.size} ${if (ids.size == 1) "photo" else "photos"} to the trash")
     }
 
     private fun trash(ids: List<Long>, message: String) {

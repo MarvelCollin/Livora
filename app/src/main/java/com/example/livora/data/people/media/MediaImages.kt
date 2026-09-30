@@ -1,11 +1,9 @@
 package com.example.livora.data.people.media
 
-import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.Context
 import android.net.Uri
 import android.os.Build
-import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
 
@@ -104,48 +102,6 @@ object MediaImages {
         val trimmed = if (data.startsWith(root)) data.removePrefix(root).trimStart('/') else data
         val slash = trimmed.lastIndexOf('/')
         return if (slash < 0) "" else trimmed.substring(0, slash + 1)
-    }
-
-    fun queryPage(
-        context: Context,
-        bucketId: Long?,
-        limit: Int,
-        offset: Int
-    ): List<MediaImage> {
-        val out = ArrayList<MediaImage>(limit)
-        val resolver = context.contentResolver
-        val cursor = try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val bundle = Bundle()
-                if (bucketId != null) {
-                    bundle.putString(ContentResolver.QUERY_ARG_SQL_SELECTION, "${MediaStore.Images.Media.BUCKET_ID} = ?")
-                    bundle.putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, arrayOf(bucketId.toString()))
-                }
-                bundle.putStringArray(
-                    ContentResolver.QUERY_ARG_SORT_COLUMNS,
-                    arrayOf(
-                        MediaStore.Images.Media.DATE_TAKEN,
-                        MediaStore.Images.Media.DATE_MODIFIED,
-                        MediaStore.Images.Media._ID
-                    )
-                )
-                bundle.putInt(ContentResolver.QUERY_ARG_SORT_DIRECTION, ContentResolver.QUERY_SORT_DIRECTION_DESCENDING)
-                bundle.putInt(ContentResolver.QUERY_ARG_LIMIT, limit)
-                bundle.putInt(ContentResolver.QUERY_ARG_OFFSET, offset)
-                resolver.query(collection, projection, bundle, null)
-            } else {
-                val selection = if (bucketId != null) "${MediaStore.Images.Media.BUCKET_ID} = ?" else null
-                val args = if (bucketId != null) arrayOf(bucketId.toString()) else null
-                val order = "${MediaStore.Images.Media.DATE_TAKEN} DESC, ${MediaStore.Images.Media._ID} DESC LIMIT $limit OFFSET $offset"
-                resolver.query(collection, projection, selection, args, order)
-            }
-        } catch (e: SecurityException) {
-            null
-        } catch (e: RuntimeException) {
-            null
-        } ?: return out
-        cursor.use { c -> while (c.moveToNext()) out.add(read(c)) }
-        return out
     }
 
     fun queryByIds(context: Context, ids: List<Long>): List<MediaImage> {
