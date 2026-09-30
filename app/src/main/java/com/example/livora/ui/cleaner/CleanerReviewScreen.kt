@@ -1,21 +1,9 @@
 package com.example.livora.ui.cleaner
 
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.Dispatchers
-import com.example.livora.ui.people.PhotoThumb
-import com.example.livora.ui.components.SkeletonBox
-import com.example.livora.data.people.media.MediaImages
-import com.example.livora.data.people.media.MediaAccess
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.runtime.produceState
 import android.text.format.DateUtils
-import android.content.Context
-import com.example.livora.ui.components.statusGood
-import com.example.livora.ui.components.SuccessCheck
+import android.text.format.Formatter
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -36,21 +24,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -59,115 +45,90 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.livora.data.cleaner.CleanerFile
 import com.example.livora.ui.components.BackButton
 import com.example.livora.ui.components.Design
-import com.example.livora.ui.components.Tag
+import com.example.livora.ui.components.SkeletonBox
+import com.example.livora.ui.components.SuccessCheck
 import com.example.livora.ui.components.TopBar
-import com.example.livora.ui.components.showPreviewOnly
+import com.example.livora.ui.components.statusGood
+import com.example.livora.ui.people.ConsentEffect
+import com.example.livora.ui.people.EmptyBlock
 import com.example.livora.ui.people.LinkButton
 import com.example.livora.ui.people.OutlineAction
 import com.example.livora.ui.people.PrimaryAction
-import kotlinx.coroutines.launch
+import com.example.livora.ui.people.formatCount
 import kotlin.math.abs
-
-private class ReviewItem(
-    val name: String,
-    val date: String,
-    val size: String,
-    val mb: Float,
-    val detail: String,
-    val video: Boolean = false,
-    val mediaId: Long? = null
-)
-
-private fun formatBytes(bytes: Long): String {
-    val mb = bytes / 1_048_576f
-    return if (mb >= 1f) "%.1f MB".format(mb) else "${(bytes / 1024).coerceAtLeast(1)} KB"
-}
-
-private fun loadReal(context: Context): List<ReviewItem> {
-    if (!MediaAccess.hasAnyAccess(context)) return emptyList()
-    return MediaImages.queryAll(context)
-        .sortedByDescending { it.size }
-        .take(8)
-        .map { image ->
-            ReviewItem(
-                name = image.displayName ?: "Photo ${image.id}",
-                date = DateUtils.formatDateTime(context, image.sortDate, DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_YEAR),
-                size = formatBytes(image.size),
-                mb = image.size / 1_048_576f,
-                detail = "${image.width} x ${image.height}, ${image.bucketName.ifBlank { "Photos" }}",
-                mediaId = image.id
-            )
-        }
-}
-
-private val sampleItems = listOf(
-    ReviewItem("IMG_4821.jpg", "12 Mar 2026", "3.4 MB", 3.4f, "4032 x 3024, Camera"),
-    ReviewItem("Screenshot_2026-09-28.png", "28 Sep 2026", "1.1 MB", 1.1f, "1220 x 2712, Screenshots"),
-    ReviewItem("VID_0093.mp4", "2 Sep 2026", "48.6 MB", 48.6f, "1080p, 0:42, Camera", video = true),
-    ReviewItem("IMG_4790.jpg", "9 Mar 2026", "2.8 MB", 2.8f, "4032 x 3024, Camera"),
-    ReviewItem("IMG-WA0043.jpg", "30 Sep 2026", "0.2 MB", 0.2f, "1280 x 960, WhatsApp Images"),
-    ReviewItem("IMG_4755.jpg", "1 Mar 2026", "4.1 MB", 4.1f, "4032 x 3024, Camera"),
-    ReviewItem("VID_0071.mp4", "14 Aug 2026", "22.3 MB", 22.3f, "720p, 0:18, Camera", video = true),
-    ReviewItem("IMG_4712.jpg", "20 Feb 2026", "3.0 MB", 3.0f, "4032 x 3024, Camera")
-)
+import kotlinx.coroutines.launch
 
 @Composable
-fun CleanerReviewScreen(onBack: () -> Unit) {
-    val context = LocalContext.current
-    var log by rememberSaveable { mutableStateOf("") }
-    val loaded by produceState<List<ReviewItem>?>(null) {
-        val real = withContext(Dispatchers.IO) { loadReal(context) }
-        value = real.ifEmpty { sampleItems }
-    }
-    val items = loaded
-    val index = log.length
-    val done = items != null && index >= items.size
+fun CleanerReviewScreen(onBack: () -> Unit, viewModel: CleanerReviewViewModel = viewModel()) {
+    val state by viewModel.state.collectAsState()
+    ConsentEffect(viewModel.consent)
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopBar(
-                title = "Swipe review",
+                title = viewModel.source.title,
                 subtitle = when {
-                    items == null -> "Getting your photos"
-                    done -> "All reviewed"
-                    else -> "${index + 1} of ${items.size}"
+                    state.loading -> "Getting your files"
+                    state.finished -> "Done"
+                    state.queue.isEmpty() -> "Nothing to review"
+                    state.done -> "All reviewed"
+                    else -> "${state.index + 1} of ${formatCount(state.queue.size)}"
                 },
                 navigationIcon = { BackButton(onBack) }
             )
         }
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            if (items == null) {
-                SkeletonBox(
+            when {
+                state.loading -> SkeletonBox(
                     modifier = Modifier.weight(1f).fillMaxWidth().padding(16.dp),
                     shape = RoundedCornerShape(16.dp)
                 )
-            } else if (done) {
-                Summary(
-                    items = items,
-                    log = log,
-                    onUndo = { log = log.dropLast(1) },
-                    onRestart = { log = "" },
+
+                state.queue.isEmpty() -> EmptyBlock(
+                    title = "Nothing to review here",
+                    body = "There are no files left in this group. Files you kept are hidden until you show them again from the cleaner.",
+                    actionLabel = "Back to the cleaner",
+                    onAction = onBack
+                )
+
+                state.finished -> Finished(
+                    count = state.trashed,
+                    bytes = state.trashedBytes,
                     onBack = onBack
                 )
-            } else {
-                Text(
-                    text = if (items.any { it.mediaId != null }) "Preview with your own photos, largest first. Nothing is deleted." else "Preview with sample photos. Nothing is deleted.",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = Design.screenHorizontalPadding, vertical = 8.dp)
+
+                state.done -> Summary(
+                    kept = state.keptCount,
+                    files = state.toTrash,
+                    total = state.queue.size,
+                    onTrash = viewModel::trash,
+                    onUndo = viewModel::undo,
+                    onRestart = viewModel::restart,
+                    onBack = onBack
                 )
-                ReviewStack(
-                    items = items,
-                    index = index,
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    onDecision = { keep -> log += if (keep) "K" else "T" },
-                    canUndo = log.isNotEmpty(),
-                    onUndo = { log = log.dropLast(1) }
-                )
+
+                else -> {
+                    Text(
+                        text = "Largest first. Nothing is deleted until you confirm at the end.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = Design.screenHorizontalPadding, vertical = 8.dp)
+                    )
+                    ReviewStack(
+                        items = state.queue,
+                        index = state.index,
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        onDecision = viewModel::decide,
+                        canUndo = state.decisions.isNotEmpty(),
+                        onUndo = viewModel::undo
+                    )
+                }
             }
         }
     }
@@ -175,7 +136,7 @@ fun CleanerReviewScreen(onBack: () -> Unit) {
 
 @Composable
 private fun ReviewStack(
-    items: List<ReviewItem>,
+    items: List<CleanerFile>,
     index: Int,
     canUndo: Boolean,
     onDecision: (Boolean) -> Unit,
@@ -314,28 +275,19 @@ private fun EdgeLabel(text: String, keep: Boolean, alpha: Float, modifier: Modif
 }
 
 @Composable
-private fun ReviewCard(item: ReviewItem, modifier: Modifier = Modifier) {
+private fun ReviewCard(item: CleanerFile, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
     ) {
-        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            if (item.mediaId != null) {
-                PhotoThumb(
-                    mediaId = item.mediaId,
-                    sizePx = 1080,
-                    modifier = Modifier.fillMaxSize(),
-                    shape = RectangleShape,
-                    description = "Photo ${item.name}"
-                )
-            } else {
-                PhotoArt(seed = item.name.length, modifier = Modifier.fillMaxSize())
-            }
-            if (item.video) {
-                Tag(text = "Video", modifier = Modifier.align(Alignment.TopStart).padding(12.dp))
-            }
-        }
+        FileThumb(
+            file = item,
+            sizePx = 1080,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            shape = RectangleShape
+        )
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
             Text(
                 text = item.name,
@@ -345,13 +297,14 @@ private fun ReviewCard(item: ReviewItem, modifier: Modifier = Modifier) {
                 maxLines = 1
             )
             Text(
-                text = "${item.date}, ${item.size}",
+                text = DateUtils.formatDateTime(context, item.dateMs, DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_YEAR) +
+                    ", " + Formatter.formatShortFileSize(context, item.size),
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 2.dp)
             )
             Text(
-                text = item.detail,
+                text = (if (item.width > 0) "${item.width} x ${item.height}, " else "") + item.folder.ifBlank { "Storage" },
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -360,38 +313,18 @@ private fun ReviewCard(item: ReviewItem, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun PhotoArt(seed: Int, modifier: Modifier = Modifier) {
-    val sky = MaterialTheme.colorScheme.surfaceContainerHigh
-    val sun = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.55f)
-    val far = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
-    val near = MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)
-    Canvas(modifier = modifier.background(sky)) {
-        val w = size.width
-        val h = size.height
-        val shift = (seed % 5) * 0.06f
-        drawCircle(color = sun, radius = w * 0.09f, center = Offset(w * (0.25f + shift), h * 0.24f))
-        val back = Path().apply {
-            moveTo(0f, h)
-            lineTo(w * (0.3f + shift), h * 0.5f)
-            lineTo(w * (0.62f + shift), h)
-            close()
-        }
-        drawPath(back, far)
-        val front = Path().apply {
-            moveTo(w * 0.35f, h)
-            lineTo(w * (0.68f - shift), h * 0.42f)
-            lineTo(w, h)
-            close()
-        }
-        drawPath(front, near)
-    }
-}
-
-@Composable
-private fun Summary(items: List<ReviewItem>, log: String, onUndo: () -> Unit, onRestart: () -> Unit, onBack: () -> Unit) {
-    val kept = log.count { it == 'K' }
-    val trashed = log.count { it == 'T' }
-    val freed = items.filterIndexed { i, _ -> log.getOrNull(i) == 'T' }.sumOf { it.mb.toDouble() }
+private fun Summary(
+    kept: Int,
+    files: List<CleanerFile>,
+    total: Int,
+    onTrash: () -> Unit,
+    onUndo: () -> Unit,
+    onRestart: () -> Unit,
+    onBack: () -> Unit
+) {
+    val context = LocalContext.current
+    val trashed = files.size
+    val freed = files.sumOf { it.size }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -407,7 +340,7 @@ private fun Summary(items: List<ReviewItem>, log: String, onUndo: () -> Unit, on
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
-            text = "You reviewed ${items.size} files. You kept $kept and marked $trashed for the trash.",
+            text = "You reviewed ${formatCount(total)} files. You kept ${formatCount(kept)} and marked ${formatCount(trashed)} for the trash.",
             fontSize = 15.sp,
             lineHeight = 22.sp,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -417,8 +350,8 @@ private fun Summary(items: List<ReviewItem>, log: String, onUndo: () -> Unit, on
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
         Spacer(modifier = Modifier.height(16.dp))
         PrimaryAction(
-            text = "Trash $trashed ${if (trashed == 1) "item" else "items"} and free ${"%.1f".format(freed)} MB",
-            onClick = { showPreviewOnly() },
+            text = "Trash ${formatCount(trashed)} ${if (trashed == 1) "item" else "items"} and free ${Formatter.formatShortFileSize(context, freed)}",
+            onClick = onTrash,
             enabled = trashed > 0,
             modifier = Modifier.fillMaxWidth()
         )
@@ -433,5 +366,34 @@ private fun Summary(items: List<ReviewItem>, log: String, onUndo: () -> Unit, on
         LinkButton(text = "Undo last swipe", onClick = onUndo)
         LinkButton(text = "Start over", onClick = onRestart)
         LinkButton(text = "Back to the cleaner", onClick = onBack)
+    }
+}
+
+@Composable
+private fun Finished(count: Int, bytes: Long, onBack: () -> Unit) {
+    val context = LocalContext.current
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp)
+            .padding(top = 48.dp)
+    ) {
+        SuccessCheck(color = statusGood(), size = 88.dp)
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "${Formatter.formatShortFileSize(context, bytes)} freed",
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = "${formatCount(count)} ${if (count == 1) "file is" else "files are"} in the system trash. Open your gallery or Files app to restore them within about 30 days.",
+            fontSize = 15.sp,
+            lineHeight = 22.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        PrimaryAction(text = "Back to the cleaner", onClick = onBack, modifier = Modifier.fillMaxWidth())
     }
 }

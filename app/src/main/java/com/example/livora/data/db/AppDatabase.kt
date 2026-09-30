@@ -5,6 +5,8 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.livora.data.cleaner.CleanerKeptDao
+import com.example.livora.data.cleaner.CleanerKeptEntity
 import com.example.livora.data.expenses.ExpenseAccountDao
 import com.example.livora.data.expenses.ExpenseAccountEntity
 import com.example.livora.data.expenses.ExpenseBudgetDao
@@ -24,9 +26,10 @@ import com.example.livora.data.usage.UsageHourEntity
         ExpenseAccountEntity::class,
         ExpenseBudgetEntity::class,
         UsageDayEntity::class,
-        UsageHourEntity::class
+        UsageHourEntity::class,
+        CleanerKeptEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -36,6 +39,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun accounts(): ExpenseAccountDao
     abstract fun budgets(): ExpenseBudgetDao
     abstract fun usage(): UsageDao
+    abstract fun cleaner(): CleanerKeptDao
 
     companion object {
 

@@ -24,6 +24,10 @@ object AppMigrationSql {
         "CREATE TABLE IF NOT EXISTS `usage_days` (`day` INTEGER NOT NULL, `packageName` TEXT NOT NULL, `millis` INTEGER NOT NULL, PRIMARY KEY(`day`, `packageName`))",
         "CREATE TABLE IF NOT EXISTS `usage_hours` (`hourStart` INTEGER NOT NULL, `millis` INTEGER NOT NULL, PRIMARY KEY(`hourStart`))"
     )
+
+    val V3_TO_V4 = listOf(
+        "CREATE TABLE IF NOT EXISTS `cleaner_kept` (`fileKey` TEXT NOT NULL, `keptAt` INTEGER NOT NULL, PRIMARY KEY(`fileKey`))"
+    )
 }
 
 object AppMigrations {
@@ -40,5 +44,11 @@ object AppMigrations {
         }
     }
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+    val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            AppMigrationSql.V3_TO_V4.forEach { db.execSQL(it) }
+        }
+    }
+
+    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
 }

@@ -99,10 +99,13 @@ fun AppNavHost(navController: NavHostController) {
         composable(ToolRoutes.CLEANER) {
             CleanerScreen(
                 onBack = { navController.popBackStack() },
-                onOpenReview = { navController.navigate(ToolRoutes.CLEANER_REVIEW) }
+                onOpenReview = { navController.navigate(ToolRoutes.review(it.id)) }
             )
         }
-        composable(ToolRoutes.CLEANER_REVIEW) { CleanerReviewScreen(onBack = { navController.popBackStack() }) }
+        composable(
+            route = ToolRoutes.CLEANER_REVIEW,
+            arguments = listOf(navArgument("source") { type = NavType.StringType })
+        ) { CleanerReviewScreen(onBack = { navController.popBackStack() }) }
         peopleGraph(navController)
         composable(Screen.Vault.route) {
             VaultScreen(onBack = { navController.popBackStack() })

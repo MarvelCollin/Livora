@@ -124,8 +124,20 @@ class AppMigrationSqlTest {
     }
 
     @Test
-    fun seedRowsMatchTheCurrentSchema() {
+    fun versionThreeToFourAddsTheKeptTable() {
         createFrom(3)
+        assertMatchesSchema(3)
+        exec("INSERT INTO usage_days (day, packageName, millis) VALUES (20000, 'a.b', 1000)")
+        AppMigrationSql.V3_TO_V4.forEach { exec(it) }
+        assertMatchesSchema(4)
+        assertEquals("1000", scalar("SELECT millis FROM usage_days WHERE packageName = 'a.b'"))
+        exec("INSERT INTO cleaner_kept (fileKey, keptAt) VALUES ('i:5', 100)")
+        assertEquals("i:5", scalar("SELECT fileKey FROM cleaner_kept"))
+    }
+
+    @Test
+    fun seedRowsMatchTheCurrentSchema() {
+        createFrom(4)
         AppSeed.SQL.forEach { exec(it) }
         assertEquals("12", scalar("SELECT COUNT(*) FROM expense_categories"))
         assertEquals("3", scalar("SELECT COUNT(*) FROM expense_accounts"))

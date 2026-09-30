@@ -90,8 +90,7 @@ fun ToolsScreen(
                 title = "Storage cleaner",
                 icon = Icons.Default.CleaningServices,
                 description = "Swipe through photos and videos to free space",
-                onClick = { onOpenRoute(ToolRoutes.CLEANER) },
-                value = { Tag("Preview") }
+                onClick = { onOpenRoute(ToolRoutes.CLEANER) }
             )
             NavRow(
                 title = "App usage",

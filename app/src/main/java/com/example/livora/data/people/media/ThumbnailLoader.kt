@@ -1,6 +1,9 @@
 package com.example.livora.data.people.media
 
+import android.content.ContentUris
 import android.content.Context
+import android.net.Uri
+import android.provider.MediaStore
 import android.graphics.Bitmap
 import android.os.Build
 import android.util.LruCache
@@ -28,6 +31,35 @@ object ThumbnailLoader {
     }
 
     fun peek(mediaId: Long, sizePx: Int): Bitmap? = memory.get("$mediaId:$sizePx")
+
+    fun peekKey(key: String, sizePx: Int): Bitmap? = memory.get("$key:$sizePx")
+
+    suspend fun loadFile(context: Context, uri: Uri, key: String, sizePx: Int, video: Boolean): Bitmap? =
+        withContext(Dispatchers.IO) {
+            val cacheKey = "$key:$sizePx"
+            memory.get(cacheKey)?.let { return@withContext it }
+            val bitmap = gate.withPermit { decodeFile(context, uri, sizePx, video) } ?: return@withContext null
+            memory.put(cacheKey, bitmap)
+            bitmap
+        }
+
+    @Suppress("DEPRECATION")
+    private fun decodeFile(context: Context, uri: Uri, sizePx: Int, video: Boolean): Bitmap? = try {
+        when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> context.contentResolver.loadThumbnail(uri, Size(sizePx, sizePx), null)
+            video -> MediaStore.Video.Thumbnails.getThumbnail(
+                context.contentResolver,
+                ContentUris.parseId(uri),
+                MediaStore.Video.Thumbnails.MINI_KIND,
+                null
+            )
+            else -> PhotoDecoder.decode(context, uri, PhotoDecoder.exifRotation(context, uri), 0, 0, sizePx)
+        }
+    } catch (e: Exception) {
+        null
+    } catch (e: OutOfMemoryError) {
+        null
+    }
 
     fun clear() {
         memory.evictAll()

@@ -14,7 +14,8 @@ Effort sizes are relative: S is small, M is medium, L is large, XL is the bigges
 - [x] Navigation is grouped into four tabs, see section 0b
 - [x] Expenses is a real tool with its own database, charts, categories with icons and CSV export, see section 5
 - [x] App usage is a real tool with real screen time, charts and unused apps, see section 7
-- [x] UI previews with sample data exist for QR codes, Documents and the Storage cleaner with swipe review. They do not work yet, see section 0b
+- [x] The Storage cleaner is a real tool with real storage numbers, duplicates, screenshots, big files and swipe review with system trash, see section 9
+- [x] UI previews with sample data exist for QR codes and Documents. They do not work yet, see section 0b
 
 ## 0b. Navigation and where every tool lives
 
@@ -37,7 +38,6 @@ Status of the UI previews (sample data only, no real function behind them):
 - [x] Tools hub with grouped rows
 - [x] QR codes: Scan tab with history and a safe result sheet, Create tab with a live preview
 - [x] Documents: searchable library with sort, document page grid
-- [x] Storage cleaner: overview with space breakdown, swipe review card stack with undo and end summary
 - [ ] Replace each preview with the real tool, in the order of section 10
 
 ## 1. Decisions to confirm first
@@ -287,34 +287,34 @@ Includes the swipe review for photos and videos, and every cleaner feature that 
 
 **Swipe review (the headline feature)**
 - Swipe left keeps, swipe right sends to the trash queue
-- [ ] Card stack with drag, rotation and fly off animation, the next two cards preloaded
-- [ ] Photos are zoomable. Videos play muted with tap to unmute and a seek bar (Media3 ExoPlayer)
-- [ ] Info on each card: size, date, resolution, folder
-- [ ] While dragging, show "Keep" on the left edge and "Trash" on the right edge with flat tints, no gradients
-- [ ] Buttons for Keep and Trash and custom accessibility actions, because swipe only is not accessible
-- [ ] Undo last swipe, with haptic feedback on each decision
-- [ ] Nothing is deleted while swiping. Trashed items collect in a review list
-- [ ] End summary: "Trash 84 items and free 1.2 GB", one system confirmation with `MediaStore.createTrashRequest` (recoverable for about 30 days). Older Android versions fall back to the recoverable delete flow
-- [ ] Remember kept items so they do not come back, with a "reset decisions" setting
-- [ ] Sort and filter: oldest first, biggest first, random, by month or folder, photos only, videos only, screenshots
-- [ ] Progress line such as "23 of 1,204", and a resume where you stopped
-- [ ] Session recap: reviewed, kept, trashed, space freed
+- [x] Card stack with drag, rotation and fly off animation, the next card behind it
+- [ ] Photos are zoomable. Videos play muted with tap to unmute and a seek bar (Media3 ExoPlayer). Videos show a thumbnail and length for now
+- [x] Info on each card: size, date, resolution, folder
+- [x] While dragging, show "Keep" on the left edge and "Trash" on the right edge with flat tints, no gradients
+- [x] Buttons for Keep and Trash and custom accessibility actions, because swipe only is not accessible
+- [x] Undo last swipe, with haptic feedback on each decision
+- [x] Nothing is deleted while swiping. Trashed items collect until the end summary
+- [x] End summary: "Trash 84 items and free 1.2 GB", one system confirmation with `MediaStore.createTrashRequest` (recoverable for about 30 days). Older Android versions fall back to the recoverable delete flow
+- [x] Remember kept items so they do not come back, with "Show kept files again"
+- [ ] Sort and filter: oldest first, biggest first, random, by month or folder, photos only, videos only. Biggest first and the groups Duplicates, Screenshots, Large files and Messaging media are done
+- [x] Progress line such as "23 of 1,204". Resume where you stopped is open
+- [x] Session recap: reviewed, kept, trashed, space freed
 
 **Other cleaner features**
-- [ ] Storage overview: used and free space, breakdown by images, videos, audio, documents, apps
-- [ ] Exact duplicates by size then content hash, cached by id and date modified
+- [x] Storage overview: used and free space, breakdown by apps, photos, videos, audio and everything else
+- [x] Duplicates by size then a content sample hash (start, middle and end of the file)
 - [ ] Near duplicates and burst shots with perceptual hash on small thumbnails, pick the best to keep
-- [ ] Large files list with a size threshold
-- [ ] Screenshots and screen recordings bucket
+- [x] Large files list, 50 MB or more
+- [x] Screenshots and screen recordings bucket
 - [ ] Blurry, very dark and accidental photos with a Laplacian variance score
-- [ ] Messaging app media (WhatsApp and similar folders visible through MediaStore)
+- [x] Messaging app media (WhatsApp, Telegram, LINE and similar folders)
 - [ ] Full cleaner mode (needs all files access): old APKs, large downloads, empty folders, temp files
-- [ ] Unused apps with sizes and an uninstall prompt (needs section 7)
+- [x] Unused apps with sizes and an uninstall prompt, in App usage
 - [ ] Clear this app's own cache
 - [ ] For other apps' caches, deep link to system settings, since Android does not let third party apps clear them
 - [ ] Background scan through WorkManager with a progress notification
-- [ ] Safety rules: never delete without explicit confirmation, always show total size first, prefer system trash over permanent delete
-- [ ] Permission, partial access, empty and nothing to clean states
+- [x] Safety rules: never delete without explicit confirmation, always show total size first, prefer system trash over permanent delete
+- [x] Permission, partial access, empty and nothing to clean states
 
 ## 10. Suggested build order
 

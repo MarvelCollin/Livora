@@ -18,7 +18,9 @@ object ToolRoutes {
     const val DOCUMENT = "tools/documents/{id}"
     const val USAGE = "tools/usage"
     const val CLEANER = "tools/cleaner"
-    const val CLEANER_REVIEW = "tools/cleaner/review"
+    const val CLEANER_REVIEW = "tools/cleaner/review/{source}"
+
+    fun review(source: String) = "tools/cleaner/review/$source"
 
     fun document(id: Int) = "tools/documents/$id"
 }
