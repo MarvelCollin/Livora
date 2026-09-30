@@ -37,6 +37,10 @@ class PeoplePrefs(context: Context) {
         get() = prefs.getInt(KEY_LAST_MEDIA_COUNT, -1)
         set(value) = prefs.edit().putInt(KEY_LAST_MEDIA_COUNT, value).apply()
 
+    var groupingVersion: Int
+        get() = prefs.getInt(KEY_GROUPING_VERSION, 0)
+        set(value) = prefs.edit().putInt(KEY_GROUPING_VERSION, value).apply()
+
     var groupingPending: Boolean
         get() = prefs.getBoolean(KEY_GROUPING_PENDING, false)
         set(value) = prefs.edit().putBoolean(KEY_GROUPING_PENDING, value).apply()
@@ -67,6 +71,7 @@ class PeoplePrefs(context: Context) {
         private const val KEY_LAST_NEW = "last_new"
         private const val KEY_LAST_GENERATION = "last_generation"
         private const val KEY_LAST_MEDIA_COUNT = "last_media_count"
+        private const val KEY_GROUPING_VERSION = "grouping_version"
         private const val KEY_STRICTNESS = "strictness"
         private const val KEY_LAST_FINISHED = "last_finished"
         private const val KEY_SKIP_SCREENSHOTS = "skip_screenshots"

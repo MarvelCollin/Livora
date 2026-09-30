@@ -3,6 +3,7 @@ package com.example.livora.data.people.backup
 import android.content.Context
 import android.net.Uri
 import androidx.room.withTransaction
+import com.example.livora.data.people.ClusteringService
 import com.example.livora.data.people.PeoplePrefs
 import com.example.livora.data.people.db.FaceEntity
 import com.example.livora.data.people.db.LinkedCopyEntity
@@ -133,6 +134,7 @@ class PeopleBackup(
         prefs.strictness = data.strictness
         prefs.setMinPhotos(data.minPhotos)
         prefs.initialScanDone = true
+        prefs.groupingVersion = ClusteringService.ALGORITHM_VERSION
         prefs.groupingPending = false
         prefs.lastGeneration = -1L
         prefs.lastMediaCount = -1

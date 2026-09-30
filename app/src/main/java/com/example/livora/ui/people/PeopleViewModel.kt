@@ -161,8 +161,16 @@ class PeopleViewModel(application: Application) : AndroidViewModel(application) 
 
     private var suggestionJob: kotlinx.coroutines.Job? = null
 
+    private var suggestionsAt = 0L
+    private var suggestionsFaces = -1
+
     fun refreshMergeSuggestions() {
         if (progress.value.active) return
+        val now = System.currentTimeMillis()
+        val faces = indexedFaces.value
+        if (now - suggestionsAt < 30_000L && faces == suggestionsFaces) return
+        suggestionsAt = now
+        suggestionsFaces = faces
         suggestionJob?.cancel()
         suggestionJob = viewModelScope.launch {
             suggestionCountState.value = repository.mergeSuggestions().size

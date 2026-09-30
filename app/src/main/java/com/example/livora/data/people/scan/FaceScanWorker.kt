@@ -10,6 +10,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import com.example.livora.R
+import com.example.livora.data.people.ClusteringService
 import com.example.livora.data.people.PeopleServices
 import com.example.livora.data.people.media.MediaAccess
 import java.text.NumberFormat
@@ -31,6 +32,11 @@ class FaceScanWorker(context: Context, params: WorkerParameters) : CoroutineWork
     private suspend fun runScan(services: PeopleServices): Result {
         return try {
             val plan = services.scanner.prepare()
+            if (services.prefs.initialScanDone && services.prefs.groupingVersion < ClusteringService.ALGORITHM_VERSION) {
+                ScanStatus.publish(ScanProgress(ScanPhase.Grouping, plan.eligibleTotal, plan.eligibleTotal))
+                services.clustering.regroup(services.prefs.strictness)
+                services.prefs.groupingVersion = ClusteringService.ALGORITHM_VERSION
+            }
             if (plan.isEmpty && !services.prefs.groupingPending) {
                 com.example.livora.data.people.media.MediaChange.remember(applicationContext, services.prefs, plan.generation, plan.mediaCount)
                 services.prefs.initialScanDone = true

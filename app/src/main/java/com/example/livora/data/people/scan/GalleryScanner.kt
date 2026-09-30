@@ -289,6 +289,7 @@ class GalleryScanner(
                 "ejected=${summary.ejected} ms=${SystemClock.elapsedRealtime() - started}"
         )
         prefs.groupingPending = false
+        prefs.groupingVersion = ClusteringService.ALGORITHM_VERSION
         prefs.initialScanDone = true
         prefs.lastScanNewCount = result.processed
         com.example.livora.data.people.media.MediaChange.remember(context, prefs, plan.generation, plan.mediaCount)

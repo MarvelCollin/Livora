@@ -19,6 +19,7 @@ object MediaChange {
     fun hasChanged(context: Context, prefs: PeoplePrefs): Boolean {
         if (!prefs.initialScanDone) return true
         if (prefs.groupingPending) return true
+        if (prefs.groupingVersion < com.example.livora.data.people.ClusteringService.ALGORITHM_VERSION) return true
         val generation = generation(context)
         if (generation >= 0 && prefs.lastGeneration >= 0) return generation != prefs.lastGeneration
         return MediaImages.count(context) != prefs.lastMediaCount

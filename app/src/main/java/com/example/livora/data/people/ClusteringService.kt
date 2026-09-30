@@ -28,6 +28,10 @@ class MergeSuggestion(
 
 class ClusteringService(private val database: PeopleDatabase, private val prefs: PeoplePrefs) {
 
+    companion object {
+        const val ALGORITHM_VERSION = 2
+    }
+
     private val mutex = Mutex()
 
     fun currentParams(): ClusterParams = ClusterParams.forStrictness(prefs.strictness)
