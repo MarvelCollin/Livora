@@ -28,11 +28,17 @@ class TodoRepository {
     }
 
     private suspend fun <T> call(block: suspend () -> T): T {
+        check(SupabaseClient.isConfigured) { NOT_CONFIGURED_MESSAGE }
         try {
             return block()
         } catch (e: HttpException) {
             val body = e.response()?.errorBody()?.string()?.takeIf { it.isNotBlank() }
             throw IllegalStateException(body ?: "HTTP ${e.code()} ${e.message()}", e)
         }
+    }
+
+    private companion object {
+        const val NOT_CONFIGURED_MESSAGE =
+            "Cloud sync is not set up. Add secrets.properties and rebuild the app."
     }
 }

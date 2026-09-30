@@ -13,6 +13,12 @@ object SupabaseClient {
     private const val WRITE_TIMEOUT_SECONDS = 20L
     private const val CALL_TIMEOUT_SECONDS = 30L
 
+    val isConfigured: Boolean =
+        BuildConfig.SUPABASE_URL.startsWith("http") && BuildConfig.SUPABASE_ANON_KEY.isNotBlank()
+
+    private val baseUrl: String =
+        if (isConfigured) "${BuildConfig.SUPABASE_URL.trimEnd('/')}/rest/v1/" else "https://supabase.invalid/rest/v1/"
+
     private val httpClient: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -31,7 +37,7 @@ object SupabaseClient {
         .build()
 
     val retrofit: Retrofit = Retrofit.Builder()
-        .baseUrl("${BuildConfig.SUPABASE_URL}/rest/v1/")
+        .baseUrl(baseUrl)
         .client(httpClient)
         .addConverterFactory(GsonConverterFactory.create())
         .build()
