@@ -2,6 +2,7 @@ package com.example.livora.ui.todo
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.livora.data.model.DayActivity
 import com.example.livora.data.model.Todo
 import com.example.livora.data.model.TodoCompletion
 import com.example.livora.data.model.TodoDurationUnit
@@ -26,6 +27,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 import java.util.UUID
 
 class TodoViewModel : ViewModel() {
@@ -37,6 +41,9 @@ class TodoViewModel : ViewModel() {
 
     private val _stats = MutableStateFlow<List<TodoStats>>(emptyList())
     val stats: StateFlow<List<TodoStats>> = _stats.asStateFlow()
+
+    private val _dailyActivity = MutableStateFlow<List<DayActivity>>(emptyList())
+    val dailyActivity: StateFlow<List<DayActivity>> = _dailyActivity.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -250,6 +257,38 @@ class TodoViewModel : ViewModel() {
             compareBy<TodoStats> { it.isDoneCurrentInterval }
                 .thenByDescending { it.todo.createdAt }
         )
+        _dailyActivity.value = computeDailyActivity()
+    }
+
+    private fun computeDailyActivity(): List<DayActivity> {
+        val durationByTodo = _todos.value.associate { it.id to durationMinutes(it) }
+        val calendar = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val todayStart = calendar.timeInMillis
+        val dayMs = 86_400_000L
+        val labelFormat = SimpleDateFormat("EEE", Locale.getDefault())
+        return (6 downTo 0).map { offset ->
+            val dayStart = todayStart - offset * dayMs
+            val dayEnd = dayStart + dayMs
+            val dayCompletions = _completions.value.filter { it.completedAt in dayStart until dayEnd }
+            val minutes = dayCompletions.sumOf { durationByTodo[it.todoId] ?: 0 }
+            DayActivity(
+                dayStart = dayStart,
+                label = labelFormat.format(dayStart),
+                tasks = dayCompletions.size,
+                minutes = minutes,
+                isToday = offset == 0
+            )
+        }
+    }
+
+    private fun durationMinutes(todo: Todo): Int {
+        val unit = if (todo.durationUnit == TodoDurationUnit.Hour) 60 else 1
+        return todo.durationValue.coerceAtLeast(0) * unit
     }
 
     private fun TodoDto.toTodo(): Todo = Todo(

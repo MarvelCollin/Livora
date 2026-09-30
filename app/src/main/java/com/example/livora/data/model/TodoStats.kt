@@ -11,6 +11,14 @@ data class TodoStats(
     val history: List<TodoIntervalStatus>
 )
 
+data class DayActivity(
+    val dayStart: Long,
+    val label: String,
+    val tasks: Int,
+    val minutes: Int,
+    val isToday: Boolean
+)
+
 data class TodoIntervalStatus(
     val index: Int,
     val start: Long,
