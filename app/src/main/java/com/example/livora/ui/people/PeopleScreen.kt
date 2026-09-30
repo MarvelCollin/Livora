@@ -136,9 +136,6 @@ fun PeopleScreen(
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         viewModel.refreshAccess()
         foldersViewModel.refresh()
-        if (Build.VERSION.SDK_INT >= 33 && !viewModel.notificationAsked) {
-            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
     }
 
     fun requestAccess() {
@@ -625,7 +622,7 @@ private fun PeopleEmptyState(
         )
         indexedPhotos == 0 -> EmptyBlock(
             title = "No photos on this phone yet",
-            body = "Take or save a few photos, then come back. New photos are scanned automatically."
+            body = "Take or save a few photos, then come back."
         )
         indexedFaces == 0 -> EmptyBlock(
             title = "No faces found",

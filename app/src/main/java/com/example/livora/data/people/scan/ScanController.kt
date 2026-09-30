@@ -1,22 +1,16 @@
 package com.example.livora.data.people.scan
 
 import android.content.Context
-import androidx.work.Constraints
-import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.Data
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
-import java.util.concurrent.TimeUnit
 
 object ScanController {
 
     private const val UNIQUE_NAME = "people_scan"
     private const val PERIODIC_NAME = "people_scan_periodic"
-
-    fun startIfNeeded(context: Context, prefs: com.example.livora.data.people.PeoplePrefs) {
-        if (com.example.livora.data.people.media.MediaChange.hasChanged(context, prefs)) start(context)
-    }
+    const val KEY_BUCKETS = "buckets"
 
     fun start(context: Context) {
         val request = OneTimeWorkRequestBuilder<FaceScanWorker>()
@@ -25,21 +19,17 @@ object ScanController {
         WorkManager.getInstance(context).enqueueUniqueWork(UNIQUE_NAME, ExistingWorkPolicy.KEEP, request)
     }
 
-    fun schedulePeriodic(context: Context) {
-        val constraints = Constraints.Builder()
-            .setRequiresBatteryNotLow(true)
-            .setRequiresStorageNotLow(true)
+    fun startFolders(context: Context, bucketIds: Set<Long>) {
+        if (bucketIds.isEmpty()) return
+        val request = OneTimeWorkRequestBuilder<FaceScanWorker>()
+            .setInputData(Data.Builder().putLongArray(KEY_BUCKETS, bucketIds.toLongArray()).build())
+            .addTag(UNIQUE_NAME)
             .build()
-        val request = PeriodicWorkRequestBuilder<FaceScanWorker>(12, TimeUnit.HOURS)
-            .setConstraints(constraints)
-            .setInitialDelay(12, TimeUnit.HOURS)
-            .addTag(PERIODIC_NAME)
-            .build()
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-            PERIODIC_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
-            request
-        )
+        WorkManager.getInstance(context).enqueueUniqueWork(UNIQUE_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
+    }
+
+    fun cancelPeriodic(context: Context) {
+        WorkManager.getInstance(context).cancelUniqueWork(PERIODIC_NAME)
     }
 
     fun cancel(context: Context) {

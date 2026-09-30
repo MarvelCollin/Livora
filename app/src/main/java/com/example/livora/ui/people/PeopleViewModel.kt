@@ -133,16 +133,10 @@ class PeopleViewModel(application: Application) : AndroidViewModel(application) 
 
     fun refreshAccess() {
         val level = MediaAccess.level(getApplication())
-        val changed = level != accessState.value
         accessState.value = level
         initialDoneState.value = prefs.initialScanDone
         if (level == AccessLevel.None) return
-        if (changed && !prefs.initialScanDone) {
-            ScanController.start(getApplication())
-        } else if (prefs.initialScanDone) {
-            ScanController.startIfNeeded(getApplication(), prefs)
-        }
-        if (prefs.initialScanDone) ScanController.schedulePeriodic(getApplication())
+        ScanController.cancelPeriodic(getApplication())
         viewModelScope.launch {
             refreshStatus()
             refreshMergeSuggestions()
@@ -152,7 +146,6 @@ class PeopleViewModel(application: Application) : AndroidViewModel(application) 
     fun startScan() {
         if (MediaAccess.level(getApplication()) == AccessLevel.None) return
         ScanController.start(getApplication())
-        ScanController.schedulePeriodic(getApplication())
     }
 
     private suspend fun refreshStatus() {
