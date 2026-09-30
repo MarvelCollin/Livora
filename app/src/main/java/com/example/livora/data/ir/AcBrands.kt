@@ -4,13 +4,18 @@ import com.example.livora.data.ir.protocol.CoolixProtocol
 import com.example.livora.data.ir.protocol.DaikinProtocol
 import com.example.livora.data.ir.protocol.GreeProtocol
 import com.example.livora.data.ir.protocol.GreeVariant
+import com.example.livora.data.ir.protocol.HitachiProtocol
 import com.example.livora.data.ir.protocol.LgProtocol
 import com.example.livora.data.ir.protocol.LgVariant
 import com.example.livora.data.ir.protocol.MideaProtocol
+import com.example.livora.data.ir.protocol.MitsubishiHeavyProtocol
+import com.example.livora.data.ir.protocol.MitsubishiHeavyVariant
 import com.example.livora.data.ir.protocol.MitsubishiProtocol
 import com.example.livora.data.ir.protocol.PanasonicProtocol
 import com.example.livora.data.ir.protocol.PanasonicVariant
 import com.example.livora.data.ir.protocol.SamsungProtocol
+import com.example.livora.data.ir.protocol.SharpProtocol
+import com.example.livora.data.ir.protocol.SharpVariant
 import com.example.livora.data.ir.protocol.TclProtocol
 import com.example.livora.data.ir.protocol.ToshibaProtocol
 
@@ -75,6 +80,34 @@ object AcBrands {
             alsoWorksWith = "MSZ and MSY series",
             models = listOf(AcModel("Standard", "Mitsubishi Electric 144 bit remotes"))
         ) { MitsubishiProtocol() },
+        AcBrand(
+            id = "mitsubishi_heavy",
+            name = "Mitsubishi Heavy",
+            alsoWorksWith = "SRK and SRC series",
+            models = listOf(
+                AcModel("Remote A", "152 bit remotes, newer units"),
+                AcModel("Remote B", "88 bit remotes, older units")
+            )
+        ) { index ->
+            MitsubishiHeavyProtocol(MitsubishiHeavyVariant.entries[index])
+        },
+        AcBrand(
+            id = "sharp",
+            name = "Sharp",
+            alsoWorksWith = "Sharp Plasmacluster inverter units",
+            models = listOf(
+                AcModel("Remote A", "A907 remotes with heat mode"),
+                AcModel("Remote B", "A705 and A903 remotes, cool only")
+            )
+        ) { index ->
+            SharpProtocol(SharpVariant.entries[index])
+        },
+        AcBrand(
+            id = "hitachi",
+            name = "Hitachi",
+            alsoWorksWith = "Hitachi RAS series",
+            models = listOf(AcModel("Standard", "Hitachi 224 bit remotes"))
+        ) { HitachiProtocol() },
         AcBrand(
             id = "toshiba",
             name = "Toshiba",

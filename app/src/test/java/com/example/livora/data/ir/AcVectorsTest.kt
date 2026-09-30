@@ -3,11 +3,16 @@ package com.example.livora.data.ir
 import com.example.livora.data.ir.protocol.DaikinProtocol
 import com.example.livora.data.ir.protocol.GreeProtocol
 import com.example.livora.data.ir.protocol.GreeVariant
+import com.example.livora.data.ir.protocol.HitachiProtocol
 import com.example.livora.data.ir.protocol.MideaProtocol
+import com.example.livora.data.ir.protocol.MitsubishiHeavyProtocol
+import com.example.livora.data.ir.protocol.MitsubishiHeavyVariant
 import com.example.livora.data.ir.protocol.MitsubishiProtocol
 import com.example.livora.data.ir.protocol.PanasonicProtocol
 import com.example.livora.data.ir.protocol.PanasonicVariant
 import com.example.livora.data.ir.protocol.SamsungProtocol
+import com.example.livora.data.ir.protocol.SharpProtocol
+import com.example.livora.data.ir.protocol.SharpVariant
 import com.example.livora.data.ir.protocol.TclProtocol
 import com.example.livora.data.ir.protocol.ToshibaProtocol
 import com.example.livora.data.model.AcMode
@@ -217,5 +222,129 @@ class AcVectorsTest {
             0x20, 0xE0, 0x04, 0x00, 0x30, 0x32, 0x80, 0xAF, 0x00
         )
         assertArrayEquals(expected, bytes.copyOfRange(0, expected.size))
+    }
+
+    private val sharpOff = AcState(isPoweredOn = false)
+
+    @Test
+    fun sharpPowerOnAutoMatchesRealRemote() {
+        val state = AcState(isPoweredOn = true, temperature = 15, mode = AcMode.AUTO, fanSpeed = FanSpeed.AUTO)
+        val bytes = SharpProtocol(SharpVariant.A907).buildState(state, sharpOff, AcChange.POWER)
+        assertArrayEquals(
+            ints(0xAA, 0x5A, 0xCF, 0x10, 0x00, 0x11, 0x20, 0x00, 0x08, 0x80, 0x00, 0xE0, 0x01),
+            bytes
+        )
+    }
+
+    @Test
+    fun sharpPowerOffMatchesRealRemote() {
+        val state = AcState(isPoweredOn = false, temperature = 15, mode = AcMode.AUTO, fanSpeed = FanSpeed.AUTO)
+        val previous = AcState(isPoweredOn = true)
+        val bytes = SharpProtocol(SharpVariant.A907).buildState(state, previous, AcChange.POWER)
+        assertArrayEquals(
+            ints(0xAA, 0x5A, 0xCF, 0x10, 0x00, 0x21, 0x20, 0x00, 0x08, 0x80, 0x00, 0xE0, 0x31),
+            bytes
+        )
+    }
+
+    @Test
+    fun sharpCoolTemperatureMatchesRealRemote() {
+        val state = AcState(isPoweredOn = true, temperature = 28, mode = AcMode.COOL, fanSpeed = FanSpeed.AUTO)
+        val bytes = SharpProtocol(SharpVariant.A907).buildState(state, state, AcChange.TEMPERATURE)
+        assertArrayEquals(
+            ints(0xAA, 0x5A, 0xCF, 0x10, 0xCD, 0x31, 0x22, 0x00, 0x08, 0x80, 0x04, 0xE0, 0x51),
+            bytes
+        )
+    }
+
+    @Test
+    fun sharpFanSpeedsMatchRealRemote() {
+        val protocol = SharpProtocol(SharpVariant.A907)
+        val low = AcState(isPoweredOn = true, temperature = 28, mode = AcMode.COOL, fanSpeed = FanSpeed.LOW)
+        val medium = low.copy(fanSpeed = FanSpeed.MEDIUM)
+        val high = low.copy(fanSpeed = FanSpeed.HIGH)
+        assertArrayEquals(
+            ints(0xAA, 0x5A, 0xCF, 0x10, 0xCD, 0x31, 0x42, 0x00, 0x08, 0x80, 0x05, 0xE0, 0x21),
+            protocol.buildState(low, low, AcChange.FAN)
+        )
+        assertArrayEquals(
+            ints(0xAA, 0x5A, 0xCF, 0x10, 0xCD, 0x31, 0x32, 0x00, 0x08, 0x80, 0x05, 0xE0, 0x51),
+            protocol.buildState(medium, medium, AcChange.FAN)
+        )
+        assertArrayEquals(
+            ints(0xAA, 0x5A, 0xCF, 0x10, 0xCD, 0x31, 0x72, 0x00, 0x08, 0x80, 0x05, 0xE0, 0x11),
+            protocol.buildState(high, high, AcChange.FAN)
+        )
+    }
+
+    @Test
+    fun sharpA705PowerOnCoolMatchesRealRemote() {
+        val state = AcState(isPoweredOn = true, temperature = 16, mode = AcMode.COOL, fanSpeed = FanSpeed.AUTO)
+        val bytes = SharpProtocol(SharpVariant.A705).buildState(state, sharpOff, AcChange.POWER)
+        assertArrayEquals(
+            ints(0xAA, 0x5A, 0xCF, 0x10, 0xD1, 0x11, 0x22, 0x00, 0x08, 0x80, 0x00, 0xF0, 0xF1),
+            bytes
+        )
+    }
+
+    @Test
+    fun hitachiCool16MatchesRealCapture() {
+        val state = AcState(isPoweredOn = true, temperature = 16, mode = AcMode.COOL, fanSpeed = FanSpeed.AUTO)
+        assertArrayEquals(
+            ints(
+                0x80, 0x08, 0x0C, 0x02, 0xFD, 0x80, 0x7F, 0x88, 0x48, 0x80,
+                0x20, 0x04, 0x00, 0x80, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0xAC
+            ),
+            HitachiProtocol().buildState(state)
+        )
+    }
+
+    @Test
+    fun hitachiHeat32HighMatchesRealCapture() {
+        val state = AcState(isPoweredOn = true, temperature = 32, mode = AcMode.HEAT, fanSpeed = FanSpeed.HIGH)
+        assertArrayEquals(
+            ints(
+                0x80, 0x08, 0x0C, 0x02, 0xFD, 0x80, 0x7F, 0x88, 0x48, 0x10,
+                0xC0, 0x02, 0x00, 0xA0, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0xD0
+            ),
+            HitachiProtocol().buildState(state)
+        )
+    }
+
+    @Test
+    fun mitsubishiHeavy152HeatMaxMatchesLibraryExample() {
+        val state = AcState(
+            isPoweredOn = true,
+            temperature = 24,
+            mode = AcMode.HEAT,
+            fanSpeed = FanSpeed.HIGH,
+            swingMode = SwingMode.VERTICAL
+        )
+        val bytes = MitsubishiHeavyProtocol(MitsubishiHeavyVariant.ZMS_152).buildState(state)
+        val expected = ints(
+            0xAD, 0x51, 0x3C, 0xE5, 0x1A, 0x0C, 0xF3, 0x07,
+            0xF8, 0x04, 0xFB, 0x00, 0xFF, 0x00, 0xFF, 0x00,
+            0xFF, 0x80, 0x7F
+        )
+        val actual = bytes.copyOf()
+        actual[13] = 0x00
+        actual[14] = 0xFF
+        assertArrayEquals(expected, actual)
+    }
+
+    @Test
+    fun mitsubishiHeavy88DryMatchesLibraryExampleTail() {
+        val state = AcState(
+            isPoweredOn = true,
+            temperature = 25,
+            mode = AcMode.DRY,
+            fanSpeed = FanSpeed.AUTO,
+            swingMode = SwingMode.OFF
+        )
+        val bytes = MitsubishiHeavyProtocol(MitsubishiHeavyVariant.ZJS_88).buildState(state)
+        assertArrayEquals(ints(0xAD, 0x51, 0x3C, 0xD9, 0x26), bytes.copyOfRange(0, 5))
+        assertArrayEquals(ints(0x00, 0xFF, 0x8A, 0x75), bytes.copyOfRange(7, 11))
     }
 }
