@@ -7,9 +7,12 @@ import com.example.livora.data.ir.protocol.GreeVariant
 import com.example.livora.data.ir.protocol.LgProtocol
 import com.example.livora.data.ir.protocol.LgVariant
 import com.example.livora.data.ir.protocol.MideaProtocol
+import com.example.livora.data.ir.protocol.MitsubishiProtocol
 import com.example.livora.data.ir.protocol.PanasonicProtocol
 import com.example.livora.data.ir.protocol.PanasonicVariant
 import com.example.livora.data.ir.protocol.SamsungProtocol
+import com.example.livora.data.ir.protocol.TclProtocol
+import com.example.livora.data.ir.protocol.ToshibaProtocol
 
 class AcModel(val label: String, val detail: String)
 
@@ -67,6 +70,29 @@ object AcBrands {
             PanasonicProtocol(PanasonicVariant.entries[index])
         },
         AcBrand(
+            id = "mitsubishi",
+            name = "Mitsubishi Electric",
+            alsoWorksWith = "MSZ and MSY series",
+            models = listOf(AcModel("Standard", "Mitsubishi Electric 144 bit remotes"))
+        ) { MitsubishiProtocol() },
+        AcBrand(
+            id = "toshiba",
+            name = "Toshiba",
+            alsoWorksWith = "Toshiba RAS series",
+            models = listOf(
+                AcModel("Remote A", "Toshiba native remote"),
+                AcModel("Remote B", "Coolix based remote such as RAS-M10YKV-E")
+            )
+        ) { index ->
+            if (index == 0) ToshibaProtocol() else CoolixProtocol()
+        },
+        AcBrand(
+            id = "tcl",
+            name = "TCL",
+            alsoWorksWith = "TCL TAC and GZ remotes",
+            models = listOf(AcModel("Standard", "TCL 112 bit remotes"))
+        ) { TclProtocol() },
+        AcBrand(
             id = "gree",
             name = "Gree",
             alsoWorksWith = "Cooper and Hunter, Sinclair, Tosot",
@@ -80,15 +106,34 @@ object AcBrands {
         AcBrand(
             id = "midea",
             name = "Midea",
-            alsoWorksWith = "Comfee, Electrolux, Kaysun",
-            models = listOf(AcModel("Standard", "Midea 48 bit remotes"))
-        ) { MideaProtocol() },
+            alsoWorksWith = "Comfee, Electrolux, Kaysun, Carrier",
+            models = listOf(
+                AcModel("Remote A", "Midea 48 bit remotes"),
+                AcModel("Remote B", "Coolix based remotes")
+            )
+        ) { index ->
+            if (index == 0) MideaProtocol() else CoolixProtocol()
+        },
         AcBrand(
-            id = "coolix",
-            name = "Toshiba and Beko",
-            alsoWorksWith = "Bosch, Kelon and other Coolix remotes",
-            models = listOf(AcModel("Standard", "Coolix 24 bit remotes"))
-        ) { CoolixProtocol() }
+            id = "other",
+            name = "Other Indonesian brands",
+            alsoWorksWith = "Polytron, Changhong, Sanken, Akari, Denpoo, Modena",
+            models = listOf(
+                AcModel("Try 1", "Gree style remotes"),
+                AcModel("Try 2", "Midea style remotes"),
+                AcModel("Try 3", "Coolix style remotes"),
+                AcModel("Try 4", "Gree style remotes, second variant"),
+                AcModel("Try 5", "TCL style remotes")
+            )
+        ) { index ->
+            when (index) {
+                0 -> GreeProtocol(GreeVariant.YAW1F)
+                1 -> MideaProtocol()
+                2 -> CoolixProtocol()
+                3 -> GreeProtocol(GreeVariant.YBOFB)
+                else -> TclProtocol()
+            }
+        }
     )
 
     fun find(id: String): AcBrand = all.firstOrNull { it.id == id } ?: all.first()

@@ -94,7 +94,7 @@ class AcProtocolsTest {
 
     @Test
     fun coolixDefaultStateMatchesLibraryDefault() {
-        val protocol = AcBrands.find("coolix").createProtocol(0)
+        val protocol = com.example.livora.data.ir.protocol.CoolixProtocol()
         val state = AcState(isPoweredOn = true, temperature = 25, mode = AcMode.AUTO, fanSpeed = FanSpeed.AUTO)
         val signal = protocol.encode(state, state, AcChange.MODE).single()
         val first = 0xB2L shl 16 or (0x1FL shl 8) or 0xC8L

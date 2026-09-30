@@ -93,3 +93,27 @@ internal fun Int.reverseByte(): Int {
     }
     return result
 }
+
+class ByteFrame(
+    private val frequency: Int,
+    private val headerMark: Int,
+    private val headerSpace: Int,
+    private val timing: BitTiming,
+    private val footerMark: Int,
+    private val gap: Int,
+    private val msbFirst: Boolean = false
+) {
+    fun encode(bytes: IntArray, repeats: Int = 1): IrSignal {
+        val builder = IrPulseBuilder(frequency)
+        repeat(repeats) {
+            builder.header(headerMark, headerSpace)
+            if (msbFirst) {
+                builder.bytesMsbFirst(bytes, 0, bytes.size, timing)
+            } else {
+                builder.bytesLsbFirst(bytes, 0, bytes.size, timing)
+            }
+            builder.footer(footerMark, gap)
+        }
+        return builder.build()
+    }
+}

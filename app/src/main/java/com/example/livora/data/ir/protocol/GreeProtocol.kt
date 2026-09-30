@@ -37,7 +37,7 @@ class GreeProtocol(private val variant: GreeVariant) : AcProtocol {
         return listOf(signal(buildState(state)))
     }
 
-    private fun buildState(state: AcState): IntArray {
+    internal fun buildState(state: AcState): IntArray {
         val mode = when (state.mode) {
             AcMode.AUTO -> 0
             AcMode.COOL -> 1
