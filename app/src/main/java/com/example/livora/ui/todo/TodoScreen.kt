@@ -90,7 +90,7 @@ fun TodoScreen(
                         IconButton(onClick = onBack) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = null,
+                                contentDescription = "Back",
                                 tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                             )
                         }
@@ -103,7 +103,7 @@ fun TodoScreen(
                     }) {
                         Icon(
                             imageVector = Icons.Default.Add,
-                            contentDescription = null,
+                            contentDescription = "Add routine",
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -211,16 +211,16 @@ private fun TodoRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onOpen)
-            .padding(horizontal = 12.dp, vertical = 14.dp),
+            .padding(horizontal = 4.dp, vertical = 6.dp),
         verticalAlignment = Alignment.Top
     ) {
         IconButton(
             onClick = onToggle,
-            modifier = Modifier.size(28.dp)
+            modifier = Modifier.size(48.dp)
         ) {
             Icon(
                 imageVector = if (stats.isDoneCurrentInterval) Icons.Default.CheckCircle else Icons.Outlined.Circle,
-                contentDescription = null,
+                contentDescription = if (stats.isDoneCurrentInterval) "Mark not done" else "Mark done",
                 tint = if (stats.isDoneCurrentInterval)
                     MaterialTheme.colorScheme.onSurface
                 else
@@ -266,21 +266,21 @@ private fun TodoRow(
 
         IconButton(
             onClick = onEdit,
-            modifier = Modifier.size(32.dp)
+            modifier = Modifier.size(48.dp)
         ) {
             Icon(
                 imageVector = Icons.Outlined.Edit,
-                contentDescription = null,
+                contentDescription = "Edit routine",
                 tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
             )
         }
         IconButton(
             onClick = onDelete,
-            modifier = Modifier.size(32.dp)
+            modifier = Modifier.size(48.dp)
         ) {
             Icon(
                 imageVector = Icons.Outlined.Delete,
-                contentDescription = null,
+                contentDescription = "Delete routine",
                 tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
             )
         }

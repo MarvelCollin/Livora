@@ -361,16 +361,16 @@ private fun UpNextRow(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+                .padding(horizontal = 6.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
                 onClick = onToggle,
-                modifier = Modifier.size(28.dp)
+                modifier = Modifier.size(48.dp)
             ) {
                 Icon(
                     imageVector = if (stats.isDoneCurrentInterval) Icons.Default.CheckCircle else Icons.Outlined.Circle,
-                    contentDescription = null,
+                    contentDescription = if (stats.isDoneCurrentInterval) "Mark not done" else "Mark done",
                     tint = if (stats.isDoneCurrentInterval)
                         MaterialTheme.colorScheme.onSurface
                     else

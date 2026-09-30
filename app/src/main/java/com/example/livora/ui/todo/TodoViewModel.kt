@@ -225,7 +225,7 @@ class TodoViewModel : ViewModel() {
 
     private fun completeFromTimer(todoId: String) {
         val current = _stats.value.firstOrNull { it.todo.id == todoId } ?: return
-        Toaster.success("Timer done — \"${current.todo.title}\"")
+        Toaster.success("Timer done: \"${current.todo.title}\"")
         if (!current.isDoneCurrentInterval) {
             toggleCurrentInterval(todoId)
         }

@@ -87,7 +87,7 @@ fun SelectChip(
 
     Column(
         modifier = modifier
-            .defaultMinSize(minHeight = 56.dp)
+            .defaultMinSize(minHeight = if (icon != null) 56.dp else 48.dp)
             .clip(Design.chipShape)
             .background(bgColor)
             .selectable(

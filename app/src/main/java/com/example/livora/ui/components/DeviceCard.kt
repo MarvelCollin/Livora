@@ -68,11 +68,11 @@ fun DeviceCard(
 
                 IconButton(
                     onClick = onTogglePower,
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.PowerSettingsNew,
-                        contentDescription = null,
+                        contentDescription = if (isOn) "Turn $name off" else "Turn $name on",
                         tint = if (isOn)
                             MaterialTheme.colorScheme.onSurface
                         else

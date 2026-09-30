@@ -61,7 +61,7 @@ fun TodoDetailScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = null,
+                            contentDescription = "Back",
                             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
                     }

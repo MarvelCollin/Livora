@@ -92,7 +92,7 @@ fun BulbControllerScreen(
                     }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = null,
+                            contentDescription = "Back",
                             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
                     }
@@ -102,7 +102,7 @@ fun BulbControllerScreen(
                         IconButton(onClick = { viewModel.refreshBulbState() }) {
                             Icon(
                                 imageVector = Icons.Default.Refresh,
-                                contentDescription = null
+                                contentDescription = "Refresh bulb state"
                             )
                         }
                     }

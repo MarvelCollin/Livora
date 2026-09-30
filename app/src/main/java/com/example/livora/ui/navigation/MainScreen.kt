@@ -1,5 +1,6 @@
 package com.example.livora.ui.navigation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -50,6 +51,8 @@ fun MainScreen(
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val tabs = MainTab.entries
+
+    BackHandler(enabled = selectedTab != 0) { selectedTab = 0 }
 
     Scaffold(
         bottomBar = {
