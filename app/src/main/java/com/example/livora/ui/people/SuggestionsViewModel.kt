@@ -214,38 +214,32 @@ class SuggestionsViewModel(application: Application, handle: SavedStateHandle) :
                 )
                 return@launch
             }
-            val previous = withContext(Dispatchers.IO) {
-                MediaImages.queryByIds(getApplication(), toMove).associate { it.id to it.relativePath }
-            }
             ConsentBroker.ask(MediaWriter.writeRequest(getApplication(), toMove), viewModelScope) {
-                val moved = MediaWriter.applyMove(getApplication(), toMove, path)
-                repository.syncPhotoDates(toMove)
-                repository.recordAiMoves(personId, toMove, previous, path)
-                val undo = confirmPicks(picks)
+                val outcome = repository.moveToFolder(personId, toMove, path)
                 services.folders.refresh()
+                if (outcome.done == 0) {
+                    Toaster.error("The photos could not be moved")
+                    return@ask
+                }
+                val handled = outcome.sources + already
+                val okPicks = picks.filter { it.mediaId in handled }
+                val undo = if (okPicks.isEmpty()) null else confirmPicks(okPicks)
                 Toaster.show(
-                    message = "Moved $moved ${if (moved == 1) "photo" else "photos"} to $name",
+                    message = outcome.message(name),
                     type = ToastType.Success,
-                    durationMs = 8000,
+                    durationMs = 9000,
                     actionLabel = "Undo",
-                    onAction = { undoMove(toMove, previous, picks, undo) }
+                    onAction = {
+                        MoveUndo.run(getApplication(), viewModelScope, repository, personId, outcome) {
+                            undo?.restore()
+                            decided.removeAll(okPicks.map { it.faceId }.toSet())
+                            republish()
+                            services.folders.refresh()
+                            Toaster.success("Moved the photos back")
+                        }
+                    }
                 )
             }
-        }
-    }
-
-    private fun undoMove(ids: List<Long>, previous: Map<Long, String>, picks: List<Suggestion>, undo: UndoToken?) {
-        ConsentBroker.ask(MediaWriter.writeRequest(getApplication(), ids), viewModelScope) {
-            for ((path, group) in ids.groupBy { previous[it] ?: "Pictures/" }) {
-                MediaWriter.applyMove(getApplication(), group, path)
-            }
-            repository.syncPhotoDates(ids)
-            repository.dropAiMoves(ids)
-            undo?.restore()
-            decided.removeAll(picks.map { it.faceId }.toSet())
-            republish()
-            services.folders.refresh()
-            Toaster.success("Moved the photos back")
         }
     }
 

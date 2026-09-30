@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -188,16 +189,30 @@ object MediaWriter {
         return MediaStore.createTrashRequest(context.contentResolver, ids.map { MediaImages.uri(it) }, trash).intentSender
     }
 
+    fun tryMove(context: Context, id: Long, relativePath: String): Boolean {
+        val values = ContentValues().apply { put(MediaStore.Images.Media.RELATIVE_PATH, relativePath) }
+        return try {
+            context.contentResolver.update(MediaImages.uri(id), values, null, null) > 0
+        } catch (e: Exception) {
+            Log.w("MediaWriter", "move of $id failed", e)
+            false
+        }
+    }
+
+    fun trashOne(context: Context, id: Long): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false
+        val values = ContentValues().apply { put(MediaStore.MediaColumns.IS_TRASHED, 1) }
+        return try {
+            context.contentResolver.update(MediaImages.uri(id), values, null, null) > 0
+        } catch (e: Exception) {
+            Log.w("MediaWriter", "trash of $id failed", e)
+            false
+        }
+    }
+
     suspend fun applyMove(context: Context, ids: List<Long>, relativePath: String): Int = withContext(Dispatchers.IO) {
         var moved = 0
-        for (id in ids) {
-            val values = ContentValues().apply { put(MediaStore.Images.Media.RELATIVE_PATH, relativePath) }
-            try {
-                if (context.contentResolver.update(MediaImages.uri(id), values, null, null) > 0) moved++
-            } catch (e: Exception) {
-                Unit
-            }
-        }
+        for (id in ids) if (tryMove(context, id, relativePath)) moved++
         moved
     }
 

@@ -26,6 +26,7 @@ object PersonKind {
 object AiMoveKind {
     const val MOVE = 0
     const val COPY = 1
+    const val MOVED_BY_COPY = 2
 }
 
 object LinkMode {

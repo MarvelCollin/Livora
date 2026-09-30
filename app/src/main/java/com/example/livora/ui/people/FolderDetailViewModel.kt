@@ -159,23 +159,34 @@ class FolderDetailViewModel(application: Application, handle: SavedStateHandle) 
         val rows = selectedState.value.mapNotNull { ai[it] }
         if (rows.isEmpty()) return
         val moves = rows.filter { it.kind == AiMoveKind.MOVE }
+        val swaps = rows.filter { it.kind == AiMoveKind.MOVED_BY_COPY }
         val finish: suspend () -> Unit = {
-            if (moves.isNotEmpty()) {
-                for ((path, group) in moves.groupBy { it.fromPath.ifBlank { "Pictures/" } }) {
-                    MediaWriter.applyMove(getApplication(), group.map { it.mediaId }, path)
-                }
-                repository.syncPhotoDates(moves.map { it.mediaId })
-            }
             repository.rejectAiMoves(rows)
             selectedState.value = emptySet()
             folders.refresh()
             val who = rows.mapNotNull { it.personName }.distinct().firstOrNull()
             Toaster.success(if (who == null) "Thanks, Livora will remember this" else "Thanks, Livora will be stricter about $who")
         }
+        val afterMoves: suspend () -> Unit = {
+            if (swaps.isEmpty()) {
+                finish()
+            } else {
+                ConsentBroker.ask(MediaWriter.trashRequest(getApplication(), swaps.map { it.sourceMediaId }, false), viewModelScope) {
+                    repository.restoreSwaps(swaps.map { Pair(it.sourceMediaId, it.mediaId) })
+                    finish()
+                }
+            }
+        }
         if (moves.isEmpty()) {
-            viewModelScope.launch { finish() }
+            viewModelScope.launch { afterMoves() }
         } else {
-            requestConsent(MediaWriter.writeRequest(getApplication(), moves.map { it.mediaId }), finish)
+            requestConsent(MediaWriter.writeRequest(getApplication(), moves.map { it.mediaId })) {
+                for ((path, group) in moves.groupBy { it.fromPath.ifBlank { "Pictures/" } }) {
+                    MediaWriter.applyMove(getApplication(), group.map { it.mediaId }, path)
+                }
+                repository.syncPhotoDates(moves.map { it.mediaId })
+                afterMoves()
+            }
         }
     }
 

@@ -81,11 +81,34 @@ class SuggestionSet(
 
 class MoveAllPlan(
     val person: PersonSummary,
-    val folder: com.example.livora.data.people.media.FolderInfo,
     val mediaIds: List<Long>,
     val known: Int,
     val suggestions: List<Suggestion>
 )
+
+class MoveOutcome(
+    val moved: List<Long>,
+    val replaced: List<Pair<Long, Long>>,
+    val duplicated: List<Pair<Long, Long>>,
+    val failed: List<Long>,
+    val previous: Map<Long, String>
+) {
+    val done: Int get() = moved.size + replaced.size + duplicated.size
+
+    val sources: Set<Long> get() = moved.toHashSet() + replaced.map { it.first } + duplicated.map { it.first }
+
+    fun message(folder: String): String {
+        val text = StringBuilder("Moved $done ${if (done == 1) "photo" else "photos"} to $folder.")
+        if (replaced.isNotEmpty()) {
+            text.append(" ${replaced.size} came from another app, so they were copied and the originals are in the trash.")
+        }
+        if (duplicated.isNotEmpty()) {
+            text.append(" ${duplicated.size} could not be taken out of where they were, so they are copied.")
+        }
+        if (failed.isNotEmpty()) text.append(" ${failed.size} could not be moved.")
+        return text.toString()
+    }
+}
 
 class FaceStateSnapshot(val faceId: Long, val personId: Long?, val locked: Boolean)
 
@@ -132,16 +155,82 @@ class PeopleRepository(
             )
         }
 
-    suspend fun planMoveAll(
-        person: PersonSummary,
-        folder: com.example.livora.data.people.media.FolderInfo
-    ): MoveAllPlan = withContext(Dispatchers.IO) {
-        val already = MediaImages.idsInRelativePath(context, folder.relativePath)
+    suspend fun planMoveAll(person: PersonSummary, relativePath: String): MoveAllPlan = withContext(Dispatchers.IO) {
+        val already = MediaImages.idsInRelativePath(context, relativePath)
         val own = mediaIdsOfPerson(person.id).filter { it !in already }
         val set = suggestions(person.id)
         val ownSet = own.toHashSet()
         val similar = set.atThreshold(set.effectiveThreshold).filter { it.mediaId !in already && it.mediaId !in ownSet }
-        MoveAllPlan(person, folder, (own + similar.map { it.mediaId }).distinct(), own.size, similar)
+        MoveAllPlan(person, (own + similar.map { it.mediaId }).distinct(), own.size, similar)
+    }
+
+    suspend fun moveToFolder(personId: Long, ids: List<Long>, relativePath: String): MoveOutcome = withContext(Dispatchers.IO) {
+        val previous = MediaImages.queryByIds(context, ids).associate { it.id to it.relativePath }
+        val moved = ArrayList<Long>()
+        val leftover = ArrayList<Long>()
+        val failed = ArrayList<Long>()
+        for (id in ids) {
+            when {
+                id !in previous -> failed.add(id)
+                MediaWriter.tryMove(context, id, relativePath) -> moved.add(id)
+                else -> leftover.add(id)
+            }
+        }
+        val replaced = ArrayList<Pair<Long, Long>>()
+        val duplicated = ArrayList<Pair<Long, Long>>()
+        if (leftover.isNotEmpty()) {
+            val copy = MediaWriter.copyImages(context, leftover, relativePath)
+            val copiedSources = copy.created.map { it.first }.toHashSet()
+            failed.addAll(leftover.filter { it !in copiedSources })
+            for (pair in copy.created) {
+                if (MediaWriter.trashOne(context, pair.first)) replaced.add(pair) else duplicated.add(pair)
+            }
+            for (pair in replaced) transferIndex(pair.first, pair.second)
+            registerCopies(duplicated.map { it.second })
+        }
+        val now = System.currentTimeMillis()
+        val rows = ArrayList<AiMoveEntity>()
+        for (id in moved) {
+            rows.add(AiMoveEntity(id, personId, id, AiMoveKind.MOVE, previous[id].orEmpty(), relativePath, now))
+        }
+        for ((source, copy) in replaced) {
+            rows.add(AiMoveEntity(copy, personId, source, AiMoveKind.MOVED_BY_COPY, previous[source].orEmpty(), relativePath, now))
+        }
+        for ((source, copy) in duplicated) {
+            rows.add(AiMoveEntity(copy, personId, source, AiMoveKind.COPY, previous[source].orEmpty(), relativePath, now))
+        }
+        if (rows.isNotEmpty()) database.aiMoves().insertAll(rows)
+        if (duplicated.isNotEmpty()) {
+            database.linkedCopies().insertAll(duplicated.map { LinkedCopyEntity(personId, it.first, now) })
+        }
+        if (moved.isNotEmpty()) syncPhotoDates(moved)
+        MoveOutcome(moved, replaced, duplicated, failed, previous)
+    }
+
+    private suspend fun transferIndex(from: Long, to: Long) {
+        val row = database.photos().byId(from)
+        val image = MediaImages.queryByIds(context, listOf(to)).firstOrNull()
+        if (row != null && image != null) {
+            database.photos().upsertAll(listOf(row.copy(mediaId = to, dateModified = image.dateModified, size = image.size)))
+        }
+        database.faces().moveMedia(from, to)
+        database.photos().deleteByIds(listOf(from))
+    }
+
+    suspend fun restoreSwaps(swaps: List<Pair<Long, Long>>) = withContext(Dispatchers.IO) {
+        for ((source, copy) in swaps) transferIndex(copy, source)
+        val copies = swaps.map { it.second }
+        MediaWriter.deleteOwned(context, copies)
+        database.photos().deleteByIds(copies)
+        dropAiMoves(copies)
+    }
+
+    suspend fun discardCopies(personId: Long, pairs: List<Pair<Long, Long>>) = withContext(Dispatchers.IO) {
+        val copies = pairs.map { it.second }
+        MediaWriter.deleteOwned(context, copies)
+        database.photos().deleteByIds(copies)
+        database.linkedCopies().remove(personId, pairs.map { it.first })
+        dropAiMoves(copies)
     }
 
     suspend fun dropAiMoves(mediaIds: List<Long>) = withContext(Dispatchers.IO) {

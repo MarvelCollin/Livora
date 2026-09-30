@@ -116,6 +116,9 @@ interface PhotoDao {
     @Query("SELECT mediaId FROM photos WHERE mediaId IN (:ids)")
     suspend fun existing(ids: List<Long>): List<Long>
 
+    @Query("SELECT * FROM photos WHERE mediaId = :id")
+    suspend fun byId(id: Long): PhotoEntity?
+
     @Query("UPDATE photos SET dateModified = :dateModified, orientation = :orientation WHERE mediaId = :mediaId")
     suspend fun updateDates(mediaId: Long, dateModified: Long, orientation: Int)
 
@@ -146,6 +149,9 @@ interface FaceDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun restoreAll(faces: List<FaceEntity>)
+
+    @Query("UPDATE faces SET mediaId = :toId WHERE mediaId = :fromId")
+    suspend fun moveMedia(fromId: Long, toId: Long)
 
     @Query("SELECT * FROM faces ORDER BY id LIMIT :limit OFFSET :offset")
     suspend fun page(limit: Int, offset: Int): List<FaceEntity>
