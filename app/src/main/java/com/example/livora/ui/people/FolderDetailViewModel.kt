@@ -76,9 +76,11 @@ class FolderDetailViewModel(application: Application, handle: SavedStateHandle) 
         .map { imagesOfFolder(key, it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, imagesOfFolder(key, folders.images.value))
 
-    val aiMoves: StateFlow<Map<Long, AiMoveRow>> = repository.aiMoves
-        .map { list -> list.associateBy { it.mediaId } }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+    val aiMoves: StateFlow<Map<Long, AiMoveRow>> = combine(repository.aiMoves, folders.images) { list, all ->
+        val where = all.associate { it.id to it.relativePath.trimEnd('/') }
+        list.filter { row -> where[row.mediaId].equals(row.toPath.trimEnd('/'), ignoreCase = true) }
+            .associateBy { it.mediaId }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
     val aiLabels: StateFlow<Map<Long, String>> = aiMoves
         .map { map -> map.mapValues { it.value.personName.orEmpty() } }

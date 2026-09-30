@@ -493,6 +493,7 @@ class AiMoveRow(
     val sourceMediaId: Long,
     val kind: Int,
     val fromPath: String,
+    val toPath: String,
     val personName: String?
 )
 
@@ -504,7 +505,7 @@ interface AiMoveDao {
 
     @Query(
         "SELECT m.mediaId AS mediaId, m.personId AS personId, m.sourceMediaId AS sourceMediaId, m.kind AS kind, " +
-            "m.fromPath AS fromPath, p.name AS personName FROM ai_moves m INNER JOIN persons p ON p.id = m.personId"
+            "m.fromPath AS fromPath, m.toPath AS toPath, p.name AS personName FROM ai_moves m INNER JOIN persons p ON p.id = m.personId"
     )
     fun observeAll(): Flow<List<AiMoveRow>>
 
