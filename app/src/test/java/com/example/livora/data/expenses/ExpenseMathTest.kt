@@ -1,7 +1,6 @@
 package com.example.livora.data.expenses
 
 import java.time.LocalDate
-import java.time.YearMonth
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -17,7 +16,7 @@ class ExpenseMathTest {
     private fun row(id: Long, date: LocalDate, amount: Long, category: Long) =
         ExpenseEntity(id, amount, category, 1, "", date.toEpochDay(), 0)
 
-    private val sept = YearMonth.of(2026, 9)
+    private val sept = Period.of(PeriodKind.Month, LocalDate.of(2026, 9, 1))
     private val today = LocalDate.of(2026, 9, 10)
 
     @Test
@@ -42,10 +41,10 @@ class ExpenseMathTest {
             row(3, LocalDate.of(2026, 9, 30), -5_000, 2)
         )
         val summary = ExpenseMath.summarize(rows, categories, sept, today)
-        assertEquals(30, summary.daily.size)
-        assertEquals(60_000L, summary.daily[0])
-        assertEquals(5_000L, summary.daily[29])
-        assertEquals(summary.spent, summary.daily.sum())
+        assertEquals(30, summary.buckets.size)
+        assertEquals(60_000L, summary.buckets[0].spent)
+        assertEquals(5_000L, summary.buckets[29].spent)
+        assertEquals(summary.spent, summary.buckets.sumOf { it.spent })
     }
 
     @Test
@@ -117,11 +116,12 @@ class ExpenseMathTest {
             row(3, LocalDate.of(2026, 9, 11), 70_000, 3)
         )
         val summary = ExpenseMath.summarize(rows, categories, sept, today)
-        assertEquals(6, summary.trend.size)
-        assertEquals(YearMonth.of(2026, 4), summary.trend.first().month)
-        assertEquals(10_000L, summary.trend.first().spent)
-        assertEquals(20_000L, summary.trend.last().spent)
-        assertEquals(70_000L, summary.trend.last().received)
+        val history = summary.history!!
+        assertEquals(6, history.size)
+        assertEquals(LocalDate.of(2026, 4, 1), history.first().from)
+        assertEquals(10_000L, history.first().spent)
+        assertEquals(20_000L, history.last().spent)
+        assertEquals(70_000L, history.last().received)
     }
 
     @Test
@@ -136,7 +136,80 @@ class ExpenseMathTest {
 
     @Test
     fun trendWindowStartsFiveMonthsBack() {
-        assertEquals(LocalDate.of(2026, 4, 1).toEpochDay(), ExpenseMath.firstDayOfTrend(sept))
+        assertEquals(LocalDate.of(2026, 4, 1), ExpenseMath.queryFrom(sept))
+    }
+
+    @Test
+    fun weeksStartOnMondayAndHaveSevenDays() {
+        val week = Period.of(PeriodKind.Week, LocalDate.of(2026, 9, 30))
+        assertEquals(LocalDate.of(2026, 9, 28), week.from)
+        assertEquals(LocalDate.of(2026, 10, 4), week.to)
+        assertEquals(7, week.days)
+        assertEquals(LocalDate.of(2026, 9, 21), week.previous().from)
+        assertEquals(LocalDate.of(2026, 10, 5), week.next().from)
+        assertEquals(Granularity.Day, week.granularity)
+    }
+
+    @Test
+    fun aWeekComparesWithTheSameDaysOfLastWeek() {
+        val rows = listOf(
+            row(1, LocalDate.of(2026, 9, 21), -100_000, 1),
+            row(2, LocalDate.of(2026, 9, 27), -400_000, 1),
+            row(3, LocalDate.of(2026, 9, 28), -150_000, 1)
+        )
+        val week = Period.of(PeriodKind.Week, LocalDate.of(2026, 9, 30))
+        val summary = ExpenseMath.summarize(rows, categories, week, LocalDate.of(2026, 9, 30))
+        assertEquals(3, summary.elapsedDays)
+        assertEquals(100_000L, summary.previousToDate)
+        assertEquals(500_000L, summary.previousSpent)
+        assertEquals(150_000L, summary.spent)
+        assertEquals(8, summary.history!!.size)
+    }
+
+    @Test
+    fun aYearHasTwelveMonthlyBucketsAndNoHistory() {
+        val rows = listOf(
+            row(1, LocalDate.of(2026, 1, 15), -10_000, 1),
+            row(2, LocalDate.of(2026, 9, 2), -30_000, 1),
+            row(3, LocalDate.of(2025, 12, 31), -70_000, 1)
+        )
+        val year = Period.of(PeriodKind.Year, LocalDate.of(2026, 6, 1))
+        val summary = ExpenseMath.summarize(rows, categories, year, LocalDate.of(2026, 9, 30))
+        assertEquals(Granularity.Month, year.granularity)
+        assertEquals(12, summary.buckets.size)
+        assertEquals(10_000L, summary.buckets[0].spent)
+        assertEquals(30_000L, summary.buckets[8].spent)
+        assertEquals(40_000L, summary.spent)
+        assertNull(summary.history)
+        assertEquals(70_000L, summary.previousSpent)
+    }
+
+    @Test
+    fun customRangesPickTheirGranularityFromTheirLength() {
+        assertEquals(Granularity.Day, Period.custom(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)).granularity)
+        assertEquals(Granularity.Week, Period.custom(LocalDate.of(2026, 6, 1), LocalDate.of(2026, 9, 30)).granularity)
+        assertEquals(Granularity.Month, Period.custom(LocalDate.of(2025, 1, 1), LocalDate.of(2026, 9, 30)).granularity)
+    }
+
+    @Test
+    fun customRangeSwapsReversedDatesAndComparesWithTheBlockBefore() {
+        val range = Period.custom(LocalDate.of(2026, 9, 10), LocalDate.of(2026, 9, 1))
+        assertEquals(LocalDate.of(2026, 9, 1), range.from)
+        assertEquals(10, range.days)
+        assertEquals(LocalDate.of(2026, 8, 22), range.previous().from)
+        assertEquals(LocalDate.of(2026, 8, 31), range.previous().to)
+    }
+
+    @Test
+    fun weeklyBucketsCoverTheWholeCustomRange() {
+        val range = Period.custom(LocalDate.of(2026, 6, 1), LocalDate.of(2026, 9, 30))
+        val rows = listOf(row(1, LocalDate.of(2026, 6, 2), -5_000, 1), row(2, LocalDate.of(2026, 9, 30), -7_000, 1))
+        val buckets = ExpenseMath.buckets(rows, range)
+        assertEquals(LocalDate.of(2026, 6, 1), buckets.first().from)
+        assertEquals(LocalDate.of(2026, 9, 30), buckets.last().to)
+        assertEquals(12_000L, buckets.sumOf { it.spent })
+        assertEquals(5_000L, buckets.first().spent)
+        assertEquals(7_000L, buckets.last().spent)
     }
 
     @Test

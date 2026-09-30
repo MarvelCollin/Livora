@@ -23,7 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.livora.data.expenses.CategoryTotal
 import com.example.livora.data.expenses.Money
-import com.example.livora.data.expenses.MonthSummary
+import com.example.livora.data.expenses.Granularity
+import com.example.livora.data.expenses.PeriodSummary
 import com.example.livora.ui.components.BarChart
 import com.example.livora.ui.components.BarPoint
 import com.example.livora.ui.components.ChartSlot
@@ -33,7 +34,6 @@ import com.example.livora.ui.components.DonutSlice
 import com.example.livora.ui.components.chartColor
 import com.example.livora.ui.components.chartNeutral
 import java.time.LocalDate
-import java.time.YearMonth
 
 const val OTHERS_ID = -1L
 private const val MAX_SLICES = 7
@@ -47,25 +47,21 @@ fun foldCategories(all: List<CategoryTotal>): FoldedCategories =
     else FoldedCategories(all.take(MAX_SLICES), all.drop(MAX_SLICES))
 
 @Composable
-fun DailyChart(summary: MonthSummary, today: LocalDate, modifier: Modifier = Modifier) {
-    val month = summary.month
-    val points = remember(summary.daily, month) {
-        summary.daily.mapIndexed { index, value ->
-            BarPoint(
-                value = value.toFloat(),
-                title = dayTitle(month.atDay(index + 1)),
-                valueText = Money.format(value)
-            )
-        }
+fun SpendingChart(summary: PeriodSummary, today: LocalDate, modifier: Modifier = Modifier) {
+    val period = summary.period
+    val granularity = period.granularity
+    val buckets = summary.buckets
+    val points = remember(buckets) {
+        buckets.map { BarPoint(it.spent.toFloat(), bucketTitle(it, granularity), Money.format(it.spent)) }
     }
-    val labels = remember(summary.daily) {
-        summary.daily.indices.map { index ->
-            val day = index + 1
-            if (day == 1 || day % 5 == 0 || day == summary.daily.size) day.toString() else null
-        }
+    val labels = remember(buckets, period) { axisLabels(period, buckets) }
+    val initial = buckets.indexOfFirst { today >= it.from && today <= it.to }.takeIf { it >= 0 }
+    val busiest = buckets.indices.maxByOrNull { buckets[it].spent }
+    val unit = when (granularity) {
+        Granularity.Day -> "day"
+        Granularity.Week -> "week"
+        Granularity.Month -> "month"
     }
-    val initial = if (YearMonth.from(today) == month) today.dayOfMonth - 1 else null
-    val busiest = summary.daily.indices.maxByOrNull { summary.daily[it] }
     Column(modifier = modifier) {
         BarChart(
             points = points,
@@ -73,11 +69,11 @@ fun DailyChart(summary: MonthSummary, today: LocalDate, modifier: Modifier = Mod
             color = chartColor(ChartSlot.Blue),
             chartHeight = 132.dp,
             initialSelected = initial,
-            description = "Spending for each day of ${monthTitle(month)}. Average ${Money.format(summary.averagePerDay)} a day."
+            description = "Spending for each $unit of ${periodTitle(period, today)}. Total ${Money.format(summary.spent)}."
         )
-        if (busiest != null && summary.daily[busiest] > 0) {
+        if (busiest != null && buckets[busiest].spent > 0) {
             Text(
-                text = "Busiest day ${dayTitle(month.atDay(busiest + 1))}, ${Money.format(summary.daily[busiest])}",
+                text = "Highest $unit ${bucketTitle(buckets[busiest], granularity)}, ${Money.format(buckets[busiest].spent)}",
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp)
@@ -88,7 +84,7 @@ fun DailyChart(summary: MonthSummary, today: LocalDate, modifier: Modifier = Mod
 
 @Composable
 fun CategoryBreakdown(
-    summary: MonthSummary,
+    summary: PeriodSummary,
     selectedId: Long?,
     onSelect: (Long?) -> Unit,
     modifier: Modifier = Modifier
@@ -183,26 +179,28 @@ fun CategoryBreakdown(
 }
 
 @Composable
-fun TrendChart(summary: MonthSummary, modifier: Modifier = Modifier) {
-    val trend = summary.trend
-    val points = remember(trend) {
-        trend.map { BarPoint(value = it.spent.toFloat(), title = monthTitle(it.month), valueText = Money.format(it.spent)) }
+fun HistoryChart(summary: PeriodSummary, modifier: Modifier = Modifier) {
+    val history = summary.history ?: return
+    val granularity = summary.historyGranularity
+    val points = remember(history) {
+        history.map { BarPoint(it.spent.toFloat(), bucketTitle(it, granularity), Money.format(it.spent)) }
     }
-    val labels = remember(trend) { trend.map { monthAbbreviation(it.month) } }
-    val active = trend.filter { it.spent > 0 }
+    val labels = remember(history) { history.map { historyAxis(it, granularity) } }
+    val active = history.filter { it.spent > 0 }
+    val unit = if (granularity == Granularity.Week) "week" else "month"
     Column(modifier = modifier) {
         BarChart(
             points = points,
             axisLabels = labels,
             color = chartColor(ChartSlot.Blue),
             chartHeight = 112.dp,
-            initialSelected = trend.lastIndex,
-            description = "Spending for the last ${trend.size} months, " +
-                trend.joinToString(", ") { "${monthAbbreviation(it.month)} ${Money.format(it.spent)}" }
+            initialSelected = history.lastIndex,
+            description = "Spending for the last ${history.size} ${unit}s, " +
+                history.joinToString(", ") { "${historyAxis(it, granularity)} ${Money.format(it.spent)}" }
         )
         if (active.size >= 2) {
             Text(
-                text = "Average ${Money.format(active.sumOf { it.spent } / active.size)} a month over ${active.size} months",
+                text = "Average ${Money.format(active.sumOf { it.spent } / active.size)} a $unit over ${active.size} ${unit}s",
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp)
@@ -212,7 +210,7 @@ fun TrendChart(summary: MonthSummary, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun KeyFigures(summary: MonthSummary, modifier: Modifier = Modifier) {
+fun KeyFigures(summary: PeriodSummary, modifier: Modifier = Modifier) {
     Row(modifier = modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Figure(label = "Received", value = Money.format(summary.received), modifier = Modifier.weight(1f))
         Figure(

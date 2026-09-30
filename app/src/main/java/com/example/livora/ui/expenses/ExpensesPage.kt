@@ -23,7 +23,13 @@ import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.DateRangePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.SelectableDates
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,7 +52,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.livora.data.expenses.ExpenseEntity
 import com.example.livora.data.expenses.Money
-import com.example.livora.data.expenses.MonthSummary
+import com.example.livora.data.expenses.Granularity
+import com.example.livora.data.expenses.Period
+import com.example.livora.data.expenses.PeriodKind
+import com.example.livora.data.expenses.PeriodSummary
 import com.example.livora.ui.components.ChoiceOption
 import com.example.livora.ui.components.ChoiceRow
 import com.example.livora.ui.components.Design
@@ -59,7 +68,8 @@ import com.example.livora.ui.people.EmptyBlock
 import com.example.livora.ui.people.LinkButton
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
-import java.time.YearMonth
+import java.time.Instant
+import java.time.ZoneOffset
 
 private enum class MoneyFilter { All, Spent, Received }
 
@@ -76,6 +86,7 @@ fun ExpensesPage(
     var adding by rememberSaveable { mutableStateOf(false) }
     var editingId by rememberSaveable { mutableStateOf<Long?>(null) }
     var budgeting by rememberSaveable { mutableStateOf(false) }
+    var pickingRange by rememberSaveable { mutableStateOf(false) }
 
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
         if (uri != null) viewModel.export(uri)
@@ -83,7 +94,7 @@ fun ExpensesPage(
 
     LaunchedEffect(addRequests) { addRequests.collect { adding = true } }
     LaunchedEffect(exportRequests) { exportRequests.collect { exporter.launch("livora-expenses-${LocalDate.now()}.csv") } }
-    LaunchedEffect(state.month) { selectedCategory = null }
+    LaunchedEffect(state.period.from, state.period.to) { selectedCategory = null }
 
     val summary = state.summary
     val folded = remember(summary?.categories) { summary?.let { foldCategories(it.categories) } }
@@ -130,30 +141,32 @@ fun ExpensesPage(
             }
 
             summary != null -> {
-                item(key = "month") {
-                    MonthSwitcher(
-                        month = state.month,
-                        canPrevious = state.canPrevious,
-                        canNext = state.canNext,
-                        onPrevious = viewModel::previousMonth,
-                        onNext = viewModel::nextMonth
+                item(key = "period") {
+                    PeriodBar(
+                        state = state,
+                        onKind = { kind -> if (kind == PeriodKind.Custom) pickingRange = true else viewModel.setKind(kind) },
+                        onPrevious = viewModel::previous,
+                        onNext = viewModel::next,
+                        onEditRange = { pickingRange = true }
                     )
                 }
 
                 item(key = "headline") {
                     Column(modifier = Modifier.padding(horizontal = Design.screenHorizontalPadding, vertical = 8.dp)) {
                         Headline(
-                            label = "Spent in ${monthOnly(state.month)}",
+                            label = spentLabel(state.period, state.today),
                             value = Money.format(summary.spent)
                         )
-                        Comparison(summary = summary, current = state.month == YearMonth.from(state.today))
-                        Spacer(modifier = Modifier.height(16.dp))
-                        BudgetLine(
-                            summary = summary,
-                            budget = state.budget,
-                            today = state.today,
-                            onEdit = { budgeting = true }
-                        )
+                        Comparison(summary = summary, today = state.today)
+                        if (state.period.kind == PeriodKind.Month) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            BudgetLine(
+                                summary = summary,
+                                budget = state.budget,
+                                today = state.today,
+                                onEdit = { budgeting = true }
+                            )
+                        }
                         Spacer(modifier = Modifier.height(20.dp))
                         KeyFigures(summary = summary)
                         summary.biggest?.let { biggest ->
@@ -165,8 +178,8 @@ fun ExpensesPage(
                 if (summary.count == 0) {
                     item(key = "empty-month") {
                         EmptyBlock(
-                            title = "Nothing logged in ${monthOnly(state.month)}",
-                            body = "Add a transaction and this month fills in.",
+                            title = "Nothing logged in ${periodTitle(state.period, state.today)}",
+                            body = "Add a transaction or pick another period.",
                             actionLabel = "Add expense",
                             onAction = { adding = true }
                         )
@@ -175,8 +188,14 @@ fun ExpensesPage(
                     if (summary.spent > 0) {
                         item(key = "daily") {
                             Column(modifier = Modifier.padding(horizontal = Design.screenHorizontalPadding)) {
-                                SectionLabel(text = "Daily spending")
-                                DailyChart(summary = summary, today = state.today)
+                                SectionLabel(
+                                    text = when (state.period.granularity) {
+                                        Granularity.Day -> "Daily spending"
+                                        Granularity.Week -> "Weekly spending"
+                                        Granularity.Month -> "Monthly spending"
+                                    }
+                                )
+                                SpendingChart(summary = summary, today = state.today)
                             }
                         }
                         item(key = "categories") {
@@ -193,10 +212,14 @@ fun ExpensesPage(
                             }
                         }
                     }
-                    item(key = "trend") {
-                        Column(modifier = Modifier.padding(horizontal = Design.screenHorizontalPadding)) {
-                            SectionLabel(text = "Last ${summary.trend.size} months")
-                            TrendChart(summary = summary)
+                    summary.history?.let { history ->
+                        item(key = "trend") {
+                            Column(modifier = Modifier.padding(horizontal = Design.screenHorizontalPadding)) {
+                                SectionLabel(
+                                    text = "Last ${history.size} " + if (summary.historyGranularity == Granularity.Week) "weeks" else "months"
+                                )
+                                HistoryChart(summary = summary)
+                            }
                         }
                     }
                 }
@@ -311,6 +334,18 @@ fun ExpensesPage(
         }
     }
 
+    if (pickingRange) {
+        RangePickerDialog(
+            initial = if (state.period.kind == PeriodKind.Custom) state.period else viewModel.currentCustom(),
+            today = state.today,
+            onConfirm = { from, to ->
+                viewModel.setCustom(from, to)
+                pickingRange = false
+            },
+            onDismiss = { pickingRange = false }
+        )
+    }
+
     if (budgeting) {
         BudgetSheet(
             current = state.budget,
@@ -321,46 +356,124 @@ fun ExpensesPage(
 }
 
 @Composable
-private fun MonthSwitcher(
-    month: YearMonth,
-    canPrevious: Boolean,
-    canNext: Boolean,
+private fun PeriodBar(
+    state: ExpensesUiState,
+    onKind: (PeriodKind) -> Unit,
     onPrevious: () -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
+    onEditRange: () -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = onPrevious, enabled = canPrevious) {
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowLeft,
-                contentDescription = "Previous month",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (canPrevious) 1f else 0.3f)
-            )
-        }
-        Text(
-            text = monthTitle(month),
-            fontSize = 15.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f)
+    val custom = state.period.kind == PeriodKind.Custom
+    Column(modifier = Modifier.padding(horizontal = Design.screenHorizontalPadding, vertical = 8.dp)) {
+        ChoiceRow(
+            options = listOf(
+                ChoiceOption(PeriodKind.Week, "Week"),
+                ChoiceOption(PeriodKind.Month, "Month"),
+                ChoiceOption(PeriodKind.Year, "Year"),
+                ChoiceOption(PeriodKind.Custom, "Custom")
+            ),
+            selected = state.period.kind,
+            enabled = true,
+            onSelect = onKind
         )
-        IconButton(onClick = onNext, enabled = canNext) {
-            Icon(
-                Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = "Next month",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (canNext) 1f else 0.3f)
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (custom) {
+                Text(
+                    text = periodTitle(state.period, state.today),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f).padding(vertical = 12.dp)
+                )
+                LinkButton(text = "Change dates", onClick = onEditRange)
+            } else {
+                IconButton(onClick = onPrevious, enabled = state.canPrevious) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                        contentDescription = "Previous period",
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (state.canPrevious) 1f else 0.3f)
+                    )
+                }
+                Text(
+                    text = periodTitle(state.period, state.today),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = onNext, enabled = state.canNext) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = "Next period",
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (state.canNext) 1f else 0.3f)
+                    )
+                }
+            }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun Comparison(summary: MonthSummary, current: Boolean) {
-    val previous = monthOnly(summary.month.minusMonths(1))
+private fun RangePickerDialog(
+    initial: Period?,
+    today: LocalDate,
+    onConfirm: (LocalDate, LocalDate) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val todayMillis = today.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+    val from = initial?.from ?: today.minusDays(29)
+    val to = initial?.to ?: today
+    val picker = rememberDateRangePickerState(
+        initialSelectedStartDateMillis = from.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+        initialSelectedEndDateMillis = to.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+        selectableDates = object : SelectableDates {
+            override fun isSelectableDate(utcTimeMillis: Long): Boolean = utcTimeMillis <= todayMillis
+        }
+    )
+    val start = picker.selectedStartDateMillis
+    val end = picker.selectedEndDateMillis
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                enabled = start != null && end != null,
+                onClick = {
+                    if (start != null && end != null) {
+                        onConfirm(
+                            Instant.ofEpochMilli(start).atZone(ZoneOffset.UTC).toLocalDate(),
+                            Instant.ofEpochMilli(end).atZone(ZoneOffset.UTC).toLocalDate()
+                        )
+                    }
+                }
+            ) { Text("Apply") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    ) {
+        DateRangePicker(
+            state = picker,
+            modifier = Modifier.height(520.dp),
+            title = { Text("Pick a range", modifier = Modifier.padding(start = 24.dp, top = 16.dp)) }
+        )
+    }
+}
+
+@Composable
+private fun Comparison(summary: PeriodSummary, today: LocalDate) {
+    val period = summary.period
+    val current = today in period && period.kind != PeriodKind.Custom
+    val previous = previousName(period, today)
     val change = summary.change
     val hasBasis = summary.previousToDate > 0 || summary.previousSpent > 0
+    val span = when (period.kind) {
+        PeriodKind.Week -> "week"
+        PeriodKind.Month -> "month"
+        PeriodKind.Year -> "year"
+        PeriodKind.Custom -> "period"
+    }
     Column(modifier = Modifier.padding(top = 4.dp)) {
         if (hasBasis) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -392,7 +505,7 @@ private fun Comparison(summary: MonthSummary, current: Boolean) {
         }
         summary.projected?.let { projected ->
             Text(
-                text = "On pace for ${Money.format(projected)} by the end of the month",
+                text = "On pace for ${Money.format(projected)} by the end of the $span",
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 2.dp)
@@ -402,7 +515,7 @@ private fun Comparison(summary: MonthSummary, current: Boolean) {
 }
 
 @Composable
-private fun BudgetLine(summary: MonthSummary, budget: Long?, today: LocalDate, onEdit: () -> Unit) {
+private fun BudgetLine(summary: PeriodSummary, budget: Long?, today: LocalDate, onEdit: () -> Unit) {
     if (budget == null) {
         Row(
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
@@ -421,8 +534,8 @@ private fun BudgetLine(summary: MonthSummary, budget: Long?, today: LocalDate, o
     val spent = summary.spent
     val over = spent > budget
     val fraction = (spent.toFloat() / budget).coerceIn(0f, 1f)
-    val current = YearMonth.from(today) == summary.month
-    val remainingDays = if (current) summary.month.lengthOfMonth() - today.dayOfMonth + 1 else 0
+    val current = today in summary.period
+    val remainingDays = if (current) (summary.period.to.toEpochDay() - today.toEpochDay() + 1).toInt() else 0
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(

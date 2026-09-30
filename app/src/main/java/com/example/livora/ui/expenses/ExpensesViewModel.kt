@@ -10,10 +10,11 @@ import com.example.livora.data.expenses.ExpenseCategoryEntity
 import com.example.livora.data.expenses.ExpenseEntity
 import com.example.livora.data.expenses.ExpenseMath
 import com.example.livora.data.expenses.ExpenseRepository
-import com.example.livora.data.expenses.MonthSummary
+import com.example.livora.data.expenses.Period
+import com.example.livora.data.expenses.PeriodKind
+import com.example.livora.data.expenses.PeriodSummary
 import com.example.livora.ui.components.Toaster
 import java.time.LocalDate
-import java.time.YearMonth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,9 +30,9 @@ import kotlinx.coroutines.withContext
 
 class ExpensesUiState(
     val loading: Boolean,
-    val month: YearMonth,
+    val period: Period,
     val today: LocalDate,
-    val summary: MonthSummary?,
+    val summary: PeriodSummary?,
     val rows: List<ExpenseEntity>,
     val categories: List<ExpenseCategoryEntity>,
     val accounts: List<ExpenseAccountEntity>,
@@ -44,28 +45,35 @@ class ExpensesUiState(
     val accountById: Map<Long, ExpenseAccountEntity> by lazy { accounts.associateBy { it.id } }
 }
 
+private class Selection(val kind: PeriodKind, val anchor: LocalDate, val custom: Period?) {
+    val period: Period
+        get() = if (kind == PeriodKind.Custom && custom != null) custom else Period.of(kind, anchor)
+}
+
 class ExpensesViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = ExpenseRepository(AppDatabase.get(application))
-    private val month = MutableStateFlow(YearMonth.now())
+    private val selection = MutableStateFlow(Selection(PeriodKind.Month, LocalDate.now(), null))
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val state: StateFlow<ExpensesUiState> = month
-        .flatMapLatest { selected ->
+    val state: StateFlow<ExpensesUiState> = selection
+        .flatMapLatest { chosen ->
+            val period = chosen.period
             combine(
-                repository.between(ExpenseMath.firstDayOfTrend(selected), selected.atEndOfMonth().toEpochDay()),
+                repository.between(ExpenseMath.queryFrom(period).toEpochDay(), period.to.toEpochDay()),
                 repository.categories(),
                 repository.accounts(),
                 repository.budgets(),
                 repository.firstDay()
             ) { rows, categories, accounts, budgets, firstDay ->
                 val today = LocalDate.now()
-                val summary = ExpenseMath.summarize(rows, categories.associateBy { it.id }, selected, today)
-                val first = selected.atDay(1).toEpochDay()
-                val last = selected.atEndOfMonth().toEpochDay()
+                val summary = ExpenseMath.summarize(rows, categories.associateBy { it.id }, period, today)
+                val first = period.from.toEpochDay()
+                val last = period.to.toEpochDay()
+                val custom = period.kind == PeriodKind.Custom
                 ExpensesUiState(
                     loading = false,
-                    month = selected,
+                    period = period,
                     today = today,
                     summary = summary,
                     rows = rows.filter { it.day in first..last },
@@ -73,8 +81,8 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
                     accounts = accounts,
                     budget = budgets.firstOrNull { it.categoryId == ExpenseRepository.TOTAL_BUDGET }?.monthlyLimit,
                     hasAny = firstDay != null,
-                    canPrevious = firstDay != null && firstDay < first,
-                    canNext = selected < YearMonth.from(today)
+                    canPrevious = !custom && firstDay != null && firstDay < first,
+                    canNext = !custom && period.to < today
                 )
             }
         }
@@ -84,7 +92,7 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
             SharingStarted.WhileSubscribed(5_000),
             ExpensesUiState(
                 loading = true,
-                month = month.value,
+                period = selection.value.period,
                 today = LocalDate.now(),
                 summary = null,
                 rows = emptyList(),
@@ -97,9 +105,23 @@ class ExpensesViewModel(application: Application) : AndroidViewModel(application
             )
         )
 
-    fun previousMonth() = month.update { it.minusMonths(1) }
+    fun setKind(kind: PeriodKind) = selection.update { Selection(kind, it.anchor, it.custom) }
 
-    fun nextMonth() = month.update { if (it < YearMonth.now()) it.plusMonths(1) else it }
+    fun setCustom(from: LocalDate, to: LocalDate) =
+        selection.update { Selection(PeriodKind.Custom, it.anchor, Period.custom(from, minOf(to, LocalDate.now()))) }
+
+    fun previous() = selection.update { chosen ->
+        val period = chosen.period
+        if (period.kind == PeriodKind.Custom) chosen else Selection(chosen.kind, period.previous().from, chosen.custom)
+    }
+
+    fun next() = selection.update { chosen ->
+        val period = chosen.period
+        if (period.kind == PeriodKind.Custom || period.to >= LocalDate.now()) chosen
+        else Selection(chosen.kind, period.next().from, chosen.custom)
+    }
+
+    fun currentCustom(): Period? = selection.value.custom
 
     fun save(item: ExpenseEntity) {
         viewModelScope.launch {
