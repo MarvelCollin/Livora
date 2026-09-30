@@ -1,5 +1,7 @@
 package com.example.livora.data.ir
 
+import com.example.livora.data.ir.protocol.Daikin216Protocol
+import com.example.livora.data.ir.protocol.Daikin2Protocol
 import com.example.livora.data.ir.protocol.DaikinProtocol
 import com.example.livora.data.ir.protocol.GreeProtocol
 import com.example.livora.data.ir.protocol.GreeVariant
@@ -346,5 +348,67 @@ class AcVectorsTest {
         val bytes = MitsubishiHeavyProtocol(MitsubishiHeavyVariant.ZJS_88).buildState(state)
         assertArrayEquals(ints(0xAD, 0x51, 0x3C, 0xD9, 0x26), bytes.copyOfRange(0, 5))
         assertArrayEquals(ints(0x00, 0xFF, 0x8A, 0x75), bytes.copyOfRange(7, 11))
+    }
+
+    @Test
+    fun daikin2OffMatchesRealCapture() {
+        val state = AcState(
+            isPoweredOn = false,
+            temperature = 19,
+            mode = AcMode.AUTO,
+            fanSpeed = FanSpeed.AUTO,
+            swingMode = SwingMode.OFF
+        )
+        val bytes = Daikin2Protocol { 0x37A }.buildState(state)
+        assertArrayEquals(ints(0x11, 0xDA, 0x27, 0x00, 0x01, 0x7A, 0xC3, 0x70, 0x28, 0x0C), bytes.copyOfRange(0, 10))
+        assertArrayEquals(
+            ints(
+                0x80, 0x04, 0xB0, 0x16, 0x24, 0x00, 0x00, 0xBE
+            ),
+            bytes.copyOfRange(10, 18)
+        )
+        assertArrayEquals(
+            ints(
+                0x11, 0xDA, 0x27, 0x00, 0x00, 0x08, 0x26, 0x00, 0xA0, 0x00,
+                0x00, 0x06, 0x60, 0x00, 0x00, 0xC1, 0x80, 0x60, 0xE7
+            ),
+            bytes.copyOfRange(20, 39)
+        )
+    }
+
+    @Test
+    fun daikin2PowerOnUsesClockAndModeBits() {
+        val state = AcState(
+            isPoweredOn = true,
+            temperature = 20,
+            mode = AcMode.COOL,
+            fanSpeed = FanSpeed.AUTO,
+            swingMode = SwingMode.VERTICAL
+        )
+        val bytes = Daikin2Protocol { 0x230 }.buildState(state)
+        assertEquals(0x30, bytes[5])
+        assertEquals(0x42, bytes[6])
+        assertEquals(0x39, bytes[25])
+        assertEquals(0x28, bytes[26])
+        assertEquals(0xDF, bytes[18])
+    }
+
+    @Test
+    fun daikin216OffAutoMatchesLibraryState() {
+        val state = AcState(
+            isPoweredOn = false,
+            temperature = 19,
+            mode = AcMode.AUTO,
+            fanSpeed = FanSpeed.AUTO,
+            swingMode = SwingMode.OFF
+        )
+        assertArrayEquals(
+            ints(
+                0x11, 0xDA, 0x27, 0xF0, 0x00, 0x00, 0x00, 0x02,
+                0x11, 0xDA, 0x27, 0x00, 0x00, 0x00, 0x26, 0x00, 0xA0, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x00, 0x00, 0x98
+            ),
+            Daikin216Protocol().buildState(state)
+        )
     }
 }

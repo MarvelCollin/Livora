@@ -1,6 +1,8 @@
 package com.example.livora.data.ir
 
 import com.example.livora.data.ir.protocol.CoolixProtocol
+import com.example.livora.data.ir.protocol.Daikin216Protocol
+import com.example.livora.data.ir.protocol.Daikin2Protocol
 import com.example.livora.data.ir.protocol.DaikinProtocol
 import com.example.livora.data.ir.protocol.GreeProtocol
 import com.example.livora.data.ir.protocol.GreeVariant
@@ -59,8 +61,18 @@ object AcBrands {
             id = "daikin",
             name = "Daikin",
             alsoWorksWith = "Daikin ARC series remotes",
-            models = listOf(AcModel("Standard", "Daikin 280 bit remotes"))
-        ) { DaikinProtocol() },
+            models = listOf(
+                AcModel("Remote A", "ARC433 series, 280 bit"),
+                AcModel("Remote B", "ARC466 and ARC470 series, 312 bit"),
+                AcModel("Remote C", "216 bit remotes")
+            )
+        ) { index ->
+            when (index) {
+                0 -> DaikinProtocol()
+                1 -> Daikin2Protocol()
+                else -> Daikin216Protocol()
+            }
+        },
         AcBrand(
             id = "panasonic",
             name = "Panasonic",
