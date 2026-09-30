@@ -224,9 +224,9 @@ private fun TodoRow(
                 imageVector = if (stats.isDoneCurrentInterval) Icons.Default.CheckCircle else Icons.Outlined.Circle,
                 contentDescription = if (stats.isDoneCurrentInterval) "Mark not done" else "Mark done",
                 tint = if (stats.isDoneCurrentInterval)
-                    MaterialTheme.colorScheme.onSurface
+                    MaterialTheme.colorScheme.primary
                 else
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                    MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 
@@ -309,7 +309,7 @@ private fun StreakDots(stats: TodoStats) {
                         .size(6.dp)
                         .background(
                             color = if (interval.isDone)
-                                MaterialTheme.colorScheme.onSurface
+                                MaterialTheme.colorScheme.primary
                             else
                                 MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
                             shape = RoundedCornerShape(50)

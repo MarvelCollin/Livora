@@ -209,7 +209,7 @@ private fun HistoryRow(item: TodoIntervalStatus) {
                 .size(6.dp)
                 .background(
                     color = if (item.isDone)
-                        MaterialTheme.colorScheme.onSurface
+                        MaterialTheme.colorScheme.primary
                     else
                         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f),
                     shape = RoundedCornerShape(50)

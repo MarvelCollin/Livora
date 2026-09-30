@@ -1,6 +1,6 @@
 package com.example.livora.ui.components
 
-import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -16,43 +16,36 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun shimmerBrush(): Brush {
-    val transition = rememberInfiniteTransition(label = "shimmer")
-    val translate by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1000f,
+fun skeletonColor(): Color {
+    val transition = rememberInfiniteTransition(label = "skeleton")
+    val alpha by transition.animateFloat(
+        initialValue = 0.07f,
+        targetValue = 0.16f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1100, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
+            animation = tween(durationMillis = 900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
         ),
-        label = "translate"
+        label = "skeletonAlpha"
     )
-    val base = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f)
-    val highlight = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
-    return Brush.linearGradient(
-        colors = listOf(base, highlight, base),
-        start = Offset(translate - 300f, 0f),
-        end = Offset(translate, 0f)
-    )
+    return MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
 }
 
 @Composable
 fun SkeletonBox(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(8.dp),
-    brush: Brush = shimmerBrush()
+    color: Color = skeletonColor()
 ) {
     Box(
         modifier = modifier
             .clip(shape)
-            .background(brush)
+            .background(color)
     )
 }
 
@@ -60,13 +53,13 @@ fun SkeletonBox(
 fun SkeletonLine(
     width: Dp,
     height: Dp = 14.dp,
-    brush: Brush = shimmerBrush()
+    color: Color = skeletonColor()
 ) {
     SkeletonBox(
         modifier = Modifier
             .width(width)
             .height(height),
         shape = RoundedCornerShape(50),
-        brush = brush
+        color = color
     )
 }

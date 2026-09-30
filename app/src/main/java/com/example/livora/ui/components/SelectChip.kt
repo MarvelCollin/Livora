@@ -71,14 +71,14 @@ fun SelectChip(
 ) {
     val bgColor by animateColorAsState(
         targetValue = when {
-            selected && enabled -> MaterialTheme.colorScheme.onSurface
+            selected && enabled -> MaterialTheme.colorScheme.primary
             else -> MaterialTheme.colorScheme.surfaceContainerHigh
         },
         label = "chipBg"
     )
     val contentColor by animateColorAsState(
         targetValue = when {
-            selected && enabled -> MaterialTheme.colorScheme.surface
+            selected && enabled -> MaterialTheme.colorScheme.onPrimary
             enabled -> MaterialTheme.colorScheme.onSurface
             else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
         },
