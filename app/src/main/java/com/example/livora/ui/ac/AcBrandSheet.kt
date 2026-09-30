@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -64,9 +65,9 @@ fun AcBrandSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
+                .fillMaxHeight(0.94f)
                 .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp)
+                .padding(bottom = 16.dp)
         ) {
             Text(
                 text = "Remote brand",
@@ -91,6 +92,11 @@ fun AcBrandSheet(
             )
             Spacer(modifier = Modifier.height(8.dp))
 
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+            ) {
             if (visibleBrands.isEmpty()) {
                 Text(
                     text = "No brand matches \"$query\"",
@@ -143,9 +149,10 @@ fun AcBrandSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            }
+
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             Text(
                 text = "${brand.name}, model ${modelIndex.coerceIn(0, brand.models.lastIndex) + 1} of ${brand.models.size}",
