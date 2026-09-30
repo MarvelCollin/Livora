@@ -57,6 +57,7 @@ import com.example.livora.data.model.DictionaryEntry
 import com.example.livora.data.model.DictionaryLanguage
 import com.example.livora.ui.components.SkeletonBox
 import com.example.livora.ui.components.SkeletonLine
+import com.example.livora.ui.components.Tag
 import com.example.livora.ui.components.TopBar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,7 +87,7 @@ fun DictionaryScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Quiz,
-                            contentDescription = null,
+                            contentDescription = "Start quiz",
                             tint = if (viewModel.canQuiz())
                                 MaterialTheme.colorScheme.onSurface
                             else
@@ -99,7 +100,7 @@ fun DictionaryScreen(
                     }) {
                         Icon(
                             imageVector = Icons.Default.Add,
-                            contentDescription = null,
+                            contentDescription = "Add word",
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -198,10 +199,10 @@ private fun LanguageRow(
                             MaterialTheme.colorScheme.onSurface
                         else
                             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
-                        shape = RoundedCornerShape(50)
+                        shape = RoundedCornerShape(8.dp)
                     )
                     .clickable { onSelect(language) }
-                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                    .padding(horizontal = 14.dp, vertical = 14.dp)
             )
         }
     }
@@ -456,18 +457,7 @@ private fun EntryRow(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = DictionaryLanguage.fromCode(entry.language).label,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    modifier = Modifier
-                        .background(
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
-                            shape = RoundedCornerShape(50)
-                        )
-                        .padding(horizontal = 8.dp, vertical = 2.dp)
-                )
+                Tag(text = DictionaryLanguage.fromCode(entry.language).label)
             }
             if (entry.translation.isNotBlank()) {
                 Spacer(modifier = Modifier.height(3.dp))
@@ -511,29 +501,18 @@ private fun EntryRow(
                         .horizontalScroll(rememberScrollState())
                 ) {
                     entry.synonyms.forEach { synonym ->
-                        Text(
-                            text = synonym,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                            modifier = Modifier
-                                .background(
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
-                                    shape = RoundedCornerShape(50)
-                                )
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
-                        )
+                        Tag(text = synonym)
                     }
                 }
             }
         }
         IconButton(
             onClick = onDelete,
-            modifier = Modifier.size(32.dp)
+            modifier = Modifier.size(48.dp)
         ) {
             Icon(
                 imageVector = Icons.Outlined.Delete,
-                contentDescription = null,
+                contentDescription = "Delete word",
                 tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
             )
         }

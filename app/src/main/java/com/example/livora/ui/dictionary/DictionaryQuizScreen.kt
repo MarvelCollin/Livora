@@ -45,6 +45,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.livora.data.model.DictionaryLanguage
+import com.example.livora.ui.components.Tag
+import com.example.livora.ui.components.Tag
 import com.example.livora.ui.components.TopBar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -69,7 +71,7 @@ fun DictionaryQuizScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = null,
+                            contentDescription = "Back",
                             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
                     }
@@ -154,18 +156,7 @@ fun DictionaryQuizScreen(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = DictionaryLanguage.fromCode(question.entry.language).label,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    modifier = Modifier
-                        .background(
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
-                            shape = RoundedCornerShape(50)
-                        )
-                        .padding(horizontal = 10.dp, vertical = 3.dp)
-                )
+                Tag(text = DictionaryLanguage.fromCode(question.entry.language).label)
             }
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -369,18 +360,7 @@ private fun HintCard(
                 modifier = Modifier.horizontalScroll(rememberScrollState())
             ) {
                 synonyms.forEach { synonym ->
-                    Text(
-                        text = synonym,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f),
-                        modifier = Modifier
-                            .background(
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f),
-                                shape = RoundedCornerShape(50)
-                            )
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                    )
+                    Tag(text = synonym)
                 }
             }
         }

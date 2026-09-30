@@ -1,6 +1,6 @@
 package com.example.livora.ui.components
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,10 +13,13 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -28,14 +31,18 @@ fun TaskTimerChip(
     onCancel: () -> Unit
 ) {
     val running = remainingMs != null
+    val shape = RoundedCornerShape(8.dp)
     Row(
         modifier = Modifier
-            .clickable(onClick = if (running) onCancel else onStart)
-            .background(
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (running) 0.1f else 0.06f),
-                shape = RoundedCornerShape(50)
+            .minimumInteractiveComponentSize()
+            .clip(shape)
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = if (running) 1f else 0.5f),
+                shape = shape
             )
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .clickable(role = Role.Button, onClick = if (running) onCancel else onStart)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
