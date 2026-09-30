@@ -10,11 +10,15 @@ import com.example.livora.data.people.EnrollFace
 import com.example.livora.data.people.EnrollPhoto
 import com.example.livora.data.people.PeopleServices
 import com.example.livora.data.people.ReferenceInput
+import com.example.livora.data.people.db.PersonSummary
 import com.example.livora.data.people.scan.ScanController
 import com.example.livora.ui.components.Toaster
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class EnrollItem(
@@ -43,6 +47,13 @@ class EnrollViewModel(application: Application, handle: SavedStateHandle) : Andr
     private val existingName = MutableStateFlow<String?>(null)
     val personName: StateFlow<String?> = existingName.asStateFlow()
 
+    val people: StateFlow<List<PersonSummary>> = repository.summaries
+        .map { all -> all.filter { it.name != null && !it.hidden }.sortedByDescending { it.photoCount } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val chosenState = MutableStateFlow<PersonSummary?>(null)
+    val chosen: StateFlow<PersonSummary?> = chosenState.asStateFlow()
+
     private val savingState = MutableStateFlow(false)
     val saving: StateFlow<Boolean> = savingState.asStateFlow()
 
@@ -55,6 +66,10 @@ class EnrollViewModel(application: Application, handle: SavedStateHandle) : Andr
         }
         val draft = EnrollDraft.take()
         if (draft.isNotEmpty()) addUris(draft)
+    }
+
+    fun choose(person: PersonSummary?) {
+        chosenState.value = if (chosenState.value?.id == person?.id) null else person
     }
 
     fun setName(value: String) {
@@ -102,21 +117,32 @@ class EnrollViewModel(application: Application, handle: SavedStateHandle) : Andr
         viewModelScope.launch {
             savingState.value = true
             try {
-                val id = if (personId != null) {
+                val trimmed = nameState.value.trim()
+                val target = chosenState.value
+                    ?: people.value.firstOrNull { it.name.equals(trimmed, ignoreCase = true) }
+                val id: Long
+                val label: String
+                if (personId != null) {
                     repository.addReferences(personId, references)
-                    personId
+                    id = personId
+                    label = existingName.value ?: "this person"
+                } else if (target != null) {
+                    repository.addReferences(target.id, references)
+                    id = target.id
+                    label = target.name.orEmpty()
                 } else {
-                    val trimmed = nameState.value.trim()
                     if (trimmed.isEmpty()) {
                         Toaster.error("Enter a name first")
                         savingState.value = false
                         return@launch
                     }
-                    repository.createEnrolled(trimmed, references)
+                    id = repository.createEnrolled(trimmed, references)
+                    label = trimmed
                 }
+                val photos = if (references.size == 1) "photo" else "photos"
                 Toaster.success(
-                    if (personId != null) "Added ${references.size} reference ${if (references.size == 1) "photo" else "photos"}"
-                    else "Saved ${nameState.value.trim()} with ${references.size} reference ${if (references.size == 1) "photo" else "photos"}"
+                    if (personId != null || target != null) "Added ${references.size} reference $photos to $label"
+                    else "Saved $label with ${references.size} reference $photos"
                 )
                 if (scope.first.isNotEmpty()) {
                     ScanController.startFolders(getApplication(), scope.first)

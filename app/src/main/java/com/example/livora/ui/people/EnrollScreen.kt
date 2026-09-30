@@ -8,6 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -39,6 +40,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -47,6 +49,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.livora.data.people.EnrollFace
@@ -65,6 +68,8 @@ fun EnrollScreen(
     val personName by viewModel.personName.collectAsState()
     val saving by viewModel.saving.collectAsState()
     val done by viewModel.done.collectAsState()
+    val people by viewModel.people.collectAsState()
+    val chosen by viewModel.chosen.collectAsState()
     val selectedCount = items.count { it.selectedFace != null }
     val existing = viewModel.personId != null
 
@@ -95,10 +100,11 @@ fun EnrollScreen(
                         text = when {
                             selectedCount == 0 -> "Pick a face first"
                             existing -> "Add $selectedCount reference ${if (selectedCount == 1) "photo" else "photos"}"
+                            chosen != null -> "Add $selectedCount ${if (selectedCount == 1) "photo" else "photos"} to ${chosen?.name.orEmpty()}"
                             else -> "Save person with $selectedCount ${if (selectedCount == 1) "photo" else "photos"}"
                         },
                         onClick = { viewModel.save() },
-                        enabled = selectedCount > 0 && !saving && (existing || name.isNotBlank()),
+                        enabled = selectedCount > 0 && !saving && (existing || chosen != null || name.isNotBlank()),
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -136,12 +142,62 @@ fun EnrollScreen(
                             value = name,
                             onValueChange = { viewModel.setName(it) },
                             label = { Text("Name") },
+                            enabled = chosen == null,
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                }
+                if (people.isNotEmpty()) {
+                    item(key = "existing") {
+                        Column(modifier = Modifier.padding(vertical = 12.dp)) {
+                            Text(
+                                text = "Or add these photos to someone you already named",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                items(people, key = { it.id }) { person ->
+                                    val picked = chosen?.id == person.id
+                                    Column(
+                                        modifier = Modifier
+                                            .width(72.dp)
+                                            .clickable(role = Role.RadioButton) { viewModel.choose(person) },
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        FaceAvatar(
+                                            faceId = person.coverFaceId,
+                                            referenceId = person.coverRefId,
+                                            size = 56.dp,
+                                            modifier = Modifier.border(
+                                                if (picked) 3.dp else 0.dp,
+                                                MaterialTheme.colorScheme.primary,
+                                                RoundedCornerShape(14.dp)
+                                            ),
+                                            description = "Face of ${person.name.orEmpty()}. ${if (picked) "Selected" else "Not selected"}"
+                                        )
+                                        Text(
+                                            text = person.name.orEmpty(),
+                                            fontSize = 12.sp,
+                                            color = if (picked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.padding(top = 4.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                    }
                 }
             }
             if (items.isEmpty()) {

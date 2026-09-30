@@ -381,13 +381,20 @@ fun PeopleScreen(
 
     val target = renaming
     if (target != null) {
-        RenameDialog(
+        val named = (people as? PeopleListState.Ready)?.people.orEmpty()
+            .filter { it.name != null && it.id != target.id }
+        NamePersonSheet(
             initial = target.name.orEmpty(),
-            onDismiss = { renaming = null },
-            onSave = {
-                viewModel.rename(target.id, it)
+            people = named,
+            onPick = { existing ->
                 renaming = null
-            }
+                viewModel.mergeInto(existing, target)
+            },
+            onNew = { name ->
+                renaming = null
+                viewModel.rename(target.id, name)
+            },
+            onDismiss = { renaming = null }
         )
     }
 }

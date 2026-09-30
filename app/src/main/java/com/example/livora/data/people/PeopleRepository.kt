@@ -168,6 +168,22 @@ class PeopleRepository(
         )
     }
 
+    suspend fun absorb(intoId: Long, fromId: Long): SamePersonResult? = withContext(Dispatchers.IO) {
+        val merged = mergePeople(intoId, fromId) ?: return@withContext null
+        val wasPinned = database.persons().byId(intoId)?.pinned == true
+        database.persons().setPinned(intoId, true)
+        val added = addExemplarReferences(intoId, 8)
+        SamePersonResult(
+            intoId,
+            1,
+            UndoToken {
+                if (added.isNotEmpty()) database.references().deleteIds(added)
+                merged.restore()
+                if (!wasPinned) database.persons().setPinned(intoId, false)
+            }
+        )
+    }
+
     suspend fun mergeGroups(pairs: List<Pair<Long, Long>>): UndoToken? = withContext(Dispatchers.IO) {
         val parent = HashMap<Long, Long>()
         fun find(x: Long): Long {

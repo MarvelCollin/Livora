@@ -122,7 +122,7 @@ class PersonDetailViewModel(application: Application, handle: SavedStateHandle) 
 
     fun mergeInto(targetId: Long, targetName: String?) {
         viewModelScope.launch {
-            val result = repository.samePerson(listOf(targetId, personId))
+            val result = repository.absorb(targetId, personId)
             if (result == null) {
                 Toaster.error("These people could not be merged")
             } else {

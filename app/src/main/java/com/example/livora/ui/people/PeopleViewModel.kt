@@ -194,6 +194,24 @@ class PeopleViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    fun mergeInto(target: PersonSummary, person: PersonSummary) {
+        viewModelScope.launch {
+            val result = repository.absorb(target.id, person.id)
+            if (result == null) {
+                Toaster.error("These groups could not be merged")
+            } else {
+                Toaster.show(
+                    message = "Added to ${target.name ?: "the other person"}",
+                    type = ToastType.Success,
+                    durationMs = 7000,
+                    actionLabel = "Undo",
+                    onAction = { viewModelScope.launch { result.undo.restore() } }
+                )
+                refreshMergeSuggestions()
+            }
+        }
+    }
+
     fun sameSelected() {
         val ids = selectedState.value.toList()
         if (ids.size < 2) return

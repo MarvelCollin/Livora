@@ -306,13 +306,18 @@ fun PersonDetailScreen(
     }
 
     if (renaming) {
-        RenameDialog(
+        NamePersonSheet(
             initial = current?.name.orEmpty(),
-            onDismiss = { renaming = false },
-            onSave = {
-                viewModel.rename(it)
+            people = others.filter { it.name != null },
+            onPick = {
                 renaming = false
-            }
+                viewModel.mergeInto(it.id, it.name)
+            },
+            onNew = {
+                renaming = false
+                viewModel.rename(it)
+            },
+            onDismiss = { renaming = false }
         )
     }
     if (mergePicker) {
