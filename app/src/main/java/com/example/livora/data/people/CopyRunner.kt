@@ -30,6 +30,7 @@ class CopyRunner(private val repository: PeopleRepository, private val folders: 
         mediaIds: List<Long>,
         relativePath: String,
         folderName: String,
+        byAi: Boolean = false,
         onFinished: (CopyResult) -> Unit = {}
     ) {
         if (mediaIds.isEmpty()) return
@@ -43,9 +44,9 @@ class CopyRunner(private val repository: PeopleRepository, private val folders: 
         }
         job = scope.launch {
             state.value = CopyProgress(mediaIds.size, 0, folderName)
-            val result = repository.copyPhotos(personId, mediaIds, relativePath) { done ->
+            val result = repository.copyPhotos(personId, mediaIds, relativePath, { done ->
                 state.value = CopyProgress(mediaIds.size, done, folderName)
-            }
+            }, byAi)
             state.value = null
             folders.refresh()
             withContext(Dispatchers.Main) {

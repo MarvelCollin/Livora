@@ -99,6 +99,7 @@ class PeopleBackup(
             database.rejections().clear()
             database.separations().clear()
             database.linkedCopies().clear()
+            database.aiMoves().clear()
             database.virtualFolders().clear()
             for (chunk in data.persons.chunked(300)) {
                 for (p in chunk) {

@@ -23,6 +23,11 @@ object PersonKind {
     const val ENROLLED = 1
 }
 
+object AiMoveKind {
+    const val MOVE = 0
+    const val COPY = 1
+}
+
 object LinkMode {
     const val NONE = 0
     const val REVIEW = 1
@@ -126,4 +131,19 @@ data class VirtualFolderEntity(
 data class SeparationEntity(
     val personA: Long,
     val personB: Long
+)
+
+@Entity(
+    tableName = "ai_moves",
+    primaryKeys = ["mediaId", "personId"],
+    indices = [Index("personId")]
+)
+data class AiMoveEntity(
+    val mediaId: Long,
+    val personId: Long,
+    val sourceMediaId: Long,
+    val kind: Int,
+    val fromPath: String,
+    val toPath: String,
+    val movedAt: Long
 )

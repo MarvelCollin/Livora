@@ -16,9 +16,10 @@ import java.io.File
         RejectionEntity::class,
         LinkedCopyEntity::class,
         VirtualFolderEntity::class,
-        SeparationEntity::class
+        SeparationEntity::class,
+        AiMoveEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class PeopleDatabase : RoomDatabase() {
@@ -31,6 +32,7 @@ abstract class PeopleDatabase : RoomDatabase() {
     abstract fun linkedCopies(): LinkedCopyDao
     abstract fun virtualFolders(): VirtualFolderDao
     abstract fun separations(): SeparationDao
+    abstract fun aiMoves(): AiMoveDao
 
     companion object {
 

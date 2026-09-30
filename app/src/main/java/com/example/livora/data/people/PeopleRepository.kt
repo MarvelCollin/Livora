@@ -9,6 +9,9 @@ import androidx.paging.PagingData
 import androidx.room.withTransaction
 import com.example.livora.data.people.cluster.FaceRecord
 import com.example.livora.data.people.cluster.PersonMatcher
+import com.example.livora.data.people.db.AiMoveEntity
+import com.example.livora.data.people.db.AiMoveKind
+import com.example.livora.data.people.db.AiMoveRow
 import com.example.livora.data.people.db.CandidateFaceRow
 import com.example.livora.data.people.db.LinkMode
 import com.example.livora.data.people.db.LinkedCopyEntity
@@ -110,6 +113,53 @@ class PeopleRepository(
     fun observeIndexedFaces(): Flow<Int> = database.faces().observeCount()
 
     fun observeScannedPhotos(): Flow<Int> = database.photos().observeScannedCount()
+
+    val aiMoves: Flow<List<AiMoveRow>> = database.aiMoves().observeAll()
+
+    suspend fun recordAiMoves(personId: Long, mediaIds: List<Long>, previous: Map<Long, String>, toPath: String) =
+        withContext(Dispatchers.IO) {
+            val now = System.currentTimeMillis()
+            database.aiMoves().insertAll(
+                mediaIds.map { AiMoveEntity(it, personId, it, AiMoveKind.MOVE, previous[it].orEmpty(), toPath, now) }
+            )
+        }
+
+    suspend fun dropAiMoves(mediaIds: List<Long>) = withContext(Dispatchers.IO) {
+        for (chunk in mediaIds.chunked(400)) database.aiMoves().delete(chunk)
+    }
+
+    suspend fun rejectAiMoves(rows: List<AiMoveRow>) = withContext(Dispatchers.IO) {
+        for ((personId, group) in rows.groupBy { it.personId }) {
+            val sources = group.map { it.sourceMediaId }.distinct()
+            if (removeFromPerson(personId, sources) == null) rejectBestFaces(personId, sources)
+        }
+        val copies = rows.filter { it.kind == AiMoveKind.COPY }
+        if (copies.isNotEmpty()) {
+            val ids = copies.map { it.mediaId }
+            MediaWriter.deleteOwned(context, ids)
+            database.photos().deleteByIds(ids)
+            for ((personId, group) in copies.groupBy { it.personId }) {
+                database.linkedCopies().remove(personId, group.map { it.sourceMediaId })
+            }
+        }
+        dropAiMoves(rows.map { it.mediaId })
+    }
+
+    private suspend fun rejectBestFaces(personId: Long, mediaIds: List<Long>) {
+        val person = database.persons().byId(personId) ?: return
+        val prototypes = prototypesOf(person)
+        if (prototypes.isEmpty()) return
+        val rejections = ArrayList<RejectionEntity>()
+        for (chunk in mediaIds.chunked(400)) {
+            val faces = database.faces().candidatesInMedia(chunk, 0f)
+            for ((_, inPhoto) in faces.groupBy { it.mediaId }) {
+                val scored = inPhoto.map { it to PersonMatcher.bestScore(VectorMath.fromBytes(it.embedding), prototypes) }
+                val best = scored.maxByOrNull { it.second } ?: continue
+                rejections.add(RejectionEntity(best.first.id, personId, best.second))
+            }
+        }
+        if (rejections.isNotEmpty()) database.rejections().insertAll(rejections)
+    }
 
     fun personPhotos(personId: Long): Flow<PagingData<PersonPhotoRow>> =
         Pager(PagingConfig(pageSize = 60, prefetchDistance = 30, enablePlaceholders = false)) {
@@ -260,6 +310,7 @@ class PeopleRepository(
             database.references().moveAll(fromId, intoId)
             database.rejections().moveAll(fromId, intoId)
             database.linkedCopies().deleteOfPerson(fromId)
+            database.aiMoves().moveAll(fromId, intoId)
             database.persons().delete(fromId)
         }
         UndoToken {
@@ -320,6 +371,7 @@ class PeopleRepository(
             database.references().deleteOfPerson(id)
             database.rejections().deleteOfPerson(id)
             database.linkedCopies().deleteOfPerson(id)
+            database.aiMoves().deleteOfPerson(id)
             database.persons().delete(id)
         }
     }
@@ -515,10 +567,19 @@ class PeopleRepository(
         personId: Long?,
         mediaIds: List<Long>,
         relativePath: String,
-        onProgress: (Int) -> Unit = {}
+        onProgress: (Int) -> Unit = {},
+        byAi: Boolean = false
     ): CopyResult {
         val result = MediaWriter.copyImages(context, mediaIds, relativePath, onProgress)
         registerCopies(result.created.map { it.second })
+        if (byAi && personId != null && result.created.isNotEmpty()) {
+            val now = System.currentTimeMillis()
+            withContext(Dispatchers.IO) {
+                database.aiMoves().insertAll(
+                    result.created.map { AiMoveEntity(it.second, personId, it.first, AiMoveKind.COPY, "", relativePath, now) }
+                )
+            }
+        }
         if (personId != null && result.created.isNotEmpty()) {
             database.linkedCopies().insertAll(
                 result.created.map { LinkedCopyEntity(personId, it.first, System.currentTimeMillis()) }
@@ -584,7 +645,7 @@ class PeopleRepository(
             val media = matches.mapNotNull { byId[it.faceId]?.mediaId }.distinct()
                 .filter { it !in copied && it !in inFolder }
             if (media.isEmpty()) continue
-            copyPhotos(person.id, media, path)
+            copyPhotos(person.id, media, path, byAi = true)
             val faceIds = matches.filter { byId[it.faceId]?.personId == null && byId[it.faceId]?.mediaId in media }.map { it.faceId }
             for (chunk in faceIds.chunked(400)) database.faces().assign(chunk, person.id)
         }

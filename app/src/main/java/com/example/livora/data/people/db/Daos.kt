@@ -480,3 +480,37 @@ interface SeparationDao {
     @Query("DELETE FROM person_separations WHERE (personA = :a AND personB = :b) OR (personA = :b AND personB = :a)")
     suspend fun remove(a: Long, b: Long)
 }
+
+class AiMoveRow(
+    val mediaId: Long,
+    val personId: Long,
+    val sourceMediaId: Long,
+    val kind: Int,
+    val fromPath: String,
+    val personName: String?
+)
+
+@Dao
+interface AiMoveDao {
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(rows: List<AiMoveEntity>)
+
+    @Query(
+        "SELECT m.mediaId AS mediaId, m.personId AS personId, m.sourceMediaId AS sourceMediaId, m.kind AS kind, " +
+            "m.fromPath AS fromPath, p.name AS personName FROM ai_moves m INNER JOIN persons p ON p.id = m.personId"
+    )
+    fun observeAll(): Flow<List<AiMoveRow>>
+
+    @Query("DELETE FROM ai_moves WHERE mediaId IN (:mediaIds)")
+    suspend fun delete(mediaIds: List<Long>)
+
+    @Query("DELETE FROM ai_moves WHERE personId = :personId")
+    suspend fun deleteOfPerson(personId: Long)
+
+    @Query("UPDATE OR REPLACE ai_moves SET personId = :toId WHERE personId = :fromId")
+    suspend fun moveAll(fromId: Long, toId: Long)
+
+    @Query("DELETE FROM ai_moves")
+    suspend fun clear()
+}

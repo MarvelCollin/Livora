@@ -161,8 +161,20 @@ class MigrationSqlTest {
     }
 
     @Test
+    fun versionThreeToFourAddsAiMoves() {
+        createFrom(3)
+        assertMatchesSchema(3)
+        exec("INSERT INTO persons (id, name, hidden, kind, createdAt, threshold, linkMode, pinned) VALUES (1, 'Kim', 0, 0, 1, 0.62, 0, 0)")
+        PeopleMigrationSql.V3_TO_V4.forEach { exec(it) }
+        assertMatchesSchema(4)
+        assertEquals("Kim", scalar("SELECT name FROM persons WHERE id = 1"))
+        exec("INSERT INTO ai_moves (mediaId, personId, sourceMediaId, kind, fromPath, toPath, movedAt) VALUES (5, 1, 5, 0, 'DCIM/Camera/', 'Pictures/Kim/', 10)")
+        assertEquals("DCIM/Camera/", scalar("SELECT fromPath FROM ai_moves WHERE mediaId = 5"))
+    }
+
+    @Test
     fun schemaFilesExistForEveryVersion() {
-        for (v in 1..3) assertNotNull(schema(v))
-        assertTrue(schema(3).getInt("version") == 3)
+        for (v in 1..4) assertNotNull(schema(v))
+        assertTrue(schema(4).getInt("version") == 4)
     }
 }

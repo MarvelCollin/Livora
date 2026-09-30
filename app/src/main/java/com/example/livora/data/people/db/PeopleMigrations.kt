@@ -17,6 +17,11 @@ object PeopleMigrationSql {
         "ALTER TABLE `faces` ADD COLUMN `modelVersion` INTEGER NOT NULL DEFAULT 1",
         "ALTER TABLE `faces` ADD COLUMN `pipelineVersion` INTEGER NOT NULL DEFAULT 1"
     )
+
+    val V3_TO_V4 = listOf(
+        "CREATE TABLE IF NOT EXISTS `ai_moves` (`mediaId` INTEGER NOT NULL, `personId` INTEGER NOT NULL, `sourceMediaId` INTEGER NOT NULL, `kind` INTEGER NOT NULL, `fromPath` TEXT NOT NULL, `toPath` TEXT NOT NULL, `movedAt` INTEGER NOT NULL, PRIMARY KEY(`mediaId`, `personId`))",
+        "CREATE INDEX IF NOT EXISTS `index_ai_moves_personId` ON `ai_moves` (`personId`)"
+    )
 }
 
 object PeopleMigrations {
@@ -33,5 +38,11 @@ object PeopleMigrations {
         }
     }
 
-    val ALL = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
+    val MIGRATION_3_4 = object : Migration(3, 4) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            PeopleMigrationSql.V3_TO_V4.forEach { db.execSQL(it) }
+        }
+    }
+
+    val ALL = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
 }
