@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.livora.data.people.media.MediaImage
@@ -52,6 +53,7 @@ fun GalleryGrid(
     onToggle: (Long) -> Unit,
     onToggleGroup: (List<Long>) -> Unit,
     modifier: Modifier = Modifier,
+    aiLabels: Map<Long, String> = emptyMap(),
     topContent: @Composable () -> Unit = {},
     emptyContent: @Composable () -> Unit = {}
 ) {
@@ -87,6 +89,7 @@ fun GalleryGrid(
                 )
                 is GalleryRow.Photo -> PhotoCell(
                     image = row.image,
+                    aiName = aiLabels[row.image.id],
                     isSelected = row.image.id in selected,
                     selecting = selecting,
                     onOpen = { onOpen(row.image.id) },
@@ -136,6 +139,7 @@ private fun DayHeader(header: GalleryRow.Header, selecting: Boolean, allSelected
 @Composable
 private fun PhotoCell(
     image: MediaImage,
+    aiName: String?,
     isSelected: Boolean,
     selecting: Boolean,
     onOpen: () -> Unit,
@@ -163,11 +167,65 @@ private fun PhotoCell(
             shape = RoundedCornerShape(if (isSelected) 6.dp else 2.dp),
             description = "Photo"
         )
+        if (aiName != null) {
+            Text(
+                text = if (aiName.isEmpty()) "AI" else "AI $aiName",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(4.dp)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.9f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 5.dp, vertical = 1.dp)
+            )
+        }
         if (selecting) {
             SelectMark(
                 selected = isSelected,
                 description = if (isSelected) "Selected photo" else "Photo not selected",
                 modifier = Modifier.align(Alignment.TopStart).padding(6.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun ReviewBanner(text: String, action: String, onAction: () -> Unit) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = text,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            LinkButton(text = action, onClick = onAction, emphasis = true)
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+    }
+}
+
+@Composable
+fun ReviewBar(count: Int, onWrong: () -> Unit, onRight: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier = modifier.background(MaterialTheme.colorScheme.surface)) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            OutlineAction(text = "Looks right", onClick = onRight, enabled = count > 0, modifier = Modifier.weight(1f))
+            PrimaryAction(
+                text = if (count == 0) "Tap the wrong ones" else "This is wrong ($count)",
+                onClick = onWrong,
+                enabled = count > 0,
+                modifier = Modifier.weight(1f)
             )
         }
     }

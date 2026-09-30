@@ -47,6 +47,10 @@ fun FolderDetailScreen(
     var picker by remember { mutableStateOf<PickerMode?>(null) }
     var renaming by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    val reviewing by viewModel.reviewing.collectAsState()
+    val aiCount by viewModel.aiCount.collectAsState()
+    val aiLabels by viewModel.aiLabels.collectAsState()
+    var confirmWrong by remember { mutableStateOf(false) }
     val selecting = selected.isNotEmpty()
     val pick = viewModel.pickMode
     val all = viewModel.isAll
@@ -54,6 +58,7 @@ fun FolderDetailScreen(
     val count = if (all) images.size else folder?.count ?: images.size
     val canAdd = !all && folder != null && com.example.livora.data.people.media.MediaFolders.isWritableTarget(folder?.relativePath.orEmpty())
 
+    BackHandler(enabled = reviewing) { viewModel.stopReview() }
     BackHandler(enabled = selecting) { viewModel.clearSelection() }
     LaunchedEffect(left) { if (left) onBack() }
 
@@ -76,6 +81,8 @@ fun FolderDetailScreen(
                     actions = {
                         if (!pick) {
                             LinkButton(text = "All", onClick = { viewModel.selectAll() })
+                        }
+                        if (!pick && !reviewing) {
                             LinkButton(
                                 text = "Use as reference photos",
                                 onClick = { if (viewModel.useAsReferences()) onUseAsReferences() },
@@ -89,6 +96,7 @@ fun FolderDetailScreen(
                     title = title,
                     subtitle = when {
                         pick -> "Tap the photos of the person"
+                        reviewing -> "Reviewing what AI sorted here"
                         folder?.virtual == true -> "Empty folder"
                         else -> photosLabel(count)
                     },
@@ -98,12 +106,12 @@ fun FolderDetailScreen(
                         }
                     },
                     actions = {
-                        if (canAdd && !pick) {
+                        if (canAdd && !pick && !reviewing) {
                             IconButton(onClick = { pickLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
                                 Icon(Icons.Default.Add, contentDescription = "Add photos to this folder", tint = MaterialTheme.colorScheme.onSurface)
                             }
                         }
-                        if (!all && !pick) {
+                        if (!all && !pick && !reviewing) {
                             Column {
                                 IconButton(onClick = { menuOpen = true }) {
                                     Icon(Icons.Default.MoreVert, contentDescription = "More options", tint = MaterialTheme.colorScheme.onSurface)
@@ -131,6 +139,13 @@ fun FolderDetailScreen(
                     onUse = { if (viewModel.useAsReferences()) onUseAsReferences() },
                     modifier = Modifier.navigationBarsPadding()
                 )
+            } else if (reviewing) {
+                ReviewBar(
+                    count = selected.size,
+                    onWrong = { confirmWrong = true },
+                    onRight = { viewModel.looksRight() },
+                    modifier = Modifier.navigationBarsPadding()
+                )
             } else if (selecting) {
                 PhotoSelectionBar(
                     canModify = viewModel.supportsConsent,
@@ -145,10 +160,26 @@ fun FolderDetailScreen(
         GalleryGrid(
             rows = rows,
             selected = selected,
-            onOpen = { if (pick) viewModel.toggle(it) else onOpenPhoto(it) },
+            onOpen = { if (pick || reviewing) viewModel.toggle(it) else onOpenPhoto(it) },
             onToggle = { viewModel.toggle(it) },
             onToggleGroup = { viewModel.toggleGroup(it) },
             modifier = Modifier.padding(innerPadding),
+            aiLabels = aiLabels,
+            topContent = {
+                if (reviewing) {
+                    ReviewBanner(
+                        text = "Tap the photos the AI got wrong, then choose This is wrong",
+                        action = "Done",
+                        onAction = { viewModel.stopReview() }
+                    )
+                } else if (aiCount > 0 && !pick) {
+                    ReviewBanner(
+                        text = if (aiCount == 1) "1 photo here was sorted by AI" else "$aiCount photos here were sorted by AI",
+                        action = "Review",
+                        onAction = { viewModel.startReview() }
+                    )
+                }
+            },
             emptyContent = {
                 EmptyBlock(
                     title = if (folder?.virtual == true) "This folder is empty" else "No photos here",
@@ -189,6 +220,19 @@ fun FolderDetailScreen(
                 renaming = false
                 viewModel.renameFolder(it)
             }
+        )
+    }
+    if (confirmWrong) {
+        ConfirmDialog(
+            title = "Mark ${selected.size} ${if (selected.size == 1) "photo" else "photos"} as wrong?",
+            body = "Moved photos go back to where they were and copies are removed. Livora remembers these faces are not that person and becomes stricter about them.",
+            confirm = "This is wrong",
+            destructive = true,
+            onConfirm = {
+                confirmWrong = false
+                viewModel.markWrong()
+            },
+            onDismiss = { confirmWrong = false }
         )
     }
     if (confirmDelete) {

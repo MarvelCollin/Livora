@@ -9,6 +9,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.livora.data.people.FoldersState
 import com.example.livora.data.people.PeopleServices
 import com.example.livora.data.people.EnrollDraft
+import com.example.livora.data.people.db.AiMoveKind
+import com.example.livora.data.people.db.AiMoveRow
 import com.example.livora.data.people.media.FolderInfo
 import com.example.livora.data.people.media.MediaFolders
 import com.example.livora.data.people.media.MediaImage
@@ -74,15 +76,34 @@ class FolderDetailViewModel(application: Application, handle: SavedStateHandle) 
         .map { imagesOfFolder(key, it) }
         .stateIn(viewModelScope, SharingStarted.Eagerly, imagesOfFolder(key, folders.images.value))
 
+    val aiMoves: StateFlow<Map<Long, AiMoveRow>> = repository.aiMoves
+        .map { list -> list.associateBy { it.mediaId } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    val aiLabels: StateFlow<Map<Long, String>> = aiMoves
+        .map { map -> map.mapValues { it.value.personName.orEmpty() } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    val aiCount: StateFlow<Int> = combine(images, aiMoves) { list, ai -> list.count { it.id in ai } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, 0)
+
+    private val reviewState = MutableStateFlow(false)
+    val reviewing: StateFlow<Boolean> = reviewState.asStateFlow()
+
     val rows: StateFlow<List<GalleryRow>?> = combine(
         folders.state.map { it is FoldersState.Loading }.distinctUntilChanged(),
-        images
-    ) { loading, list ->
-        if (loading) null else GalleryGrouping.group(getApplication(), list)
+        images,
+        aiMoves,
+        reviewState
+    ) { loading, list, ai, review ->
+        if (loading) null else GalleryGrouping.group(getApplication(), if (review) list.filter { it.id in ai } else list)
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     init {
         reload()
+        viewModelScope.launch {
+            aiCount.collect { if (it == 0 && reviewState.value) reviewState.value = false }
+        }
     }
 
     fun reload() {
@@ -108,7 +129,54 @@ class FolderDetailViewModel(application: Application, handle: SavedStateHandle) 
     }
 
     fun selectAll() {
-        selectedState.value = images.value.map { it.id }.toSet()
+        val ai = aiMoves.value
+        val list = if (reviewState.value) images.value.filter { it.id in ai } else images.value
+        selectedState.value = list.map { it.id }.toSet()
+    }
+
+    fun startReview() {
+        selectedState.value = emptySet()
+        reviewState.value = true
+    }
+
+    fun stopReview() {
+        selectedState.value = emptySet()
+        reviewState.value = false
+    }
+
+    fun looksRight() {
+        val ids = selectedState.value.toList()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            repository.dropAiMoves(ids)
+            selectedState.value = emptySet()
+            Toaster.success(if (ids.size == 1) "Marked 1 photo as right" else "Marked ${ids.size} photos as right")
+        }
+    }
+
+    fun markWrong() {
+        val ai = aiMoves.value
+        val rows = selectedState.value.mapNotNull { ai[it] }
+        if (rows.isEmpty()) return
+        val moves = rows.filter { it.kind == AiMoveKind.MOVE }
+        val finish: suspend () -> Unit = {
+            if (moves.isNotEmpty()) {
+                for ((path, group) in moves.groupBy { it.fromPath.ifBlank { "Pictures/" } }) {
+                    MediaWriter.applyMove(getApplication(), group.map { it.mediaId }, path)
+                }
+                repository.syncPhotoDates(moves.map { it.mediaId })
+            }
+            repository.rejectAiMoves(rows)
+            selectedState.value = emptySet()
+            folders.refresh()
+            val who = rows.mapNotNull { it.personName }.distinct().firstOrNull()
+            Toaster.success(if (who == null) "Thanks, Livora will remember this" else "Thanks, Livora will be stricter about $who")
+        }
+        if (moves.isEmpty()) {
+            viewModelScope.launch { finish() }
+        } else {
+            requestConsent(MediaWriter.writeRequest(getApplication(), moves.map { it.mediaId }), finish)
+        }
     }
 
     fun toggleGroup(ids: List<Long>) {
