@@ -113,7 +113,8 @@ fun DictionaryScreen(
             item { EmptyState(onAdd = { isAdding = true }) }
         }
 
-        itemsIndexed(entries) { index, entry ->
+        itemsIndexed(entries, key = { _, it -> it.id }) { index, entry ->
+            Column(modifier = Modifier.animateItem()) {
             EntryRow(
                 entry = entry,
                 onDelete = { viewModel.deleteEntry(entry) }
@@ -124,6 +125,7 @@ fun DictionaryScreen(
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f),
                     thickness = 0.5.dp
                 )
+            }
             }
         }
 

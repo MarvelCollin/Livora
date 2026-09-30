@@ -1,5 +1,13 @@
 package com.example.livora.ui.people
 
+import com.example.livora.ui.components.pressScale
+import com.example.livora.ui.components.Motion
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.animateColorAsState
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -151,6 +159,16 @@ fun SegmentTabs(
     ) {
         labels.forEachIndexed { index, label ->
             val active = index == selected
+            val underline by animateFloatAsState(
+                targetValue = if (active) 1f else 0f,
+                animationSpec = tween(Motion.Medium, easing = Motion.EmphasizedDecelerate),
+                label = "tabUnderline"
+            )
+            val tint by animateColorAsState(
+                targetValue = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                animationSpec = Motion.quick(),
+                label = "tabTint"
+            )
             Column(
                 modifier = Modifier
                     .defaultMinSize(minHeight = 48.dp)
@@ -161,13 +179,14 @@ fun SegmentTabs(
                     text = label,
                     fontSize = 15.sp,
                     fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                    color = tint
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Box(
                     modifier = Modifier
                         .height(2.dp)
-                        .width(if (active) 28.dp else 0.dp)
+                        .width(28.dp)
+                        .graphicsLayer { scaleX = underline }
                         .background(MaterialTheme.colorScheme.primary)
                 )
             }
@@ -208,15 +227,23 @@ fun PrimaryAction(
     enabled: Boolean = true
 ) {
     val shape = RoundedCornerShape(12.dp)
+    val interaction = remember { MutableInteractionSource() }
     Box(
         modifier = modifier
+            .pressScale(interaction)
             .defaultMinSize(minHeight = 48.dp)
             .clip(shape)
             .background(
                 if (enabled) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
             )
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .clickable(
+                interactionSource = interaction,
+                indication = LocalIndication.current,
+                enabled = enabled,
+                role = Role.Button,
+                onClick = onClick
+            )
             .padding(horizontal = 20.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -237,12 +264,20 @@ fun OutlineAction(
     enabled: Boolean = true
 ) {
     val shape = RoundedCornerShape(12.dp)
+    val interaction = remember { MutableInteractionSource() }
     Box(
         modifier = modifier
+            .pressScale(interaction)
             .defaultMinSize(minHeight = 48.dp)
             .clip(shape)
             .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = if (enabled) 0.7f else 0.25f), shape)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .clickable(
+                interactionSource = interaction,
+                indication = LocalIndication.current,
+                enabled = enabled,
+                role = Role.Button,
+                onClick = onClick
+            )
             .padding(horizontal = 20.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
     ) {

@@ -1,5 +1,8 @@
 package com.example.livora.ui.components
 
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -85,13 +88,17 @@ fun SelectChip(
         label = "chipContent"
     )
 
+    val interaction = remember { MutableInteractionSource() }
     Column(
         modifier = modifier
+            .pressScale(interaction, 0.95f)
             .defaultMinSize(minHeight = if (icon != null) 56.dp else 48.dp)
             .clip(Design.chipShape)
             .background(bgColor)
             .selectable(
                 selected = selected,
+                interactionSource = interaction,
+                indication = LocalIndication.current,
                 enabled = enabled,
                 role = Role.RadioButton,
                 onClick = onClick

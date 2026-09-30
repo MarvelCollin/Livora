@@ -163,12 +163,14 @@ fun DocumentsScreen(onBack: () -> Unit, onOpenDocument: (Int) -> Unit) {
                 }
             } else {
                 items(shown, key = { it.id }) { doc ->
-                    DocumentRow(doc = doc, onClick = { onOpenDocument(doc.id) })
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 92.dp, end = Design.screenHorizontalPadding),
-                        color = MaterialTheme.colorScheme.outlineVariant,
-                        thickness = 0.5.dp
-                    )
+                    Column(modifier = Modifier.animateItem()) {
+                        DocumentRow(doc = doc, onClick = { onOpenDocument(doc.id) })
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 92.dp, end = Design.screenHorizontalPadding),
+                            color = MaterialTheme.colorScheme.outlineVariant,
+                            thickness = 0.5.dp
+                        )
+                    }
                 }
             }
             item(key = "end") { Spacer(modifier = Modifier.height(16.dp)) }

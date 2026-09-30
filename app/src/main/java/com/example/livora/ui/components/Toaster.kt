@@ -116,8 +116,8 @@ fun ToasterHost(modifier: Modifier = Modifier) {
             }
             AnimatedVisibility(
                 visibleState = item.transitionState,
-                enter = slideInVertically(animationSpec = tween(220)) { -it } + fadeIn(tween(220)),
-                exit = slideOutVertically(animationSpec = tween(180)) { -it } + fadeOut(tween(180))
+                enter = slideInVertically(animationSpec = Motion.enter()) { -it } + fadeIn(Motion.enter()),
+                exit = slideOutVertically(animationSpec = Motion.exit()) { -it } + fadeOut(Motion.exit())
             ) {
                 ToastCard(item)
             }
@@ -139,12 +139,7 @@ private fun ToastCard(item: ToastItem) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         when (item.type) {
-            ToastType.Success -> Icon(
-                imageVector = Icons.Default.CheckCircle,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = Color(0xFF22C55E)
-            )
+            ToastType.Success -> SuccessCheck(color = statusGood(), size = 26.dp)
             ToastType.Error -> Icon(
                 imageVector = Icons.Outlined.ErrorOutline,
                 contentDescription = null,

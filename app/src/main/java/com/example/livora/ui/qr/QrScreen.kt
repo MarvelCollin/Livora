@@ -142,7 +142,7 @@ private fun ScanPage() {
         }
         items(history.size, key = { "scan-$it" }) { index ->
             val record = history[index]
-            Column {
+            Column(modifier = Modifier.animateItem()) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

@@ -1,5 +1,12 @@
 package com.example.livora.ui.people
 
+import com.example.livora.ui.components.Motion
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.AnimatedVisibility
 import android.Manifest
 import android.content.Intent
 import android.net.Uri
@@ -616,6 +623,7 @@ private fun PeopleList(
                     )
                 }
                 items(ready.people, key = { it.id }) { person ->
+                    Column(modifier = Modifier.animateItem()) {
                     PersonRow(
                         person = person,
                         selecting = selecting,
@@ -631,6 +639,7 @@ private fun PeopleList(
                         color = MaterialTheme.colorScheme.outlineVariant,
                         thickness = 0.5.dp
                     )
+                    }
                 }
                 if (ready.smallCount > 0 && !showSmall) {
                     item(key = "small") {
@@ -817,15 +826,29 @@ private fun PersonRow(
 @Composable
 fun SelectMark(selected: Boolean, description: String, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(6.dp)
+    val fill by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+        animationSpec = Motion.quick(),
+        label = "markFill"
+    )
+    val line by animateColorAsState(
+        targetValue = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+        animationSpec = Motion.quick(),
+        label = "markLine"
+    )
     Box(
         modifier = modifier
             .size(24.dp)
             .clip(shape)
-            .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
-            .border(1.5.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, shape),
+            .background(fill)
+            .border(1.5.dp, line, shape),
         contentAlignment = Alignment.Center
     ) {
-        if (selected) {
+        AnimatedVisibility(
+            visible = selected,
+            enter = scaleIn(spring(dampingRatio = 0.55f, stiffness = 500f)) + fadeIn(Motion.quick()),
+            exit = fadeOut(Motion.quick())
+        ) {
             Icon(
                 imageVector = Icons.Default.Check,
                 contentDescription = description,

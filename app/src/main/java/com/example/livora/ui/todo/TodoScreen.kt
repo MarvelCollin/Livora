@@ -1,5 +1,21 @@
 package com.example.livora.ui.todo
 
+import com.example.livora.ui.components.Motion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.Path
+import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -145,7 +161,8 @@ fun TodoScreen(
             }
         }
 
-        itemsIndexed(stats) { index, item ->
+        itemsIndexed(stats, key = { _, it -> it.todo.id }) { index, item ->
+            Column(modifier = Modifier.animateItem()) {
             TodoRow(
                 stats = item,
                 remainingMs = runningTimers[item.todo.id],
@@ -166,9 +183,59 @@ fun TodoScreen(
                     thickness = 0.5.dp
                 )
             }
+            }
         }
 
         item { Spacer(modifier = Modifier.height(24.dp)) }
+    }
+}
+
+@Composable
+private fun TaskCheck(done: Boolean) {
+    val fill by animateFloatAsState(
+        targetValue = if (done) 1f else 0f,
+        animationSpec = tween(Motion.Medium, easing = Motion.EmphasizedDecelerate),
+        label = "taskFill"
+    )
+    val check by animateFloatAsState(
+        targetValue = if (done) 1f else 0f,
+        animationSpec = tween(Motion.Medium, delayMillis = 70, easing = Motion.EmphasizedDecelerate),
+        label = "taskCheck"
+    )
+    val pop = remember { Animatable(1f) }
+    LaunchedEffect(done) {
+        if (done) {
+            pop.snapTo(0.82f)
+            pop.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 380f))
+        }
+    }
+    val primary = MaterialTheme.colorScheme.primary
+    val outline = MaterialTheme.colorScheme.onSurfaceVariant
+    val onPrimary = MaterialTheme.colorScheme.onPrimary
+    Canvas(
+        modifier = Modifier
+            .size(24.dp)
+            .graphicsLayer {
+                scaleX = pop.value
+                scaleY = pop.value
+            }
+            .semantics { contentDescription = if (done) "Mark not done" else "Mark done" }
+    ) {
+        val stroke = 2.dp.toPx()
+        val r = size.minDimension / 2f - stroke / 2f
+        drawCircle(color = outline.copy(alpha = 1f - fill), radius = r, style = Stroke(stroke))
+        drawCircle(color = primary, radius = r * fill)
+        val w = size.width
+        val h = size.height
+        val full = Path().apply {
+            moveTo(w * 0.28f, h * 0.52f)
+            lineTo(w * 0.44f, h * 0.68f)
+            lineTo(w * 0.74f, h * 0.36f)
+        }
+        val measure = PathMeasure().apply { setPath(full, false) }
+        val part = Path()
+        measure.getSegment(0f, measure.length * check, part, true)
+        drawPath(part, onPrimary, style = Stroke(width = stroke * 1.2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
     }
 }
 
@@ -183,6 +250,7 @@ private fun TodoRow(
     onDelete: () -> Unit,
     onOpen: () -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -191,17 +259,13 @@ private fun TodoRow(
         verticalAlignment = Alignment.Top
     ) {
         IconButton(
-            onClick = onToggle,
+            onClick = {
+                if (!stats.isDoneCurrentInterval) haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                onToggle()
+            },
             modifier = Modifier.size(48.dp)
         ) {
-            Icon(
-                imageVector = if (stats.isDoneCurrentInterval) Icons.Default.CheckCircle else Icons.Outlined.Circle,
-                contentDescription = if (stats.isDoneCurrentInterval) "Mark not done" else "Mark done",
-                tint = if (stats.isDoneCurrentInterval)
-                    MaterialTheme.colorScheme.primary
-                else
-                    MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            TaskCheck(done = stats.isDoneCurrentInterval)
         }
 
         Spacer(modifier = Modifier.width(10.dp))

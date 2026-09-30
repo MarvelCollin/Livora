@@ -1,5 +1,17 @@
 package com.example.livora.ui.expenses
 
+import kotlinx.coroutines.delay
+import com.example.livora.ui.components.statusGood
+import com.example.livora.ui.components.pressScale
+import com.example.livora.ui.components.SuccessCheck
+import com.example.livora.ui.components.Motion
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -52,6 +64,7 @@ fun AddExpenseSheet(onDismiss: () -> Unit) {
     var category by remember { mutableStateOf(categoryNames.first()) }
     var account by remember { mutableStateOf(accountNames.first()) }
     var note by remember { mutableStateOf("") }
+    var saved by remember { mutableStateOf(false) }
     val amount = digits.toLongOrNull() ?: 0L
 
     ModalBottomSheet(
@@ -59,7 +72,12 @@ fun AddExpenseSheet(onDismiss: () -> Unit) {
         sheetState = state,
         containerColor = MaterialTheme.colorScheme.surface
     ) {
-        Column(
+        AnimatedContent(
+            targetState = saved,
+            transitionSpec = { fadeIn(Motion.enter()) togetherWith fadeOut(Motion.exit()) },
+            label = "expenseSheet"
+        ) { done ->
+        if (done) SavedState(onFinished = onDismiss) else Column(
             modifier = Modifier
                 .navigationBarsPadding()
                 .verticalScroll(rememberScrollState())
@@ -124,14 +142,42 @@ fun AddExpenseSheet(onDismiss: () -> Unit) {
             PrimaryAction(
                 text = "Save expense",
                 enabled = amount > 0,
-                onClick = {
-                    Toaster.info("This is a preview. The expense is not saved yet.")
-                    onDismiss()
-                },
+                onClick = { saved = true },
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(16.dp))
         }
+        }
+    }
+}
+
+@Composable
+private fun SavedState(onFinished: () -> Unit) {
+    LaunchedEffect(Unit) {
+        delay(1400)
+        onFinished()
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 20.dp, vertical = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        SuccessCheck(color = statusGood(), size = 88.dp)
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "Expense added",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = "This is a preview, so nothing was saved.",
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp)
+        )
     }
 }
 
@@ -160,10 +206,17 @@ private fun Keypad(onDigit: (String) -> Unit, onBackspace: () -> Unit) {
 
 @Composable
 private fun KeypadKey(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val interaction = remember { MutableInteractionSource() }
     Box(
         modifier = modifier
+            .pressScale(interaction, 0.9f)
             .heightIn(min = 56.dp)
-            .clickable(role = Role.Button, onClick = onClick),
+            .clickable(
+                interactionSource = interaction,
+                indication = LocalIndication.current,
+                role = Role.Button,
+                onClick = onClick
+            ),
         contentAlignment = Alignment.Center
     ) {
         if (label == "back") {

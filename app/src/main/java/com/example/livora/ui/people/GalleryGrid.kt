@@ -93,7 +93,8 @@ fun GalleryGrid(
                     isSelected = row.image.id in selected,
                     selecting = selecting,
                     onOpen = { onOpen(row.image.id) },
-                    onToggle = { onToggle(row.image.id) }
+                    onToggle = { onToggle(row.image.id) },
+                    modifier = Modifier.animateItem()
                 )
             }
         }
@@ -143,12 +144,13 @@ private fun PhotoCell(
     isSelected: Boolean,
     selecting: Boolean,
     onOpen: () -> Unit,
-    onToggle: () -> Unit
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
     val inset by animateDpAsState(targetValue = if (isSelected) 10.dp else 0.dp, label = "photoInset")
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .aspectRatio(1f)
             .then(if (isSelected) Modifier.background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)) else Modifier)

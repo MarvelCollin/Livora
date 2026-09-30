@@ -1,5 +1,10 @@
 package com.example.livora.ui.navigation
 
+import com.example.livora.ui.components.Motion
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.fadeIn
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -33,7 +38,19 @@ fun AppNavHost(navController: NavHostController) {
 
     NavHost(
         navController = navController,
-        startDestination = Screen.Main.route
+        startDestination = Screen.Main.route,
+        enterTransition = {
+            slideInHorizontally(Motion.enter()) { it / 8 } + fadeIn(Motion.enter())
+        },
+        exitTransition = {
+            slideOutHorizontally(Motion.exit()) { -it / 12 } + fadeOut(Motion.exit())
+        },
+        popEnterTransition = {
+            slideInHorizontally(Motion.enter()) { -it / 12 } + fadeIn(Motion.enter())
+        },
+        popExitTransition = {
+            slideOutHorizontally(Motion.exit()) { it / 8 } + fadeOut(Motion.exit())
+        }
     ) {
         composable(Screen.Main.route) {
             MainScreen(
