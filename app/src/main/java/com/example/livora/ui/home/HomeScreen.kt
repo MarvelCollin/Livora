@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.livora.data.ir.AcBrands
 import com.example.livora.data.model.AcMode
 import com.example.livora.data.model.BulbScene
 import com.example.livora.data.model.TodoStats
@@ -72,6 +73,7 @@ fun HomeScreen(
     onOpenTodoDetail: (String) -> Unit
 ) {
     val acState by acViewModel.acState.collectAsState()
+    val acRemote by acViewModel.remote.collectAsState()
     val bulbState by bulbViewModel.bulbState.collectAsState()
     val connectedBulb by bulbViewModel.connectedBulb.collectAsState()
     val stats by todoViewModel.stats.collectAsState()
@@ -79,18 +81,14 @@ fun HomeScreen(
     val todoLoading by todoViewModel.isLoading.collectAsState()
 
     val activateNormalMode = {
-        acViewModel.setTemperature(20)
-        acViewModel.setMode(AcMode.COOL)
-        acViewModel.powerOn()
+        acViewModel.applyScene(20, AcMode.COOL)
         bulbViewModel.powerOn()
         bulbViewModel.setBrightness(100)
         bulbViewModel.setScene(BulbScene.COOL_WHITE)
     }
 
     val activateSleepMode = {
-        acViewModel.setTemperature(20)
-        acViewModel.setMode(AcMode.COOL)
-        acViewModel.powerOn()
+        acViewModel.applyScene(20, AcMode.COOL)
         bulbViewModel.powerOff()
     }
 
@@ -196,7 +194,7 @@ fun HomeScreen(
                     Box(modifier = Modifier.weight(1f)) {
                         DeviceCard(
                             name = "Air conditioner",
-                            brand = "LG",
+                            brand = AcBrands.find(acRemote.brandId).name,
                             isOn = acState.isPoweredOn,
                             statusText = if (acState.isPoweredOn) "${acState.temperature}°C · ${acState.mode.name.lowercase().replaceFirstChar { it.uppercase() }}" else "Off",
                             icon = { modifier ->
