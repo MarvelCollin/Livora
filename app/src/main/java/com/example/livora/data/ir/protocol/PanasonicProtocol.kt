@@ -38,7 +38,7 @@ class PanasonicProtocol(private val variant: PanasonicVariant) : AcProtocol {
         return listOf(signal(buildState(state)))
     }
 
-    private fun buildState(state: AcState): IntArray {
+    internal fun buildState(state: AcState): IntArray {
         val bytes = KNOWN_GOOD_STATE.copyOf()
         bytes[13] = bytes[13] and 0xF0
         bytes[17] = 0x00

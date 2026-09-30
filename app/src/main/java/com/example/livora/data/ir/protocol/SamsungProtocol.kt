@@ -31,10 +31,20 @@ class SamsungProtocol : AcProtocol {
     override fun encode(state: AcState, previous: AcState, change: AcChange): List<IrSignal> {
         if (!state.isPoweredOn && change != AcChange.POWER) return emptyList()
         if (change == AcChange.SLEEP || change == AcChange.ECO) return emptyList()
-        val standard = buildState(state)
         val needsExtended = forceExtended || state.isPoweredOn != previous.isPoweredOn
         forceExtended = false
-        return listOf(if (needsExtended) extendedSignal(standard) else signal(standard))
+        return listOf(signal(if (needsExtended) extendedBytes(state) else standardBytes(state)))
+    }
+
+    internal fun standardBytes(state: AcState): IntArray = applyChecksums(buildState(state))
+
+    internal fun extendedBytes(state: AcState): IntArray {
+        val standard = buildState(state)
+        val extended = IntArray(SECTION_LENGTH * 3)
+        standard.copyInto(extended, 0, 0, SECTION_LENGTH)
+        EXTENDED_MIDDLE.copyInto(extended, SECTION_LENGTH)
+        standard.copyInto(extended, SECTION_LENGTH * 2, SECTION_LENGTH, SECTION_LENGTH * 2)
+        return applyChecksums(extended)
     }
 
     private fun buildState(state: AcState): IntArray {
@@ -79,24 +89,16 @@ class SamsungProtocol : AcProtocol {
         return (sum xor 0xFF) and 0xFF
     }
 
-    private fun applyChecksums(bytes: IntArray) {
+    private fun applyChecksums(bytes: IntArray): IntArray {
         for (offset in 0 until bytes.size step SECTION_LENGTH) {
             val checksum = sectionChecksum(bytes, offset)
             bytes[offset + 1] = (bytes[offset + 1] and 0x0F) or ((checksum and 0x0F) shl 4)
             bytes[offset + 2] = (bytes[offset + 2] and 0xF0) or ((checksum shr 4) and 0x0F)
         }
-    }
-
-    private fun extendedSignal(standard: IntArray): IrSignal {
-        val extended = IntArray(SECTION_LENGTH * 3)
-        standard.copyInto(extended, 0, 0, SECTION_LENGTH)
-        EXTENDED_MIDDLE.copyInto(extended, SECTION_LENGTH)
-        standard.copyInto(extended, SECTION_LENGTH * 2, SECTION_LENGTH, SECTION_LENGTH * 2)
-        return signal(extended)
+        return bytes
     }
 
     private fun signal(bytes: IntArray): IrSignal {
-        applyChecksums(bytes)
         val builder = IrPulseBuilder(38000)
         builder.header(690, 17844)
         for (offset in 0 until bytes.size step SECTION_LENGTH) {

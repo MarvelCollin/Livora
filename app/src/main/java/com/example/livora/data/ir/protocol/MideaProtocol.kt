@@ -66,7 +66,7 @@ class MideaProtocol : AcProtocol {
         return body or checksum(body).toLong()
     }
 
-    private fun checksum(code: Long): Int {
+    internal fun checksum(code: Long): Int {
         var sum = 0
         for (index in 1..5) {
             sum += ((code shr (index * 8)) and 0xFFL).toInt().reverseByte()

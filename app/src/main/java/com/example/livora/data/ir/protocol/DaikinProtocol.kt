@@ -32,7 +32,7 @@ class DaikinProtocol : AcProtocol {
         return listOf(signal(buildState(state)))
     }
 
-    private fun buildState(state: AcState): IntArray {
+    internal fun buildState(state: AcState): IntArray {
         val bytes = IntArray(STATE_LENGTH)
         bytes[0] = 0x11
         bytes[1] = 0xDA
