@@ -136,6 +136,48 @@ object MediaWriter {
         }
     }
 
+    suspend fun copyFromUris(
+        context: Context,
+        uris: List<Uri>,
+        relativePath: String,
+        onProgress: (Int) -> Unit = {}
+    ): List<Long> = withContext(Dispatchers.IO) {
+        val created = ArrayList<Long>()
+        var done = 0
+        for (uri in uris) {
+            val name = displayNameOf(context, uri) ?: "IMG_${System.currentTimeMillis()}_$done.jpg"
+            val mime = context.contentResolver.getType(uri) ?: "image/jpeg"
+            val input = try {
+                context.contentResolver.openInputStream(uri)
+            } catch (e: Exception) {
+                null
+            }
+            if (input != null) {
+                val id = input.use { stream ->
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        copyScoped(context, stream, name, mime, relativePath, 0L)
+                    } else {
+                        copyLegacy(context, stream, name, mime, relativePath, 0L)
+                    }
+                }
+                if (id != null) created.add(id)
+            }
+            done++
+            onProgress(done)
+        }
+        created
+    }
+
+    private fun displayNameOf(context: Context, uri: Uri): String? {
+        return try {
+            context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                if (c.moveToFirst()) c.getString(0) else null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     fun writeRequest(context: Context, ids: List<Long>): IntentSender? {
         if (!supportsConsentRequests || ids.isEmpty()) return null
         return MediaStore.createWriteRequest(context.contentResolver, ids.map { MediaImages.uri(it) }).intentSender

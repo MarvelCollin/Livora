@@ -23,6 +23,22 @@ class AnalyzerHolder(private val context: Context) {
     }
 }
 
+object EnrollDraft {
+    var uris: List<android.net.Uri> = emptyList()
+    var personId: Long? = null
+
+    fun set(uris: List<android.net.Uri>, personId: Long? = null) {
+        this.uris = uris
+        this.personId = personId
+    }
+
+    fun take(): List<android.net.Uri> {
+        val out = uris
+        uris = emptyList()
+        return out
+    }
+}
+
 class PeopleServices private constructor(context: Context) {
 
     val app: Context = context.applicationContext
@@ -32,6 +48,8 @@ class PeopleServices private constructor(context: Context) {
     val clustering = ClusteringService(database, prefs)
     val folders = FoldersRepository(app, database)
     val repository = PeopleRepository(app, database, prefs, clustering, analyzer, folders)
+    val copyRunner = CopyRunner(repository, folders)
+    val backup = com.example.livora.data.people.backup.PeopleBackup(app, database, prefs)
     val scanner = GalleryScanner(app, database, prefs, analyzer, clustering, repository)
 
     companion object {

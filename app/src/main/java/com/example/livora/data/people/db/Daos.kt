@@ -92,6 +92,9 @@ class PersonCountRow(val personId: Long, val photoCount: Int)
 @Dao
 interface PhotoDao {
 
+    @Query("SELECT * FROM photos")
+    suspend fun all(): List<PhotoEntity>
+
     @Query("SELECT mediaId, dateModified, size, status, pipelineVersion, retryCount FROM photos")
     suspend fun index(): List<PhotoIndexRow>
 
@@ -141,6 +144,15 @@ interface FaceDao {
     @Insert
     suspend fun insertAll(faces: List<FaceEntity>): List<Long>
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun restoreAll(faces: List<FaceEntity>)
+
+    @Query("SELECT * FROM faces ORDER BY id LIMIT :limit OFFSET :offset")
+    suspend fun page(limit: Int, offset: Int): List<FaceEntity>
+
+    @Query("DELETE FROM faces")
+    suspend fun clear()
+
     @Query("SELECT COUNT(*) FROM faces")
     fun observeCount(): Flow<Int>
 
@@ -185,6 +197,9 @@ interface FaceDao {
 
     @Query("SELECT id FROM faces WHERE personId = :personId")
     suspend fun idsOfPerson(personId: Long): List<Long>
+
+    @Query("SELECT id FROM faces WHERE personId = :personId ORDER BY quality DESC LIMIT :limit")
+    suspend fun topFaceIds(personId: Long, limit: Int): List<Long>
 
     @Query("SELECT id FROM faces WHERE personId = :personId AND mediaId IN (:mediaIds)")
     suspend fun idsOfPersonInMedia(personId: Long, mediaIds: List<Long>): List<Long>
@@ -256,6 +271,12 @@ interface PersonDao {
     @Query("SELECT * FROM persons")
     suspend fun all(): List<PersonEntity>
 
+    @Query("DELETE FROM persons")
+    suspend fun clear()
+
+    @Query("DELETE FROM persons WHERE kind = 0 AND name IS NULL AND pinned = 0 AND linkedFolderPath IS NULL")
+    suspend fun deleteUnlockedAuto()
+
     @Query("SELECT * FROM persons WHERE linkMode = :mode AND linkedFolderPath IS NOT NULL")
     suspend fun withLinkMode(mode: Int): List<PersonEntity>
 
@@ -326,6 +347,15 @@ interface ReferenceDao {
     @Query("SELECT * FROM person_references WHERE personId = :personId ORDER BY quality DESC")
     suspend fun ofPerson(personId: Long): List<ReferenceEntity>
 
+    @Query("SELECT * FROM person_references")
+    suspend fun all(): List<ReferenceEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun restoreAll(references: List<ReferenceEntity>)
+
+    @Query("DELETE FROM person_references")
+    suspend fun clear()
+
     @Query("SELECT * FROM person_references WHERE personId = :personId ORDER BY quality DESC")
     fun observeOfPerson(personId: Long): Flow<List<ReferenceEntity>>
 
@@ -363,6 +393,9 @@ interface RejectionDao {
     @Query("SELECT * FROM rejections")
     suspend fun all(): List<RejectionEntity>
 
+    @Query("DELETE FROM rejections")
+    suspend fun clear()
+
     @Query("SELECT * FROM rejections WHERE personId = :personId")
     suspend fun ofPerson(personId: Long): List<RejectionEntity>
 
@@ -384,6 +417,12 @@ interface LinkedCopyDao {
 
     @Query("SELECT mediaId FROM linked_copies WHERE personId = :personId")
     suspend fun mediaOf(personId: Long): List<Long>
+
+    @Query("SELECT * FROM linked_copies")
+    suspend fun all(): List<LinkedCopyEntity>
+
+    @Query("DELETE FROM linked_copies")
+    suspend fun clear()
 
     @Query("DELETE FROM linked_copies WHERE personId = :personId")
     suspend fun deleteOfPerson(personId: Long)
@@ -413,6 +452,9 @@ interface VirtualFolderDao {
     @Query("DELETE FROM virtual_folders WHERE id = :id")
     suspend fun delete(id: Long)
 
+    @Query("DELETE FROM virtual_folders")
+    suspend fun clear()
+
     @Query("DELETE FROM virtual_folders WHERE relativePath = :path")
     suspend fun deleteByPath(path: String)
 
@@ -431,6 +473,9 @@ interface SeparationDao {
 
     @Query("DELETE FROM person_separations WHERE personA = :id OR personB = :id")
     suspend fun deleteOfPerson(id: Long)
+
+    @Query("DELETE FROM person_separations")
+    suspend fun clear()
 
     @Query("DELETE FROM person_separations WHERE (personA = :a AND personB = :b) OR (personA = :b AND personB = :a)")
     suspend fun remove(a: Long, b: Long)

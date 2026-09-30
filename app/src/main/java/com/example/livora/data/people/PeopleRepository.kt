@@ -80,6 +80,16 @@ class FaceStateSnapshot(val faceId: Long, val personId: Long?, val locked: Boole
 
 class UndoToken(val restore: suspend () -> Unit)
 
+class SamePersonResult(val targetId: Long, val merged: Int, val undo: UndoToken)
+
+class IndexStatus(
+    val indexedPhotos: Int,
+    val faces: Int,
+    val failedPhotos: Int,
+    val lastScanAt: Long,
+    val lastNewPhotos: Int
+)
+
 class PeopleRepository(
     private val context: Context,
     private val database: PeopleDatabase,
@@ -113,11 +123,109 @@ class PeopleRepository(
     suspend fun rename(id: Long, name: String?) {
         val cleaned = name?.trim()?.takeIf { it.isNotEmpty() }
         database.persons().rename(id, cleaned)
+        if (cleaned != null && database.references().count(id) == 0) addExemplarReferences(id, 8)
+    }
+
+    suspend fun addExemplarReferences(personId: Long, limit: Int): List<Long> = withContext(Dispatchers.IO) {
+        val members = database.faces().vectorsOfPerson(personId)
+            .map { FaceRecord(it.id, VectorMath.fromBytes(it.embedding), it.quality, it.mediaId) }
+        val existing = database.references().ofPerson(personId)
+        val room = MAX_REFERENCES - existing.size
+        if (room <= 0) return@withContext emptyList()
+        val vectors = existing.map { VectorMath.fromBytes(it.embedding) }.toMutableList()
+        val chosen = PersonMatcher.selectPrototypes(members, limit = minOf(limit, room))
+        val now = System.currentTimeMillis()
+        val entities = ArrayList<ReferenceEntity>()
+        for (face in chosen) {
+            if (vectors.isNotEmpty() && PersonMatcher.bestScore(face.vector, vectors) > REFERENCE_DUPLICATE) continue
+            vectors.add(face.vector)
+            entities.add(ReferenceEntity(personId = personId, embedding = VectorMath.toBytes(face.vector), quality = face.quality, faceId = face.id, createdAt = now))
+        }
+        if (entities.isEmpty()) emptyList() else database.references().insertAll(entities)
+    }
+
+    suspend fun samePerson(personIds: List<Long>): SamePersonResult? = withContext(Dispatchers.IO) {
+        val summaries = personIds.distinct().mapNotNull { database.persons().summary(it) }
+        if (summaries.size < 2) return@withContext null
+        val target = summaries.sortedWith(
+            compareByDescending<PersonSummary> { it.name != null }.thenByDescending { it.photoCount }
+        ).first()
+        val others = summaries.filter { it.id != target.id }
+        val undos = ArrayList<UndoToken>()
+        for (other in others) mergePeople(target.id, other.id)?.let { undos.add(it) }
+        val before = database.persons().byId(target.id)
+        val wasPinned = before?.pinned == true
+        database.persons().setPinned(target.id, true)
+        val added = addExemplarReferences(target.id, 8)
+        SamePersonResult(
+            target.id,
+            others.size,
+            UndoToken {
+                if (added.isNotEmpty()) database.references().deleteIds(added)
+                for (undo in undos.reversed()) undo.restore()
+                if (!wasPinned) database.persons().setPinned(target.id, false)
+            }
+        )
+    }
+
+    suspend fun mergeGroups(pairs: List<Pair<Long, Long>>): UndoToken? = withContext(Dispatchers.IO) {
+        val parent = HashMap<Long, Long>()
+        fun find(x: Long): Long {
+            var root = x
+            while (parent[root] != null && parent[root] != root) root = parent.getValue(root)
+            parent[x] = root
+            return root
+        }
+        for ((a, b) in pairs) {
+            parent.putIfAbsent(a, a)
+            parent.putIfAbsent(b, b)
+            val ra = find(a)
+            val rb = find(b)
+            if (ra != rb) parent[ra] = rb
+        }
+        val groups = parent.keys.groupBy { find(it) }.values.filter { it.size > 1 }
+        val undos = ArrayList<UndoToken>()
+        for (group in groups) samePerson(group)?.let { undos.add(it.undo) }
+        if (undos.isEmpty()) null else UndoToken { for (undo in undos.reversed()) undo.restore() }
+    }
+
+    suspend fun separate(a: Long, b: Long): UndoToken = withContext(Dispatchers.IO) {
+        val low = minOf(a, b)
+        val high = maxOf(a, b)
+        database.separations().insert(com.example.livora.data.people.db.SeparationEntity(low, high))
+        UndoToken { database.separations().remove(low, high) }
+    }
+
+    suspend fun indexStatus(): IndexStatus = withContext(Dispatchers.IO) {
+        IndexStatus(
+            indexedPhotos = database.photos().count(),
+            faces = database.faces().count(),
+            failedPhotos = database.photos().failedCount(),
+            lastScanAt = prefs.lastScanFinishedAt,
+            lastNewPhotos = prefs.lastScanNewCount
+        )
+    }
+
+    suspend fun resetIndex() = withContext(Dispatchers.IO) {
+        database.withTransaction {
+            database.faces().clear()
+            database.photos().clear()
+            database.rejections().clear()
+            database.persons().deleteUnlockedAuto()
+        }
+        prefs.initialScanDone = false
+        prefs.groupingPending = false
+        prefs.lastGeneration = -1L
+        prefs.lastMediaCount = -1
     }
 
     suspend fun setHidden(id: Long, hidden: Boolean) = database.persons().setHidden(id, hidden)
 
     suspend fun photoCount(id: Long): Int = database.faces().photoCount(id)
+
+    suspend fun topFaceIds(personId: Long, limit: Int): List<Long> = database.faces().topFaceIds(personId, limit)
+
+    suspend fun mergeSuggestions(): List<MergeSuggestion> = clustering.suggestMerges()
 
     suspend fun mediaIdsOfPerson(id: Long): List<Long> =
         database.faces().mediaOfPerson(id).distinct()
@@ -401,6 +509,13 @@ class PeopleRepository(
             )
         }
         return result
+    }
+
+    suspend fun undoCopies(personId: Long?, result: CopyResult) = withContext(Dispatchers.IO) {
+        val newIds = result.created.map { it.second }
+        MediaWriter.deleteOwned(context, newIds)
+        if (newIds.isNotEmpty()) database.photos().deleteByIds(newIds)
+        if (personId != null) database.linkedCopies().remove(personId, result.created.map { it.first })
     }
 
     suspend fun registerCopies(newIds: List<Long>) = withContext(Dispatchers.IO) {

@@ -14,6 +14,10 @@ object ScanController {
     private const val UNIQUE_NAME = "people_scan"
     private const val PERIODIC_NAME = "people_scan_periodic"
 
+    fun startIfNeeded(context: Context, prefs: com.example.livora.data.people.PeoplePrefs) {
+        if (com.example.livora.data.people.media.MediaChange.hasChanged(context, prefs)) start(context)
+    }
+
     fun start(context: Context) {
         val request = OneTimeWorkRequestBuilder<FaceScanWorker>()
             .addTag(UNIQUE_NAME)

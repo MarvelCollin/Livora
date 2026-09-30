@@ -36,7 +36,9 @@ class ScanPlan(
     val eligibleTotal: Int,
     val alreadyScanned: Int,
     val runStartedAt: Long,
-    val index: Map<Long, PhotoIndexRow>
+    val index: Map<Long, PhotoIndexRow>,
+    val generation: Long = -1L,
+    val mediaCount: Int = 0
 ) {
     val isEmpty: Boolean get() = pending.isEmpty()
 }
@@ -76,6 +78,7 @@ class GalleryScanner(
 
     suspend fun prepare(): ScanPlan = withContext(Dispatchers.IO) {
         ScanStatus.publish(ScanProgress(phase = ScanPhase.Preparing))
+        val generation = com.example.livora.data.people.media.MediaChange.generation(context)
         val all = MediaImages.queryAll(context)
         val index = database.photos().index().associateBy { it.mediaId }
         val plan = ScanPlanner.plan(all, index, prefs.skipScreenshots)
@@ -87,7 +90,9 @@ class GalleryScanner(
             plan.eligible.size,
             plan.eligible.size - plan.pending.size,
             System.currentTimeMillis(),
-            index
+            index,
+            generation,
+            all.size
         )
     }
 
@@ -285,13 +290,15 @@ class GalleryScanner(
         )
         prefs.groupingPending = false
         prefs.initialScanDone = true
+        prefs.lastScanNewCount = result.processed
+        com.example.livora.data.people.media.MediaChange.remember(context, prefs, plan.generation, plan.mediaCount)
         prefs.lastScanFinishedAt = System.currentTimeMillis()
         val total = database.photos().count()
         ScanStatus.publish(
             ScanProgress(ScanPhase.Done, plan.eligibleTotal, plan.eligibleTotal, database.faces().count(), 0f)
         )
         Log.i(TAG, "indexedPhotos=$total")
-        if (com.example.livora.BuildConfig.DEBUG) Diagnostics.run(context, database)
+        if (com.example.livora.BuildConfig.DEBUG) Diagnostics.run(database)
         analyzer.release()
     }
 

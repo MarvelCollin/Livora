@@ -32,7 +32,9 @@ class FaceScanWorker(context: Context, params: WorkerParameters) : CoroutineWork
         return try {
             val plan = services.scanner.prepare()
             if (plan.isEmpty && !services.prefs.groupingPending) {
-                if (com.example.livora.BuildConfig.DEBUG) Diagnostics.run(applicationContext, services.database)
+                com.example.livora.data.people.media.MediaChange.remember(applicationContext, services.prefs, plan.generation, plan.mediaCount)
+                services.prefs.initialScanDone = true
+                if (com.example.livora.BuildConfig.DEBUG) Diagnostics.run(services.database)
                 ScanStatus.publish(ScanProgress(ScanPhase.Done, plan.eligibleTotal, plan.eligibleTotal))
                 return Result.success()
             }

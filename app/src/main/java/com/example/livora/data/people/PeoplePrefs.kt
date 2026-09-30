@@ -25,6 +25,18 @@ class PeoplePrefs(context: Context) {
         get() = prefs.getLong(KEY_LAST_FINISHED, 0L)
         set(value) = prefs.edit().putLong(KEY_LAST_FINISHED, value).apply()
 
+    var lastScanNewCount: Int
+        get() = prefs.getInt(KEY_LAST_NEW, 0)
+        set(value) = prefs.edit().putInt(KEY_LAST_NEW, value).apply()
+
+    var lastGeneration: Long
+        get() = prefs.getLong(KEY_LAST_GENERATION, -1L)
+        set(value) = prefs.edit().putLong(KEY_LAST_GENERATION, value).apply()
+
+    var lastMediaCount: Int
+        get() = prefs.getInt(KEY_LAST_MEDIA_COUNT, -1)
+        set(value) = prefs.edit().putInt(KEY_LAST_MEDIA_COUNT, value).apply()
+
     var groupingPending: Boolean
         get() = prefs.getBoolean(KEY_GROUPING_PENDING, false)
         set(value) = prefs.edit().putBoolean(KEY_GROUPING_PENDING, value).apply()
@@ -52,6 +64,9 @@ class PeoplePrefs(context: Context) {
         private const val KEY_INITIAL_DONE = "initial_scan_done"
         private const val KEY_SCAN_TOTAL = "scan_total"
         private const val KEY_GROUPING_PENDING = "grouping_pending"
+        private const val KEY_LAST_NEW = "last_new"
+        private const val KEY_LAST_GENERATION = "last_generation"
+        private const val KEY_LAST_MEDIA_COUNT = "last_media_count"
         private const val KEY_STRICTNESS = "strictness"
         private const val KEY_LAST_FINISHED = "last_finished"
         private const val KEY_SKIP_SCREENSHOTS = "skip_screenshots"

@@ -1,12 +1,10 @@
 package com.example.livora.data.people.scan
 
-import android.content.Context
 import android.util.Log
 import com.example.livora.data.people.cluster.ClusterParams
 import com.example.livora.data.people.cluster.FaceClusterer
 import com.example.livora.data.people.cluster.FaceRecord
 import com.example.livora.data.people.db.PeopleDatabase
-import com.example.livora.data.people.media.MediaImages
 import com.example.livora.data.people.ml.VectorMath
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -15,10 +13,8 @@ object Diagnostics {
 
     private const val TAG = "PeopleDiag"
 
-    suspend fun run(context: Context, database: PeopleDatabase) = withContext(Dispatchers.Default) {
-        lfwReport(context, database)
-        val lfwIds = MediaImages.queryAll(context).filter { it.relativePath.contains("LfwTest", ignoreCase = true) }.map { it.id }.toHashSet()
-        val rows = database.faces().allForDiagnostics().filter { it.mediaId !in lfwIds }
+    suspend fun run(database: PeopleDatabase) = withContext(Dispatchers.Default) {
+        val rows = database.faces().allForDiagnostics()
         val n = rows.size
         if (n < 2) return@withContext
         val vectors = Array(n) { VectorMath.fromBytes(rows[it].embedding) }
@@ -104,80 +100,6 @@ object Diagnostics {
                     "ge2=${counts.count { it >= 2 }} singletons=${counts.count { it == 1 }} largest=${counts.take(6)} " +
                     "unassigned=${outcome.assignments.values.count { it == null }} ms=$elapsed"
             )
-        }
-        val gate = ClusterParams.forStrictness(0.4f)
-        var t = 0L
-        val cl = FaceClusterer(gate, emptyList(), emptyMap(), emptySet()) { --t }
-        val res = cl.assign(records).merge().refine().outcome()
-        val members = HashMap<Long, MutableList<FaceRecord>>()
-        val byFace = records.associateBy { it.id }
-        for ((f, c) in res.assignments) if (c != null) members.getOrPut(c) { ArrayList() }.add(byFace.getValue(f))
-        val top = members.entries.sortedByDescending { it.value.size }.take(10)
-        Log.i(TAG, "topClusters=" + top.joinToString(",") { "${it.key}:${it.value.size}f/${it.value.map { m -> m.photoId }.toSet().size}p/coh=${"%.2f".format(com.example.livora.data.people.cluster.Linkage.centroidOf(it.value).let { c -> it.value.map { m -> VectorMath.dot(m.vector, c) }.average() })}" })
-        for (i in top.indices) {
-            val line = StringBuilder()
-            for (j in top.indices) {
-                if (j <= i) continue
-                val a = top[i].value
-                val b = top[j].value
-                val link = com.example.livora.data.people.cluster.Linkage.between(a, b)
-                val pa = a.map { it.photoId }.toSet()
-                val co = b.count { it.photoId in pa }
-                line.append("[${i}-${j} link=${"%.2f".format(link)} co=$co] ")
-            }
-            Log.i(TAG, "rel $line")
-        }
-    }
-
-    private suspend fun lfwReport(context: Context, database: PeopleDatabase) {
-        val lfw = MediaImages.queryAll(context).filter { it.relativePath.contains("LfwTest", ignoreCase = true) }
-        if (lfw.isEmpty()) return
-        val labelOf = lfw.associate { it.id to (it.displayName ?: "").substringBefore("__") }
-        val nameOf = lfw.associate { it.id to (it.displayName ?: "") }
-        val rows = database.faces().allForDiagnostics().filter { it.mediaId in labelOf }
-        val best = HashMap<Long, com.example.livora.data.people.db.FaceDiagRow>()
-        for (row in rows) {
-            val current = best[row.mediaId]
-            if (current == null || row.quality > current.quality) best[row.mediaId] = row
-        }
-        val faces = best.values.toList()
-        val labels = faces.map { labelOf.getValue(it.mediaId) }
-        Log.i(TAG, "lfw images=${lfw.size} withFace=${faces.size} identities=${labels.toSet().size}")
-        val records = faces.map { FaceRecord(it.id, VectorMath.fromBytes(it.embedding), it.quality, it.mediaId) }
-        val truth = HashMap<Long, String>()
-        for (i in faces.indices) truth[faces[i].id] = labels[i]
-        val counts = labels.groupingBy { it }.eachCount()
-        val big = counts.filter { it.value >= 12 }.keys
-        var samePairsAll = 0L
-        for (c in counts.values) samePairsAll += c.toLong() * (c - 1) / 2
-        for (s in listOf(0f, 0.2f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 1f)) {
-            var temp = 0L
-            val params = ClusterParams.forStrictness(s)
-            val outcome = FaceClusterer(params, emptyList(), emptyMap(), emptySet()) { --temp }
-                .assign(records).merge().refine().outcome()
-            val clusters = HashMap<Long, MutableList<String>>()
-            for ((f, c) in outcome.assignments) if (c != null) clusters.getOrPut(c) { ArrayList() }.add(truth.getValue(f))
-            var samePairsIn = 0L
-            var pairsIn = 0L
-            for (members in clusters.values) {
-                pairsIn += members.size.toLong() * (members.size - 1) / 2
-                for (c in members.groupingBy { it }.eachCount().values) samePairsIn += c.toLong() * (c - 1) / 2
-            }
-            val perIdentity = HashMap<String, MutableSet<Long>>()
-            for ((f, c) in outcome.assignments) if (c != null && truth.getValue(f) in big) perIdentity.getOrPut(truth.getValue(f)) { HashSet() }.add(c)
-            val fragments = perIdentity.values.map { it.size }
-            val impure = clusters.values.count { m -> m.groupingBy { it }.eachCount().let { it.values.sum() - it.values.max() } > 0 }
-            Log.i(
-                TAG,
-                "lfwSweep strictness=$s join=${"%.2f".format(params.joinThreshold)} clusters=${clusters.size} " +
-                    "pairPrecision=${"%.4f".format(if (pairsIn == 0L) 1.0 else samePairsIn.toDouble() / pairsIn)} " +
-                    "pairRecall=${"%.4f".format(if (samePairsAll == 0L) 1.0 else samePairsIn.toDouble() / samePairsAll)} " +
-                    "avgFragments=${"%.2f".format(if (fragments.isEmpty()) 0.0 else fragments.average())} impure=$impure"
-            )
-        }
-        for (face in faces.sortedBy { nameOf.getValue(it.mediaId) }.take(40)) {
-            val v = VectorMath.fromBytes(face.embedding)
-            Log.i(TAG, "lfwEmb ${nameOf.getValue(face.mediaId)} q=${"%.3f".format(face.quality)} " + v.joinToString(",") { "%.5f".format(it) })
         }
     }
 
