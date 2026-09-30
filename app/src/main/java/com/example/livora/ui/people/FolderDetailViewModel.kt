@@ -16,6 +16,7 @@ import com.example.livora.data.people.media.MediaImages
 import com.example.livora.data.people.media.MediaWriter
 import com.example.livora.ui.components.ToastType
 import com.example.livora.ui.components.Toaster
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,6 +33,17 @@ class ConsentRequest(val sender: IntentSender, val onResult: (Boolean) -> Unit)
 
 object ConsentBroker {
     val request = MutableStateFlow<ConsentRequest?>(null)
+
+    fun ask(sender: IntentSender?, scope: CoroutineScope, onGranted: suspend () -> Unit) {
+        if (sender == null) {
+            Toaster.error("This needs Android 11 or newer")
+            return
+        }
+        request.value = ConsentRequest(sender) { ok ->
+            request.value = null
+            if (ok) scope.launch { onGranted() } else Toaster.info("Nothing was changed")
+        }
+    }
 }
 
 class FolderDetailViewModel(application: Application, handle: SavedStateHandle) : AndroidViewModel(application) {
@@ -118,14 +130,7 @@ class FolderDetailViewModel(application: Application, handle: SavedStateHandle) 
     }
 
     fun requestConsent(sender: IntentSender?, onGranted: suspend () -> Unit) {
-        if (sender == null) {
-            Toaster.error("This needs Android 11 or newer")
-            return
-        }
-        consentState.value = ConsentRequest(sender) { ok ->
-            consentState.value = null
-            if (ok) viewModelScope.launch { onGranted() } else Toaster.info("Nothing was changed")
-        }
+        ConsentBroker.ask(sender, viewModelScope, onGranted)
     }
 
     fun moveSelected(target: FolderInfo) {

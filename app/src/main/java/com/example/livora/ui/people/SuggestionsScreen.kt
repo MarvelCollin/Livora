@@ -35,6 +35,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -45,6 +48,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.livora.data.people.cluster.PersonMatcher
 import com.example.livora.data.people.db.LinkMode
+import com.example.livora.ui.components.ChoiceOption
+import com.example.livora.ui.components.ChoiceRow
 import com.example.livora.ui.components.SkeletonBox
 import com.example.livora.ui.components.TopBar
 
@@ -55,13 +60,20 @@ fun SuggestionsScreen(viewModel: SuggestionsViewModel, onBack: () -> Unit) {
     val state by viewModel.state.collectAsState()
     val selected by viewModel.selected.collectAsState()
     val selecting = selected.isNotEmpty()
+    val progress by viewModel.progress.collectAsState()
+    val faces by viewModel.indexedFaces.collectAsState()
+    val moveMatches by viewModel.moveMatches.collectAsState()
+    var picking by remember { mutableStateOf(false) }
+    var approveAfter by remember { mutableStateOf(false) }
 
     BackHandler(enabled = selecting) { viewModel.clearSelection() }
+    ConsentEffect(viewModel.consent)
 
     val ready = state as? SuggestionsState.Ready
     val name = ready?.person?.name ?: "this person"
     val folder = ready?.person?.linkedFolderName
-    val copies = ready != null && ready.person.linkedFolderPath != null && ready.person.linkMode != LinkMode.NONE
+    val linked = ready != null && ready.person.linkedFolderPath != null && ready.person.linkMode != LinkMode.NONE
+    val moving = moveMatches && viewModel.supportsMove
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -95,8 +107,19 @@ fun SuggestionsScreen(viewModel: SuggestionsViewModel, onBack: () -> Unit) {
                     ) {
                         OutlineAction(text = "Not this person", onClick = { viewModel.reject() }, modifier = Modifier.weight(1f))
                         PrimaryAction(
-                            text = if (copies) "Add ${selected.size} and copy" else "Add ${selected.size}",
-                            onClick = { viewModel.approve() },
+                            text = when {
+                                !linked -> "Choose a folder"
+                                moving -> "Move ${selected.size}"
+                                else -> "Copy ${selected.size}"
+                            },
+                            onClick = {
+                                if (linked) {
+                                    viewModel.approve()
+                                } else {
+                                    approveAfter = true
+                                    picking = true
+                                }
+                            },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -110,6 +133,19 @@ fun SuggestionsScreen(viewModel: SuggestionsViewModel, onBack: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(2.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
+            if (progress.active) {
+                item(span = { GridItemSpan(maxLineSpan) }, key = "scan") {
+                    Column {
+                        ScanBlock(progress = progress, faceCount = faces)
+                        LinkButton(
+                            text = "Show what is found so far",
+                            onClick = { viewModel.load() },
+                            modifier = Modifier.padding(horizontal = 12.dp)
+                        )
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+                    }
+                }
+            }
             when (val current = state) {
                 SuggestionsState.Loading -> {
                     item(span = { GridItemSpan(maxLineSpan) }) {
@@ -141,12 +177,51 @@ fun SuggestionsScreen(viewModel: SuggestionsViewModel, onBack: () -> Unit) {
                                 lineHeight = 18.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            if (copies) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "Approved photos go to",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = "Approved photos are copied to $folder.",
-                                    fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(top = 4.dp)
+                                    text = if (linked) folder.orEmpty() else "No folder chosen yet",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                LinkButton(
+                                    text = if (linked) "Change" else "Choose a folder",
+                                    onClick = {
+                                        approveAfter = false
+                                        picking = true
+                                    }
+                                )
+                            }
+                            ChoiceRow(
+                                options = listOf(ChoiceOption(true, "Move"), ChoiceOption(false, "Copy")),
+                                selected = moving,
+                                enabled = viewModel.supportsMove,
+                                onSelect = { viewModel.setMoveMatches(it) }
+                            )
+                            Text(
+                                text = when {
+                                    !viewModel.supportsMove -> "Moving needs Android 11 or newer, so photos are copied."
+                                    moving -> "Moving takes a photo out of the folder it is in now. Undo it right after, or mark it as wrong later when you open the folder."
+                                    else -> "Copies use extra storage."
+                                },
+                                fontSize = 12.sp,
+                                lineHeight = 16.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                            if (!linked) {
+                                LinkButton(
+                                    text = "Add without a folder",
+                                    onClick = { viewModel.approve() },
+                                    enabled = selecting
                                 )
                             }
                             Spacer(modifier = Modifier.height(8.dp))
@@ -228,5 +303,21 @@ fun SuggestionsScreen(viewModel: SuggestionsViewModel, onBack: () -> Unit) {
             }
             item(span = { GridItemSpan(maxLineSpan) }, key = "end") { Spacer(modifier = Modifier.height(24.dp)) }
         }
+    }
+
+    if (picking) {
+        FolderPickerSheet(
+            title = "Choose the folder for matches",
+            folders = viewModel.folderList(),
+            onPick = { picked ->
+                picking = false
+                viewModel.chooseFolder(picked, approveAfter)
+            },
+            onCreate = { newName ->
+                picking = false
+                viewModel.createFolderAnd(newName, approveAfter)
+            },
+            onDismiss = { picking = false }
+        )
     }
 }

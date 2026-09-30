@@ -104,6 +104,8 @@ class EnrollViewModel(application: Application, handle: SavedStateHandle) : Andr
         itemsState.value = itemsState.value.filter { it.uri != uri }
     }
 
+    val checking: Boolean get() = scope.first.isNotEmpty()
+
     val selectedCount: Int get() = itemsState.value.count { it.selectedFace != null }
 
     fun save() {

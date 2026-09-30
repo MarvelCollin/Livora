@@ -52,14 +52,7 @@ class PhotoViewerViewModel(application: Application, handle: SavedStateHandle) :
     }
 
     private fun requestConsent(sender: IntentSender?, onGranted: suspend () -> Unit) {
-        if (sender == null) {
-            Toaster.error("This needs Android 11 or newer")
-            return
-        }
-        consentState.value = ConsentRequest(sender) { ok ->
-            consentState.value = null
-            if (ok) viewModelScope.launch { onGranted() } else Toaster.info("Nothing was changed")
-        }
+        ConsentBroker.ask(sender, viewModelScope, onGranted)
     }
 
     fun delete(image: MediaImage) {

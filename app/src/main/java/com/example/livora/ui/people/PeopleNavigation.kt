@@ -116,6 +116,10 @@ fun NavGraphBuilder.peopleGraph(navController: NavHostController) {
             onDone = { id ->
                 if (viewModel.personId != null) {
                     navController.popBackStack()
+                } else if (viewModel.checking) {
+                    navController.navigate(PeopleRoutes.suggestions(id)) {
+                        popUpTo(PeopleRoutes.FOLDER) { inclusive = true }
+                    }
                 } else {
                     navController.navigate(PeopleRoutes.person(id)) {
                         popUpTo(PeopleRoutes.ENROLL) { inclusive = true }

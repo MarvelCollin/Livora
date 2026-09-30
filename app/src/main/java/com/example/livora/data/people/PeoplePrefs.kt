@@ -57,6 +57,14 @@ class PeoplePrefs(context: Context) {
         get() = prefs.getBoolean(KEY_NOTIFICATION_ASKED, false)
         set(value) = prefs.edit().putBoolean(KEY_NOTIFICATION_ASKED, value).apply()
 
+    private val moveMatchesState = MutableStateFlow(prefs.getBoolean(KEY_MOVE_MATCHES, true))
+    val moveMatches: StateFlow<Boolean> = moveMatchesState.asStateFlow()
+
+    fun setMoveMatches(value: Boolean) {
+        prefs.edit().putBoolean(KEY_MOVE_MATCHES, value).apply()
+        moveMatchesState.value = value
+    }
+
     fun setMinPhotos(value: Int) {
         prefs.edit().putInt(KEY_MIN_PHOTOS, value).apply()
         minPhotosState.value = value
@@ -76,5 +84,6 @@ class PeoplePrefs(context: Context) {
         private const val KEY_LAST_FINISHED = "last_finished"
         private const val KEY_SKIP_SCREENSHOTS = "skip_screenshots"
         private const val KEY_NOTIFICATION_ASKED = "notification_asked"
+        private const val KEY_MOVE_MATCHES = "move_matches"
     }
 }
