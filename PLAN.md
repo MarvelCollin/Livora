@@ -19,7 +19,7 @@ Each has a recommended default. Work follows the default unless you say otherwis
 - [ ] **Navigation.** Add a fourth bottom tab called Tools that lists all seven tools as plain rows (name, one line of description, a live value such as "Vault, 12 items"). Home stays devices only. Default: yes.
 - [ ] **All files access for the cleaner.** Android 11+ hides other apps' files and the Downloads root from normal apps. Full cleaner features (old APKs, big downloads, empty folders) need the `MANAGE_EXTERNAL_STORAGE` permission. Fine for a personal sideloaded app, not accepted on Play Store. Default: ask for it as an optional "Full cleaner mode" and keep a media only mode without it.
 - [ ] **Expenses storage.** Local Room database only, or sync through Supabase like tasks. Default: local only, with encrypted export and import. Money data should not leave the phone by accident.
-- [ ] **Vault unlock.** Master password plus biometric shortcut, or biometric only. Default: master password plus biometric, because biometric only leaves no way back after a phone reset.
+- [x] **Vault unlock.** Decided: your fingerprint or phone lock unlocks it, with a recovery code as the way back after a phone reset.
 - [ ] **Document scanner engine.** ML Kit Document Scanner (needs Google Play services, best quality, least code) or a custom camera and OpenCV pipeline. Default: ML Kit now, custom fallback only if a device lacks Play services.
 - [ ] **Default currency.** IDR with `id-ID` formatting. Default: yes.
 - [ ] **Package name.** Still `com.example.livora`. Change it before any public release. Default: change later, not now.
@@ -48,7 +48,7 @@ Everything below depends on it, so it goes before any single tool.
 | Tool | Permissions and special access |
 |------|-------------------------------|
 | QR scanner | none with the Google code scanner |
-| Password vault | `USE_BIOMETRIC` |
+| Password vault | `USE_BIOMETRIC` (fingerprint or phone lock) |
 | Expenses | none. Optional `POST_NOTIFICATIONS` for budget alerts |
 | Document scanner | none with ML Kit (runs in Play services). `CAMERA` only for a custom scanner |
 | App usage stats | `PACKAGE_USAGE_STATS`, granted by the user in system Usage access settings |
@@ -99,31 +99,43 @@ Tools: `apkanalyzer` for size, `adb shell am start -W` for cold start, `adb shel
 
 ## 3. Password Vault
 
-Highest risk tool, so the security design comes before any screen. Do not write custom crypto. Use Tink or the standard JCA AES-GCM APIs.
+Highest risk tool, so the security design came before any screen. No custom crypto: standard AES-GCM from the Java crypto APIs and the Android Keystore.
 
-**Design**
-- Random 256 bit data key encrypts every secret field with AES-GCM
-- The data key is wrapped by a key derived from the master password (PBKDF2 or Argon2id with a high cost and a per vault random salt) and by an Android Keystore key that requires biometric unlock
-- No plaintext secret ever touches disk, logs, or the clipboard history
-- The `Logger.debug` helper must never receive vault values
-- No recovery if the master password is lost, so offer a printed recovery key at setup
+**Design as built (unlock is your fingerprint or phone lock, no master password to remember)**
+- A random 256 bit data key encrypts the whole vault file with AES-GCM (12 byte random nonce per save, entry file bound to its purpose so it cannot be swapped)
+- The data key is wrapped by a hardware backed Android Keystore key (StrongBox when the phone has it) that requires your fingerprint or your PIN, pattern or password for every single unlock
+- The data key exists in memory only while the vault is unlocked and is wiped when it locks
+- A recovery code (160 random bits, shown once at setup) wraps the data key a second time. If the phone key is lost (screen lock removed, phone reset), the recovery code restores the vault and creates a fresh phone key
+- The vault files live in the app's private folder and are excluded from Android cloud backup and phone to phone transfer
+- Locks the moment the app leaves the screen. Vault screens block screenshots and hide from the recent apps preview
+- Copied values are marked sensitive and cleared from the clipboard after 30 seconds
+- Needs Android 11 or newer, because that is where a fingerprint or phone lock can unlock a Keystore key together
+- The vault code never writes to the log
 
-**Checklist**
-- [ ] Threat model note (what it defends against and what it does not) (S)
-- [ ] Crypto layer with unit tests: encrypt and decrypt round trip, tamper detection, wrong password rejected (M)
-- [ ] Setup flow: master password rules, strength meter, recovery key
-- [ ] Unlock screen with biometric prompt and master password fallback
-- [ ] Auto lock on app background and after a timeout, `FLAG_SECURE` on all vault screens
-- [ ] Entry model: title, username, password, URL, notes, tags, favorite, optional TOTP secret
-- [ ] List with search and tag filter, entry detail with tap to reveal and copy
-- [ ] Clipboard copy marked sensitive (`EXTRA_IS_SENSITIVE` on Android 13+) and auto cleared after 30 seconds
-- [ ] Password generator using `SecureRandom`: length, character sets, passphrase mode (EFF wordlist is CC BY 3.0, needs attribution)
-- [ ] Health report: weak, reused and old passwords
-- [ ] TOTP codes (RFC 6238) with unit tests from the RFC vectors, add by scanning an `otpauth://` QR from the QR tool (M)
-- [ ] Optional breach check with the Pwned Passwords range API (sends only a 5 character hash prefix), off by default
+**Built and tested**
+- [x] Crypto layer with 25 unit tests: round trip, every flipped byte rejected, wrong key and wrong data rejected, nonces never repeat, no plaintext in the files, recovery restores after key loss
+- [x] Setup flow with recovery code shown once and a "saved it" confirmation
+- [x] Unlock with fingerprint or phone lock, retry, and clear messages when no screen lock is set
+- [x] Auto lock on leaving the app, `FLAG_SECURE` on all vault screens
+- [x] Entries: name, username, password, website, notes, favorite, optional one-time code key
+- [x] List with search and filters (all, favorites, weak, reused)
+- [x] Detail with tap to reveal, copy, open website
+- [x] Add, edit, delete with Undo, discard changes prompt
+- [x] Password generator (`SecureRandom`, length 8 to 64, character sets, avoid look-alikes) and strength meter
+- [x] Weak and reused password detection
+- [x] One-time codes (TOTP, RFC 6238) with live countdown, tested against all RFC vectors for SHA1, SHA256 and SHA512
+- [x] Vault store excluded from Android backup
+- [x] Restore with recovery code, and erase vault with a confirmation
+
+**Still to do**
+- [ ] Try it on the real phone: setup, lock, unlock, add, edit, delete and undo, generator, recovery restore (needs your fingerprint, so it must be tested by hand)
+- [ ] Add a one-time code by scanning its QR (comes with the QR tool)
 - [ ] Encrypted export and import file
-- [ ] Vault store excluded from Android backup
-- [ ] Security review pass with the security skill before calling it done
+- [ ] Optional breach check with the Pwned Passwords range API (sends only a 5 character hash prefix), off by default
+- [ ] Passphrase mode in the generator (EFF wordlist is CC BY 3.0, needs attribution, adds about 60 KB)
+- [ ] Optional auto lock timeout setting, and a lock on screen off
+- [ ] Threat model note (what it protects against and what it does not)
+- [ ] Security review pass with the security skill
 
 ## 4. QR Code Scanner, scan and generate (M)
 

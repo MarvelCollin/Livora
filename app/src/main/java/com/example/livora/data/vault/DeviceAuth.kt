@@ -1,5 +1,6 @@
 package com.example.livora.data.vault
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.hardware.biometrics.BiometricManager
 import android.hardware.biometrics.BiometricPrompt
@@ -23,6 +24,7 @@ class AuthCancelledException(val userCancelled: Boolean, message: String) : Exce
 
 enum class DeviceAuthStatus { READY, NO_SCREEN_LOCK, NO_HARDWARE, UNAVAILABLE, UNSUPPORTED_OS }
 
+@SuppressLint("NewApi")
 object DeviceAuth {
 
     const val AUTHENTICATORS =
@@ -79,6 +81,7 @@ object DeviceAuth {
         }
 }
 
+@SuppressLint("NewApi")
 class KeystoreKeyWrapper(
     private val context: Context,
     private val title: String,

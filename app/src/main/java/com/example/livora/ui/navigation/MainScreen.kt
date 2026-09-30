@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.Handyman
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.Icon
@@ -30,12 +31,14 @@ import com.example.livora.ui.dictionary.DictionaryScreen
 import com.example.livora.ui.dictionary.DictionaryViewModel
 import com.example.livora.ui.home.HomeScreen
 import com.example.livora.ui.todo.TodoScreen
+import com.example.livora.ui.tools.ToolsScreen
 import com.example.livora.ui.todo.TodoViewModel
 
 private enum class MainTab(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Default.Home),
     Tasks("Tasks", Icons.Default.Checklist),
-    Dictionary("Dictionary", Icons.Default.Translate)
+    Dictionary("Dictionary", Icons.Default.Translate),
+    Tools("Tools", Icons.Default.Handyman)
 }
 
 @Composable
@@ -47,7 +50,8 @@ fun MainScreen(
     onNavigateToAc: () -> Unit,
     onNavigateToBulb: () -> Unit,
     onOpenTodoDetail: (String) -> Unit,
-    onOpenQuiz: () -> Unit
+    onOpenQuiz: () -> Unit,
+    onOpenVault: () -> Unit
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val tabs = MainTab.entries
@@ -108,6 +112,7 @@ fun MainScreen(
                     viewModel = dictionaryViewModel,
                     onOpenQuiz = onOpenQuiz
                 )
+                MainTab.Tools -> ToolsScreen(onOpenVault = onOpenVault)
             }
         }
     }

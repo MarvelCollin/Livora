@@ -15,6 +15,7 @@ import com.example.livora.ui.dictionary.DictionaryQuizScreen
 import com.example.livora.ui.dictionary.DictionaryViewModel
 import com.example.livora.ui.todo.TodoDetailScreen
 import com.example.livora.ui.todo.TodoViewModel
+import com.example.livora.ui.vault.VaultScreen
 
 @Composable
 fun AppNavHost(navController: NavHostController) {
@@ -36,7 +37,8 @@ fun AppNavHost(navController: NavHostController) {
                 onNavigateToAc = { navController.navigate(Screen.AcController.route) },
                 onNavigateToBulb = { navController.navigate(Screen.BulbController.route) },
                 onOpenTodoDetail = { id -> navController.navigate(Screen.TodoDetail.create(id)) },
-                onOpenQuiz = { navController.navigate(Screen.DictionaryQuiz.route) }
+                onOpenQuiz = { navController.navigate(Screen.DictionaryQuiz.route) },
+                onOpenVault = { navController.navigate(Screen.Vault.route) }
             )
         }
         composable(Screen.AcController.route) {
@@ -50,6 +52,9 @@ fun AppNavHost(navController: NavHostController) {
                 viewModel = bulbViewModel,
                 onBack = { navController.popBackStack() }
             )
+        }
+        composable(Screen.Vault.route) {
+            VaultScreen(onBack = { navController.popBackStack() })
         }
         composable(Screen.DictionaryQuiz.route) {
             DictionaryQuizScreen(
