@@ -31,15 +31,18 @@ class FaceScanWorker(context: Context, params: WorkerParameters) : CoroutineWork
 
     private suspend fun runScan(services: PeopleServices): Result {
         return try {
-            val plan = services.scanner.prepare()
+            val buckets = inputData.getLongArray(ScanController.KEY_BUCKETS)?.toSet()
+            val plan = services.scanner.prepare(buckets)
             if (services.prefs.initialScanDone && services.prefs.groupingVersion < ClusteringService.ALGORITHM_VERSION) {
                 ScanStatus.publish(ScanProgress(ScanPhase.Grouping, plan.eligibleTotal, plan.eligibleTotal))
                 services.clustering.regroup(services.prefs.strictness)
                 services.prefs.groupingVersion = ClusteringService.ALGORITHM_VERSION
             }
             if (plan.isEmpty && !services.prefs.groupingPending) {
-                com.example.livora.data.people.media.MediaChange.remember(applicationContext, services.prefs, plan.generation, plan.mediaCount)
-                services.prefs.initialScanDone = true
+                if (!plan.scoped) {
+                    com.example.livora.data.people.media.MediaChange.remember(applicationContext, services.prefs, plan.generation, plan.mediaCount)
+                    services.prefs.initialScanDone = true
+                }
                 if (com.example.livora.BuildConfig.DEBUG) Diagnostics.run(services.database)
                 ScanStatus.publish(ScanProgress(ScanPhase.Done, plan.eligibleTotal, plan.eligibleTotal))
                 return Result.success()

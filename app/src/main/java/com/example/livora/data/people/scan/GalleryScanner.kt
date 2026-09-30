@@ -38,7 +38,8 @@ class ScanPlan(
     val runStartedAt: Long,
     val index: Map<Long, PhotoIndexRow>,
     val generation: Long = -1L,
-    val mediaCount: Int = 0
+    val mediaCount: Int = 0,
+    val scoped: Boolean = false
 ) {
     val isEmpty: Boolean get() = pending.isEmpty()
 }
@@ -76,7 +77,7 @@ class GalleryScanner(
         Thread(runnable, "people-inference").apply { priority = Thread.NORM_PRIORITY }
     }.asCoroutineDispatcher()
 
-    suspend fun prepare(): ScanPlan = withContext(Dispatchers.IO) {
+    suspend fun prepare(buckets: Set<Long>? = null): ScanPlan = withContext(Dispatchers.IO) {
         ScanStatus.publish(ScanProgress(phase = ScanPhase.Preparing))
         val generation = com.example.livora.data.people.media.MediaChange.generation(context)
         val all = MediaImages.queryAll(context)
@@ -84,15 +85,18 @@ class GalleryScanner(
         val plan = ScanPlanner.plan(all, index, prefs.skipScreenshots)
         if (plan.removedIds.isNotEmpty()) purge(plan.removedIds)
         for ((id, size) in plan.sizeBackfill) database.photos().backfillSize(id, size)
-        prefs.scanTotal = plan.eligible.size
+        val eligible = if (buckets == null) plan.eligible else plan.eligible.filter { it.bucketId in buckets }
+        val pending = if (buckets == null) plan.pending else plan.pending.filter { it.bucketId in buckets }
+        prefs.scanTotal = eligible.size
         ScanPlan(
-            plan.pending,
-            plan.eligible.size,
-            plan.eligible.size - plan.pending.size,
+            pending,
+            eligible.size,
+            eligible.size - pending.size,
             System.currentTimeMillis(),
             index,
             generation,
-            all.size
+            all.size,
+            buckets != null
         )
     }
 
@@ -290,9 +294,11 @@ class GalleryScanner(
         )
         prefs.groupingPending = false
         prefs.groupingVersion = ClusteringService.ALGORITHM_VERSION
-        prefs.initialScanDone = true
         prefs.lastScanNewCount = result.processed
-        com.example.livora.data.people.media.MediaChange.remember(context, prefs, plan.generation, plan.mediaCount)
+        if (!plan.scoped) {
+            prefs.initialScanDone = true
+            com.example.livora.data.people.media.MediaChange.remember(context, prefs, plan.generation, plan.mediaCount)
+        }
         prefs.lastScanFinishedAt = System.currentTimeMillis()
         val total = database.photos().count()
         ScanStatus.publish(
