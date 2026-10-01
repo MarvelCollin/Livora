@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Quiz
 import androidx.compose.material3.HorizontalDivider
@@ -20,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.livora.ui.components.AddAction
 import com.example.livora.ui.components.TopBar
 import com.example.livora.ui.dictionary.DictionaryScreen
 import com.example.livora.ui.dictionary.DictionaryViewModel
@@ -59,13 +59,7 @@ fun DailyScreen(
                     },
                     actions = {
                         when (segment) {
-                            0 -> IconButton(onClick = { taskAdd.tryEmit(Unit) }) {
-                                Icon(
-                                    imageVector = Icons.Default.Add,
-                                    contentDescription = "Add routine",
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
+                            0 -> AddAction(description = "Add routine", onClick = { taskAdd.tryEmit(Unit) })
                             1 -> {
                                 IconButton(onClick = { quiz.tryEmit(Unit) }) {
                                     Icon(
@@ -78,13 +72,7 @@ fun DailyScreen(
                                         }
                                     )
                                 }
-                                IconButton(onClick = { wordAdd.tryEmit(Unit) }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Add,
-                                        contentDescription = "Add word",
-                                        tint = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
+                                AddAction(description = "Add word", onClick = { wordAdd.tryEmit(Unit) })
                             }
                             else -> {
                                 IconButton(onClick = { expenseExport.tryEmit(Unit) }) {
@@ -94,13 +82,7 @@ fun DailyScreen(
                                         tint = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
-                                IconButton(onClick = { expenseAdd.tryEmit(Unit) }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Add,
-                                        contentDescription = "Add expense",
-                                        tint = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
+                                AddAction(description = "Add expense", onClick = { expenseAdd.tryEmit(Unit) })
                             }
                         }
                     }

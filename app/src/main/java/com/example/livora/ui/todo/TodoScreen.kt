@@ -1,5 +1,25 @@
 package com.example.livora.ui.todo
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextAlign
+import com.example.livora.ui.components.FormSection
+import com.example.livora.ui.components.FormSheet
+import com.example.livora.ui.components.FormTextField
+import com.example.livora.ui.components.SegmentedControl
+import kotlinx.coroutines.delay
 import com.example.livora.ui.components.ChartSlot
 import com.example.livora.ui.components.Motion
 import com.example.livora.ui.components.chartColor
@@ -117,49 +137,15 @@ fun TodoScreen(
     ) {
         item { Spacer(modifier = Modifier.height(4.dp)) }
 
-        if (isEditing) {
-            item {
-                TodoForm(
-                    todo = editingTodo,
-                    onSave = { title, notes, intervalValue, intervalUnit, timeOfDay, durationValue, durationUnit, hasTimer ->
-                        if (viewModel.upsertTodo(
-                                editingTodo,
-                                title,
-                                notes,
-                                intervalValue,
-                                intervalUnit,
-                                timeOfDay,
-                                durationValue,
-                                durationUnit,
-                                hasTimer
-                            )
-                        ) {
-                            isEditing = false
-                            editingId = null
-                        }
-                    },
-                    onCancel = {
-                        isEditing = false
-                        editingId = null
-                    }
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                    thickness = 0.5.dp
-                )
-            }
-        }
-
-        if (stats.isNotEmpty() && !isEditing) {
+        if (stats.isNotEmpty()) {
             item(key = "overview") { TaskOverview(stats = stats, daily = daily, heat = heat) }
         }
 
-        if (stats.isEmpty() && !isEditing && isLoading) {
+        if (stats.isEmpty() && isLoading) {
             items(5) { TodoRowSkeleton() }
         }
 
-        if (stats.isEmpty() && !isEditing && !isLoading) {
+        if (stats.isEmpty() && !isLoading) {
             item {
                 EmptyState(
                     onAdd = {
@@ -203,6 +189,29 @@ fun TodoScreen(
         }
 
         item { Spacer(modifier = Modifier.height(24.dp)) }
+    }
+
+    if (isEditing) {
+        TodoFormSheet(
+            todo = editingTodo,
+            onSave = { title, notes, intervalValue, intervalUnit, timeOfDay, durationValue, durationUnit, hasTimer ->
+                viewModel.upsertTodo(
+                    editingTodo,
+                    title,
+                    notes,
+                    intervalValue,
+                    intervalUnit,
+                    timeOfDay,
+                    durationValue,
+                    durationUnit,
+                    hasTimer
+                )
+            },
+            onDismiss = {
+                isEditing = false
+                editingId = null
+            }
+        )
     }
 }
 
@@ -420,10 +429,10 @@ internal fun scheduleSummary(todo: Todo): String {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TodoForm(
+private fun TodoFormSheet(
     todo: Todo?,
-    onSave: (String, String, Int, TodoIntervalUnit, String?, Int, TodoDurationUnit, Boolean) -> Unit,
-    onCancel: () -> Unit
+    onSave: (String, String, Int, TodoIntervalUnit, String?, Int, TodoDurationUnit, Boolean) -> Boolean,
+    onDismiss: () -> Unit
 ) {
     var title by remember(todo?.id) { mutableStateOf(todo?.title ?: "") }
     var notes by remember(todo?.id) { mutableStateOf(todo?.notes ?: "") }
@@ -434,180 +443,176 @@ private fun TodoForm(
     var durationUnit by remember(todo?.id) { mutableStateOf(todo?.durationUnit ?: TodoDurationUnit.Minute) }
     var hasTimer by remember(todo?.id) { mutableStateOf(todo?.hasTimer ?: false) }
     var showTimePicker by remember { mutableStateOf(false) }
+    val titleFocus = remember { FocusRequester() }
     val canSave = title.isNotBlank() &&
         (intervalValue.toIntOrNull() ?: 0) > 0 &&
         (!hasTimer || (durationValue.toIntOrNull() ?: 0) > 0)
     val supportsTime = intervalUnit == TodoIntervalUnit.Day || intervalUnit == TodoIntervalUnit.Week
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 16.dp)
-    ) {
-        Text(
-            text = if (todo == null) "New task" else "Edit task",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+    LaunchedEffect(Unit) {
+        if (todo == null) {
+            delay(Motion.Medium.toLong())
+            titleFocus.requestFocus()
+        }
+    }
 
-        Spacer(modifier = Modifier.height(14.dp))
-
-        FlatTextField(
-            value = title,
-            onValueChange = { title = it },
-            placeholder = "Task title",
-            singleLine = true
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        FlatTextField(
-            value = notes,
-            onValueChange = { notes = it },
-            placeholder = "Notes",
-            singleLine = false,
-            minLines = 2
-        )
-
-        Spacer(modifier = Modifier.height(18.dp))
-
-        PropertyLabel(text = "Repeat")
-        Spacer(modifier = Modifier.height(6.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "Every",
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            CompactNumberField(
-                value = intervalValue,
-                onValueChange = { intervalValue = it.filter(Char::isDigit) }
-            )
-            Spacer(modifier = Modifier.width(10.dp))
-            UnitSelector(
-                options = TodoIntervalUnit.entries.toList(),
-                selected = intervalUnit,
-                label = { it.label },
-                onSelect = { intervalUnit = it }
+    FormSheet(
+        title = if (todo == null) "New task" else "Edit task",
+        confirmLabel = if (todo == null) "Add task" else "Save",
+        confirmEnabled = canSave,
+        onDismiss = onDismiss,
+        onConfirm = {
+            onSave(
+                title,
+                notes,
+                intervalValue.toIntOrNull() ?: 0,
+                intervalUnit,
+                timeOfDay.takeIf { it.isNotBlank() },
+                durationValue.toIntOrNull() ?: 0,
+                durationUnit,
+                hasTimer
             )
         }
+    ) {
+        FormTextField(
+            value = title,
+            onValueChange = { title = it },
+            label = "Title",
+            placeholder = "What do you want to keep up with",
+            focusRequester = titleFocus,
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next)
+        )
 
-        if (supportsTime) {
-            Spacer(modifier = Modifier.height(16.dp))
-            PropertyLabel(text = "Time of day")
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = if (timeOfDay.isBlank()) "Not set" else timeOfDay,
-                    fontSize = 14.sp,
-                    fontWeight = if (timeOfDay.isBlank()) FontWeight.Normal else FontWeight.Medium,
-                    color = if (timeOfDay.isBlank())
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
-                    else
-                        MaterialTheme.colorScheme.onSurface
+        FormTextField(
+            value = notes,
+            onValueChange = { notes = it },
+            label = "Notes",
+            placeholder = "Optional",
+            singleLine = false,
+            minLines = 2,
+            modifier = Modifier.padding(top = 18.dp),
+            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences)
+        )
+
+        FormSection(label = "Repeat every") {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FormTextField(
+                    value = intervalValue,
+                    onValueChange = { intervalValue = it.filter(Char::isDigit).take(3) },
+                    modifier = Modifier.width(80.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    textAlign = TextAlign.Center
                 )
-                Spacer(modifier = Modifier.width(12.dp))
-                LinkText(
-                    text = if (timeOfDay.isBlank()) "Set time" else "Change",
-                    onClick = { showTimePicker = true }
+                SegmentedControl(
+                    options = TodoIntervalUnit.entries.toList(),
+                    selected = intervalUnit,
+                    label = { it.label },
+                    onSelect = { intervalUnit = it },
+                    modifier = Modifier.weight(1f)
                 )
-                if (timeOfDay.isNotBlank()) {
-                    Spacer(modifier = Modifier.width(12.dp))
-                    LinkText(
-                        text = "Clear",
-                        onClick = { timeOfDay = "" }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = supportsTime,
+            enter = expandVertically(Motion.enter()) + fadeIn(Motion.enter()),
+            exit = shrinkVertically(Motion.exit()) + fadeOut(Motion.exit())
+        ) {
+            FormSection(label = "Time of day") {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    PickerField(
+                        text = if (timeOfDay.isBlank()) "Not set" else timeOfDay,
+                        isPlaceholder = timeOfDay.isBlank(),
+                        actionLabel = if (timeOfDay.isBlank()) "Set time" else "Change",
+                        onClick = { showTimePicker = true },
+                        modifier = Modifier.weight(1f)
                     )
+                    AnimatedVisibility(
+                        visible = timeOfDay.isNotBlank(),
+                        enter = fadeIn(Motion.quick()) + expandHorizontally(Motion.enter()),
+                        exit = fadeOut(Motion.quick()) + shrinkHorizontally(Motion.exit())
+                    ) {
+                        TextButton(
+                            onClick = { timeOfDay = "" },
+                            modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                        ) {
+                            Text("Clear", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(
-                imageVector = Icons.Outlined.Timer,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
+        Row(
+            modifier = Modifier
+                .padding(top = 18.dp)
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = 56.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .toggleable(
+                    value = hasTimer,
+                    role = Role.Switch,
+                    onValueChange = { hasTimer = it }
+                ),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "Timer",
-                    fontSize = 14.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = "Count down while you do this task",
                     fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Switch(
                 checked = hasTimer,
-                onCheckedChange = { hasTimer = it },
+                onCheckedChange = null,
                 colors = SwitchDefaults.colors(
-                    checkedThumbColor = MaterialTheme.colorScheme.surface,
-                    checkedTrackColor = MaterialTheme.colorScheme.onSurface,
-                    uncheckedThumbColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                    uncheckedTrackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
-                    uncheckedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                    uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    uncheckedBorderColor = MaterialTheme.colorScheme.outline
                 )
             )
         }
 
-        if (hasTimer) {
-            Spacer(modifier = Modifier.height(14.dp))
-            PropertyLabel(text = "Timer length")
-            Spacer(modifier = Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                CompactNumberField(
-                    value = durationValue,
-                    onValueChange = { durationValue = it.filter(Char::isDigit) }
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                UnitSelector(
-                    options = TodoDurationUnit.entries.toList(),
-                    selected = durationUnit,
-                    label = { it.label },
-                    onSelect = { durationUnit = it }
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
+        AnimatedVisibility(
+            visible = hasTimer,
+            enter = expandVertically(Motion.enter()) + fadeIn(Motion.enter()),
+            exit = shrinkVertically(Motion.exit()) + fadeOut(Motion.exit())
         ) {
-            TextButton(onClick = onCancel) {
-                Text("Cancel", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f))
-            }
-            Spacer(modifier = Modifier.width(4.dp))
-            TextButton(
-                onClick = {
-                    onSave(
-                        title,
-                        notes,
-                        intervalValue.toIntOrNull() ?: 0,
-                        intervalUnit,
-                        timeOfDay.takeIf { it.isNotBlank() },
-                        durationValue.toIntOrNull() ?: 0,
-                        durationUnit,
-                        hasTimer
+            FormSection(label = "Timer length", topGap = 4.dp) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    FormTextField(
+                        value = durationValue,
+                        onValueChange = { durationValue = it.filter(Char::isDigit).take(3) },
+                        modifier = Modifier.width(80.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        textAlign = TextAlign.Center
                     )
-                },
-                enabled = canSave
-            ) { 
-                Text(
-                    text = "Save",
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (canSave) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                )
+                    SegmentedControl(
+                        options = TodoDurationUnit.entries.toList(),
+                        selected = durationUnit,
+                        label = { it.label },
+                        onSelect = { durationUnit = it },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
     }
@@ -638,106 +643,54 @@ private fun TodoForm(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FlatTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    placeholder: String,
-    singleLine: Boolean,
-    minLines: Int = 1
+private fun PickerField(
+    text: String,
+    isPlaceholder: Boolean,
+    actionLabel: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        placeholder = {
-            Text(
-                text = placeholder,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
-                fontSize = 15.sp
-            )
-        },
-        singleLine = singleLine,
-        minLines = minLines,
-        modifier = Modifier.fillMaxWidth(),
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = Color.Transparent,
-            unfocusedContainerColor = Color.Transparent,
-            disabledContainerColor = Color.Transparent,
-            focusedIndicatorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-            unfocusedIndicatorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+    Row(
+        modifier = modifier
+            .defaultMinSize(minHeight = 52.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = text,
+            fontSize = 15.sp,
+            fontWeight = if (isPlaceholder) FontWeight.Normal else FontWeight.Medium,
+            color = if (isPlaceholder)
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            else
+                MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
         )
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CompactNumberField(
-    value: String,
-    onValueChange: (String) -> Unit
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        modifier = Modifier.width(72.dp),
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = Color.Transparent,
-            unfocusedContainerColor = Color.Transparent,
-            disabledContainerColor = Color.Transparent,
-            focusedIndicatorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-            unfocusedIndicatorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
+        Text(
+            text = actionLabel,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary
         )
-    )
-}
-
-@Composable
-private fun <T> UnitSelector(
-    options: List<T>,
-    selected: T,
-    label: (T) -> String,
-    onSelect: (T) -> Unit
-) {
-    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        options.forEach { option ->
-            val isSelected = option == selected
-            Text(
-                text = label(option),
-                fontSize = 13.sp,
-                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (isSelected)
-                    MaterialTheme.colorScheme.onSurface
-                else
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                textDecoration = if (isSelected) TextDecoration.Underline else TextDecoration.None,
-                modifier = Modifier
-                    .clickable { onSelect(option) }
-                    .padding(vertical = 4.dp)
-            )
-        }
     }
-}
-
-@Composable
-private fun PropertyLabel(text: String) {
-    Text(
-        text = text,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-    )
 }
 
 @Composable
 private fun LinkText(text: String, onClick: () -> Unit) {
     Text(
         text = text,
-        fontSize = 13.sp,
-        fontWeight = FontWeight.Medium,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-        textDecoration = TextDecoration.Underline,
-        modifier = Modifier.clickable(onClick = onClick)
+        fontSize = 14.sp,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier
+            .defaultMinSize(minHeight = 48.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(role = Role.Button, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 14.dp)
     )
 }
 
