@@ -1,5 +1,19 @@
 package com.example.livora.ui.dictionary
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.text.input.ImeAction
+import com.example.livora.ui.components.FormSheet
+import com.example.livora.ui.components.FormTextField
+import com.example.livora.ui.components.Motion
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -124,23 +138,10 @@ fun DictionaryScreen(
     }
 
     if (isAdding) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
-            onDismissRequest = {
-                viewModel.clearLookup()
-                isAdding = false
-            },
-            sheetState = sheetState,
-            containerColor = MaterialTheme.colorScheme.surface
-        ) {
-            AddWordForm(
-                viewModel = viewModel,
-                onDone = {
-                    viewModel.clearLookup()
-                    isAdding = false
-                }
-            )
-        }
+        AddWordSheet(
+            viewModel = viewModel,
+            onDismiss = { isAdding = false }
+        )
     }
 
     if (showQuizChooser) {
@@ -247,11 +248,10 @@ private fun QuizModeCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddWordForm(
+private fun AddWordSheet(
     viewModel: DictionaryViewModel,
-    onDone: () -> Unit
+    onDismiss: () -> Unit
 ) {
     val lookupInProgress by viewModel.lookupInProgress.collectAsState()
     val lookupResult by viewModel.lookupResult.collectAsState()
@@ -260,6 +260,17 @@ private fun AddWordForm(
     var translation by remember { mutableStateOf("") }
     var synonyms by remember { mutableStateOf("") }
     var example by remember { mutableStateOf("") }
+    var shownSuggestion by remember { mutableStateOf("") }
+    val wordFocus = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        delay(Motion.Medium.toLong())
+        wordFocus.requestFocus()
+    }
+
+    LaunchedEffect(suggestion) {
+        suggestion?.let { shownSuggestion = it }
+    }
 
     LaunchedEffect(lookupResult) {
         val result = lookupResult
@@ -270,53 +281,55 @@ private fun AddWordForm(
         }
     }
 
-    val canSave = word.isNotBlank() && translation.isNotBlank()
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .imePadding()
-            .padding(horizontal = 16.dp)
-            .padding(top = 8.dp, bottom = 24.dp)
+    FormSheet(
+        title = "New word",
+        confirmLabel = "Add word",
+        confirmEnabled = word.isNotBlank() && translation.isNotBlank(),
+        onDismiss = {
+            viewModel.clearLookup()
+            onDismiss()
+        },
+        onConfirm = {
+            val synonymList = synonyms.split(",").map { it.trim() }.filter { it.isNotBlank() }
+            viewModel.addEntry(word, translation, synonymList, example)
+        }
     ) {
-        Text(
-            text = "New word",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(modifier = Modifier.height(14.dp))
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.weight(1f)) {
-                FlatTextField(
-                    value = word,
-                    onValueChange = {
-                        word = it
-                        viewModel.dismissSuggestion()
-                    },
-                    placeholder = "English word",
-                    singleLine = true
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Bottom
+        ) {
+            FormTextField(
+                value = word,
+                onValueChange = {
+                    word = it
+                    viewModel.dismissSuggestion()
+                },
+                label = "Word",
+                placeholder = "English word",
+                modifier = Modifier.weight(1f),
+                focusRequester = wordFocus,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(
+                    onSearch = { if (word.isNotBlank() && !lookupInProgress) viewModel.lookup(word) }
                 )
-            }
-            Spacer(modifier = Modifier.width(8.dp))
+            )
             TextButton(
                 onClick = { viewModel.lookup(word) },
-                enabled = word.isNotBlank() && !lookupInProgress
+                enabled = word.isNotBlank() && !lookupInProgress,
+                modifier = Modifier.defaultMinSize(minWidth = 72.dp, minHeight = 52.dp)
             ) {
                 if (lookupInProgress) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(18.dp),
                         strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.primary
                     )
                 } else {
                     Text(
                         text = "Look up",
                         fontWeight = FontWeight.SemiBold,
                         color = if (word.isNotBlank())
-                            MaterialTheme.colorScheme.onSurface
+                            MaterialTheme.colorScheme.primary
                         else
                             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                     )
@@ -324,14 +337,17 @@ private fun AddWordForm(
             }
         }
 
-        val pendingSuggestion = suggestion
-        if (pendingSuggestion != null) {
-            Spacer(modifier = Modifier.height(8.dp))
+        AnimatedVisibility(
+            visible = suggestion != null,
+            enter = expandVertically(Motion.enter()) + fadeIn(Motion.enter()),
+            exit = shrinkVertically(Motion.exit()) + fadeOut(Motion.exit())
+        ) {
             Row(
                 modifier = Modifier
+                    .padding(top = 10.dp)
                     .fillMaxWidth()
                     .background(
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
                         shape = RoundedCornerShape(12.dp)
                     )
                     .padding(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
@@ -340,109 +356,83 @@ private fun AddWordForm(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Did you mean",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = pendingSuggestion,
+                        text = suggestion ?: shownSuggestion,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
-                TextButton(onClick = {
-                    word = pendingSuggestion
-                    viewModel.performLookup(pendingSuggestion)
-                }) {
+                TextButton(
+                    onClick = {
+                        val fixed = suggestion ?: shownSuggestion
+                        word = fixed
+                        viewModel.performLookup(fixed)
+                    },
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                ) {
                     Text(
-                        text = "Fix & look up",
+                        text = "Fix and look up",
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
-                TextButton(onClick = {
-                    viewModel.dismissSuggestion()
-                    viewModel.performLookup(word)
-                }) {
+                TextButton(
+                    onClick = {
+                        viewModel.dismissSuggestion()
+                        viewModel.performLookup(word)
+                    },
+                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                ) {
                     Text(
                         text = "Keep",
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         }
 
-        if (lookupResult?.isEmpty == true) {
-            Spacer(modifier = Modifier.height(6.dp))
+        AnimatedVisibility(
+            visible = lookupResult?.isEmpty == true,
+            enter = expandVertically(Motion.enter()) + fadeIn(Motion.enter()),
+            exit = shrinkVertically(Motion.exit()) + fadeOut(Motion.exit())
+        ) {
             Text(
                 text = "Nothing found. Fill in the fields yourself.",
                 fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp)
             )
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-        PropertyLabel(text = "Translation")
-        Spacer(modifier = Modifier.height(4.dp))
-        FlatTextField(
+        FormTextField(
             value = translation,
             onValueChange = { translation = it },
+            label = "Translation",
             placeholder = "Terjemahan bahasa Indonesia",
-            singleLine = true
+            modifier = Modifier.padding(top = 18.dp)
         )
 
-        Spacer(modifier = Modifier.height(14.dp))
-        PropertyLabel(text = "Synonyms")
-        Spacer(modifier = Modifier.height(4.dp))
-        FlatTextField(
+        FormTextField(
             value = synonyms,
             onValueChange = { synonyms = it },
+            label = "Synonyms",
             placeholder = "Comma separated, e.g. big, large, huge",
-            singleLine = false
+            singleLine = false,
+            modifier = Modifier.padding(top = 18.dp)
         )
 
-        Spacer(modifier = Modifier.height(14.dp))
-        PropertyLabel(text = "Example")
-        Spacer(modifier = Modifier.height(4.dp))
-        FlatTextField(
+        FormTextField(
             value = example,
             onValueChange = { example = it },
+            label = "Example",
             placeholder = "One short sentence",
-            singleLine = false
+            singleLine = false,
+            modifier = Modifier.padding(top = 18.dp)
         )
-
-        Spacer(modifier = Modifier.height(18.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
-        ) {
-            TextButton(onClick = {
-                viewModel.clearLookup()
-                onDone()
-            }) {
-                Text("Cancel", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f))
-            }
-            Spacer(modifier = Modifier.width(4.dp))
-            TextButton(
-                onClick = {
-                    val synonymList = synonyms.split(",").map { it.trim() }.filter { it.isNotBlank() }
-                    if (viewModel.addEntry(word, translation, synonymList, example)) {
-                        word = ""
-                        translation = ""
-                        synonyms = ""
-                        example = ""
-                        onDone()
-                    }
-                },
-                enabled = canSave
-            ) {
-                Text(
-                    text = "Save",
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (canSave) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                )
-            }
-        }
     }
 }
 
@@ -603,46 +593,4 @@ private fun EmptyState(onAdd: () -> Unit) {
             modifier = Modifier.clickable(onClick = onAdd)
         )
     }
-}
-
-@Composable
-private fun PropertyLabel(text: String) {
-    Text(
-        text = text,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun FlatTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    placeholder: String,
-    singleLine: Boolean,
-    minLines: Int = 1
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        placeholder = {
-            Text(
-                text = placeholder,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
-                fontSize = 15.sp
-            )
-        },
-        singleLine = singleLine,
-        minLines = minLines,
-        modifier = Modifier.fillMaxWidth(),
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = Color.Transparent,
-            unfocusedContainerColor = Color.Transparent,
-            disabledContainerColor = Color.Transparent,
-            focusedIndicatorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-            unfocusedIndicatorColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-        )
-    )
 }
