@@ -52,6 +52,8 @@ import com.example.livora.data.people.media.FaceImages
 import com.example.livora.data.people.media.ThumbnailLoader
 import com.example.livora.data.people.scan.ScanPhase
 import com.example.livora.data.people.scan.ScanProgress
+import com.example.livora.ui.components.AppButton
+import com.example.livora.ui.components.ButtonKind
 import com.example.livora.ui.components.SkeletonBox
 import java.text.NumberFormat
 
@@ -200,23 +202,20 @@ fun LinkButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    emphasis: Boolean = false
+    emphasis: Boolean = false,
+    destructive: Boolean = false
 ) {
-    Box(
-        modifier = modifier
-            .defaultMinSize(minHeight = 48.dp)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
-            .padding(horizontal = 4.dp),
-        contentAlignment = Alignment.CenterStart
-    ) {
-        Text(
-            text = text,
-            fontSize = 14.sp,
-            fontWeight = if (emphasis) FontWeight.SemiBold else FontWeight.Medium,
-            color = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
-            textDecoration = TextDecoration.Underline
-        )
-    }
+    AppButton(
+        text = text,
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        kind = when {
+            destructive -> ButtonKind.Danger
+            emphasis -> ButtonKind.Primary
+            else -> ButtonKind.Tonal
+        }
+    )
 }
 
 @Composable

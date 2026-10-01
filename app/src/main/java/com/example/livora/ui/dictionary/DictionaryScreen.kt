@@ -1,5 +1,8 @@
 package com.example.livora.ui.dictionary
 
+import androidx.compose.foundation.border
+import com.example.livora.ui.components.AppButton
+import com.example.livora.ui.components.ButtonKind
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -313,25 +316,22 @@ private fun AddWordSheet(
                     onSearch = { if (word.isNotBlank() && !lookupInProgress) viewModel.lookup(word) }
                 )
             )
-            TextButton(
-                onClick = { viewModel.lookup(word) },
-                enabled = word.isNotBlank() && !lookupInProgress,
-                modifier = Modifier.defaultMinSize(minWidth = 72.dp, minHeight = 52.dp)
+            Box(
+                modifier = Modifier.defaultMinSize(minWidth = 88.dp, minHeight = 52.dp),
+                contentAlignment = Alignment.Center
             ) {
                 if (lookupInProgress) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(20.dp),
                         strokeWidth = 2.dp,
                         color = MaterialTheme.colorScheme.primary
                     )
                 } else {
-                    Text(
+                    AppButton(
                         text = "Look up",
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (word.isNotBlank())
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                        onClick = { viewModel.lookup(word) },
+                        enabled = word.isNotBlank(),
+                        modifier = Modifier.defaultMinSize(minHeight = 52.dp)
                     )
                 }
             }
@@ -342,54 +342,45 @@ private fun AddWordSheet(
             enter = expandVertically(Motion.enter()) + fadeIn(Motion.enter()),
             exit = shrinkVertically(Motion.exit()) + fadeOut(Motion.exit())
         ) {
-            Row(
+            Column(
                 modifier = Modifier
                     .padding(top = 10.dp)
                     .fillMaxWidth()
-                    .background(
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                    .padding(start = 14.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+                    .padding(14.dp)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Did you mean",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = suggestion ?: shownSuggestion,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-                TextButton(
-                    onClick = {
-                        val fixed = suggestion ?: shownSuggestion
-                        word = fixed
-                        viewModel.performLookup(fixed)
-                    },
-                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
+                Text(
+                    text = "Did you mean",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = suggestion ?: shownSuggestion,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Row(
+                    modifier = Modifier.padding(top = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
+                    AppButton(
                         text = "Fix and look up",
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
+                        onClick = {
+                            val fixed = suggestion ?: shownSuggestion
+                            word = fixed
+                            viewModel.performLookup(fixed)
+                        },
+                        kind = ButtonKind.Primary,
+                        modifier = Modifier.weight(1f)
                     )
-                }
-                TextButton(
-                    onClick = {
-                        viewModel.dismissSuggestion()
-                        viewModel.performLookup(word)
-                    },
-                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                ) {
-                    Text(
-                        text = "Keep",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    AppButton(
+                        text = "Keep mine",
+                        onClick = {
+                            viewModel.dismissSuggestion()
+                            viewModel.performLookup(word)
+                        },
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
@@ -585,12 +576,6 @@ private fun EmptyState(onAdd: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
         )
         Spacer(modifier = Modifier.height(14.dp))
-        Text(
-            text = "Add word",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-            modifier = Modifier.clickable(onClick = onAdd)
-        )
+        AppButton(text = "Add word", onClick = onAdd, kind = ButtonKind.Primary)
     }
 }

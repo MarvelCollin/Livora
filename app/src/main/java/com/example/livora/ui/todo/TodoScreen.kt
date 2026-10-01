@@ -1,5 +1,8 @@
 package com.example.livora.ui.todo
 
+import androidx.compose.material.icons.filled.AccessTime
+import com.example.livora.ui.components.AppButton
+import com.example.livora.ui.components.ButtonKind
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
@@ -529,7 +532,6 @@ private fun TodoFormSheet(
                     PickerField(
                         text = if (timeOfDay.isBlank()) "Not set" else timeOfDay,
                         isPlaceholder = timeOfDay.isBlank(),
-                        actionLabel = if (timeOfDay.isBlank()) "Set time" else "Change",
                         onClick = { showTimePicker = true },
                         modifier = Modifier.weight(1f)
                     )
@@ -538,12 +540,7 @@ private fun TodoFormSheet(
                         enter = fadeIn(Motion.quick()) + expandHorizontally(Motion.enter()),
                         exit = fadeOut(Motion.quick()) + shrinkHorizontally(Motion.exit())
                     ) {
-                        TextButton(
-                            onClick = { timeOfDay = "" },
-                            modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                        ) {
-                            Text("Clear", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
+                        AppButton(text = "Clear", onClick = { timeOfDay = "" })
                     }
                 }
             }
@@ -647,7 +644,6 @@ private fun TodoFormSheet(
 private fun PickerField(
     text: String,
     isPlaceholder: Boolean,
-    actionLabel: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -670,28 +666,13 @@ private fun PickerField(
                 MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
-        Text(
-            text = actionLabel,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.primary
+        Icon(
+            imageVector = Icons.Default.AccessTime,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
         )
     }
-}
-
-@Composable
-private fun LinkText(text: String, onClick: () -> Unit) {
-    Text(
-        text = text,
-        fontSize = 14.sp,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier
-            .defaultMinSize(minHeight = 48.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 14.dp)
-    )
 }
 
 @Composable
@@ -745,6 +726,6 @@ private fun EmptyState(onAdd: () -> Unit) {
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
         )
         Spacer(modifier = Modifier.height(14.dp))
-        LinkText(text = "New task", onClick = onAdd)
+        AppButton(text = "New task", onClick = onAdd, kind = ButtonKind.Primary)
     }
 }

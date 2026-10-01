@@ -101,27 +101,18 @@ fun FormSheet(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(
-                    onClick = { closeAnimated() },
-                    modifier = Modifier.defaultMinSize(minHeight = 48.dp)
-                ) {
-                    Text(
-                        text = "Cancel",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Spacer(modifier = Modifier.padding(horizontal = 4.dp))
-                Button(
+                AppButton(
+                    text = "Cancel",
+                    onClick = { closeAnimated() }
+                )
+                Spacer(modifier = Modifier.padding(horizontal = 6.dp))
+                AppButton(
+                    text = confirmLabel,
                     onClick = { if (onConfirm()) closeAnimated() },
                     enabled = confirmEnabled && !closing,
-                    shape = Design.chipShape,
-                    modifier = Modifier.defaultMinSize(minWidth = 104.dp, minHeight = 48.dp)
-                ) {
-                    Text(
-                        text = confirmLabel,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+                    kind = ButtonKind.Primary,
+                    modifier = Modifier.defaultMinSize(minWidth = 112.dp)
+                )
             }
         }
     }
