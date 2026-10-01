@@ -52,7 +52,7 @@ class AcSettingsStore(context: Context) {
             .putBoolean(KEY_ECO, state.isEnergySaving)
             .putBoolean(KEY_DISPLAY, state.isDisplayOn)
             .putLong(KEY_TIMER_ENDS_AT, state.timerEndsAtMillis)
-            .apply()
+            .commit()
     }
 
     fun registerChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {

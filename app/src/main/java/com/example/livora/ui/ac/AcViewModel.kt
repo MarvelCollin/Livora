@@ -161,7 +161,6 @@ class AcViewModel(application: Application) : AndroidViewModel(application) {
         commitChange(AcChange.POWER) {
             it.copy(
                 isPoweredOn = on,
-                temperature = if (on && !it.isPoweredOn) DEFAULT_ON_TEMPERATURE else it.temperature,
                 timerEndsAtMillis = if (on) it.timerEndsAtMillis else 0L
             )
         }
@@ -200,7 +199,6 @@ class AcViewModel(application: Application) : AndroidViewModel(application) {
     companion object {
         private const val TAG = "Livora.AcViewModel"
         private const val MAX_TIMER_HOURS = 12
-        private const val DEFAULT_ON_TEMPERATURE = 20
         private const val HOUR_MILLIS = 3_600_000L
     }
 }
