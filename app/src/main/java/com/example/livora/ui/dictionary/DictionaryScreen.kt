@@ -13,9 +13,11 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.text.input.ImeAction
+import com.example.livora.ui.components.FormSection
 import com.example.livora.ui.components.FormSheet
 import com.example.livora.ui.components.FormTextField
 import com.example.livora.ui.components.Motion
+import com.example.livora.ui.components.SegmentedControl
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -76,12 +78,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.livora.data.model.DictionaryEntry
+import com.example.livora.data.model.EntryCategory
 import com.example.livora.data.model.QuizMode
+import com.example.livora.data.model.SynonymInput
 import com.example.livora.ui.components.Design
 import com.example.livora.ui.components.SkeletonBox
 import com.example.livora.ui.components.SkeletonLine
 import com.example.livora.ui.components.Tag
 import com.example.livora.ui.components.TopBar
+
+private enum class ListFilter(val label: String) {
+    All("All"),
+    Vocabulary("Vocabulary"),
+    Writing("IELTS writing")
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,6 +105,15 @@ fun DictionaryScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     var isAdding by rememberSaveable { mutableStateOf(false) }
     var showQuizChooser by rememberSaveable { mutableStateOf(false) }
+    var filter by rememberSaveable { mutableStateOf(ListFilter.All) }
+    var synonymInput by rememberSaveable { mutableStateOf(SynonymInput.Click) }
+    val hasWriting = entries.any { it.category == EntryCategory.Writing }
+    val activeFilter = if (hasWriting) filter else ListFilter.All
+    val visible = when (activeFilter) {
+        ListFilter.All -> entries
+        ListFilter.Vocabulary -> entries.filter { it.category == EntryCategory.Vocabulary }
+        ListFilter.Writing -> entries.filter { it.category == EntryCategory.Writing }
+    }
 
     LaunchedEffect(addRequests) {
         addRequests.collect {
@@ -113,6 +132,18 @@ fun DictionaryScreen(
     ) {
         item { Spacer(modifier = Modifier.height(8.dp)) }
 
+        if (hasWriting) {
+            item {
+                SegmentedControl(
+                    options = ListFilter.entries.toList(),
+                    selected = activeFilter,
+                    label = { it.label },
+                    onSelect = { filter = it },
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+            }
+        }
+
         if (isLoading && entries.isEmpty()) {
             items(6) { DictionaryRowSkeleton() }
         }
@@ -121,13 +152,24 @@ fun DictionaryScreen(
             item { EmptyState(onAdd = { isAdding = true }) }
         }
 
-        itemsIndexed(entries, key = { _, it -> it.id }) { index, entry ->
+        if (entries.isNotEmpty() && visible.isEmpty()) {
+            item {
+                Text(
+                    text = "Nothing in this section yet.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 24.dp)
+                )
+            }
+        }
+
+        itemsIndexed(visible, key = { _, it -> it.id }) { index, entry ->
             Column(modifier = Modifier.animateItem()) {
             EntryRow(
                 entry = entry,
                 onDelete = { viewModel.deleteEntry(entry) }
             )
-            if (index < entries.lastIndex) {
+            if (index < visible.lastIndex) {
                 HorizontalDivider(
                     modifier = Modifier.padding(horizontal = 12.dp),
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.07f),
@@ -155,10 +197,13 @@ fun DictionaryScreen(
             containerColor = MaterialTheme.colorScheme.surface
         ) {
             QuizChooser(
-                totalWords = entries.count { it.translation.isNotBlank() },
+                totalWords = viewModel.vocabularyCount(),
                 hardestWords = viewModel.hardestCount(),
+                writingWords = viewModel.writingCount(),
+                synonymInput = synonymInput,
+                onInputChange = { synonymInput = it },
                 onPick = { mode ->
-                    viewModel.startQuiz(mode)
+                    viewModel.startQuiz(mode, synonymInput)
                     showQuizChooser = false
                     onOpenQuiz()
                 }
@@ -171,11 +216,15 @@ fun DictionaryScreen(
 private fun QuizChooser(
     totalWords: Int,
     hardestWords: Int,
+    writingWords: Int,
+    synonymInput: SynonymInput,
+    onInputChange: (SynonymInput) -> Unit,
     onPick: (QuizMode) -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp)
             .padding(top = 8.dp, bottom = 28.dp)
     ) {
@@ -185,23 +234,51 @@ private fun QuizChooser(
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
         )
-        Spacer(modifier = Modifier.height(14.dp))
-        QuizModeCard(
-            title = "All words",
-            description = "$totalWords words · random order",
-            enabled = totalWords >= 2,
-            onClick = { onPick(QuizMode.All) }
-        )
-        Spacer(modifier = Modifier.height(10.dp))
-        QuizModeCard(
-            title = "Hardest first",
-            description = if (hardestWords > 0)
-                "$hardestWords words you miss most"
-            else
-                "No mistakes yet · uses all words",
-            enabled = totalWords >= 2,
-            onClick = { onPick(QuizMode.Hardest) }
-        )
+        FormSection(label = "Answer synonyms by", topGap = 14.dp) {
+            SegmentedControl(
+                options = SynonymInput.entries.toList(),
+                selected = synonymInput,
+                label = { if (it == SynonymInput.Click) "Click" else "Write" },
+                onSelect = onInputChange
+            )
+            Text(
+                text = if (synonymInput == SynonymInput.Click)
+                    "Choose the synonyms from many options"
+                else
+                    "Type the synonyms one by one, the app tells you how many",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        FormSection(label = "Vocabulary", topGap = 20.dp) {
+            QuizModeCard(
+                title = "All words",
+                description = "$totalWords words · random order",
+                enabled = totalWords >= 2,
+                onClick = { onPick(QuizMode.All) }
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            QuizModeCard(
+                title = "Hardest first",
+                description = if (hardestWords > 0)
+                    "$hardestWords words you miss most"
+                else
+                    "No mistakes yet · uses all words",
+                enabled = totalWords >= 2,
+                onClick = { onPick(QuizMode.Hardest) }
+            )
+        }
+        FormSection(label = "IELTS writing", topGap = 20.dp) {
+            QuizModeCard(
+                title = "Writing upgrades",
+                description = if (writingWords > 0)
+                    "$writingWords words · band 7 to 9 synonyms with the Indonesian meaning"
+                else
+                    "No writing words yet",
+                enabled = writingWords >= 1,
+                onClick = { onPick(QuizMode.Writing) }
+            )
+        }
     }
 }
 
@@ -263,6 +340,7 @@ private fun AddWordSheet(
     var translation by remember { mutableStateOf("") }
     var synonyms by remember { mutableStateOf("") }
     var example by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf(EntryCategory.Vocabulary) }
     var shownSuggestion by remember { mutableStateOf("") }
     val wordFocus = remember { FocusRequester() }
 
@@ -294,7 +372,7 @@ private fun AddWordSheet(
         },
         onConfirm = {
             val synonymList = synonyms.split(",").map { it.trim() }.filter { it.isNotBlank() }
-            viewModel.saveEntry(word, translation, synonymList, example)
+            viewModel.saveEntry(word, translation, synonymList, example, category)
         }
     ) {
         Row(
@@ -424,6 +502,15 @@ private fun AddWordSheet(
             singleLine = false,
             modifier = Modifier.padding(top = 18.dp)
         )
+
+        FormSection(label = "Type") {
+            SegmentedControl(
+                options = EntryCategory.entries.toList(),
+                selected = category,
+                label = { if (it == EntryCategory.Writing) "IELTS writing" else "Vocabulary" },
+                onSelect = { category = it }
+            )
+        }
     }
 }
 

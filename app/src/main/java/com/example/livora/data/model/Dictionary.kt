@@ -1,5 +1,15 @@
 package com.example.livora.data.model
 
+enum class EntryCategory(val dbValue: String) {
+    Vocabulary("vocabulary"),
+    Writing("writing");
+
+    companion object {
+        fun fromDb(value: String?): EntryCategory =
+            entries.firstOrNull { it.dbValue.equals(value?.trim(), ignoreCase = true) } ?: Vocabulary
+    }
+}
+
 data class DictionaryEntry(
     val id: String,
     val word: String,
@@ -8,13 +18,16 @@ data class DictionaryEntry(
     val example: String = "",
     val correctCount: Int = 0,
     val wrongCount: Int = 0,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val category: EntryCategory = EntryCategory.Vocabulary
 ) {
     val attempts: Int get() = correctCount + wrongCount
     val accuracy: Float get() = if (attempts == 0) 0f else correctCount.toFloat() / attempts.toFloat()
 }
 
-enum class QuizMode { All, Hardest }
+enum class QuizMode { All, Hardest, Writing }
+
+enum class SynonymInput { Click, Write }
 
 data class LookupResult(
     val translation: String,
@@ -27,12 +40,15 @@ data class LookupResult(
 
 data class SynonymRound(
     val options: List<String>,
-    val correct: Set<String>
+    val correct: Set<String>,
+    val needed: Int = correct.size,
+    val typed: Boolean = false
 )
 
 data class QuizQuestion(
     val entry: DictionaryEntry,
     val options: List<String>,
     val correctIndex: Int,
-    val synonymRound: SynonymRound? = null
+    val synonymRound: SynonymRound? = null,
+    val translationStep: Boolean = true
 )

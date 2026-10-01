@@ -4,11 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.livora.data.dictionary.DictionaryLookupRepository
 import com.example.livora.data.dictionary.IeltsSynonyms
-import com.example.livora.data.dictionary.SynonymRounds
+import com.example.livora.data.dictionary.QuizBuilder
 import com.example.livora.data.model.DictionaryEntry
+import com.example.livora.data.model.EntryCategory
 import com.example.livora.data.model.LookupResult
 import com.example.livora.data.model.QuizMode
 import com.example.livora.data.model.QuizQuestion
+import com.example.livora.data.model.SynonymInput
 import com.example.livora.data.supabase.DictionaryDto
 import com.example.livora.data.supabase.DictionaryInsertDto
 import com.example.livora.data.supabase.DictionaryRepository
@@ -48,6 +50,7 @@ class DictionaryViewModel : ViewModel() {
 
     private val pendingMutations = MutableStateFlow<Set<String>>(emptySet())
     private var _quizMode: QuizMode = QuizMode.All
+    private var _synonymInput: SynonymInput = SynonymInput.Click
 
     init {
         refresh()
@@ -124,7 +127,8 @@ class DictionaryViewModel : ViewModel() {
         word: String,
         translation: String,
         synonyms: List<String>,
-        example: String
+        example: String,
+        category: EntryCategory = EntryCategory.Vocabulary
     ): String? {
         val trimmedWord = word.trim()
         if (trimmedWord.isBlank()) return "Enter the word first."
@@ -144,7 +148,8 @@ class DictionaryViewModel : ViewModel() {
                         example = example.trim(),
                         correctCount = 0,
                         wrongCount = 0,
-                        createdAt = System.currentTimeMillis()
+                        createdAt = System.currentTimeMillis(),
+                        category = category.dbValue.takeIf { category != EntryCategory.Vocabulary }
                     )
                 )
                 _entries.update { listOf(inserted.toEntry()) + it }
@@ -193,7 +198,8 @@ class DictionaryViewModel : ViewModel() {
                         example = entry.example,
                         correctCount = entry.correctCount,
                         wrongCount = entry.wrongCount,
-                        createdAt = entry.createdAt
+                        createdAt = entry.createdAt,
+                        category = entry.category.dbValue.takeIf { entry.category != EntryCategory.Vocabulary }
                     )
                 )
                 _entries.update { (it + inserted.toEntry()).sortedByDescending { e -> e.createdAt } }
@@ -206,43 +212,13 @@ class DictionaryViewModel : ViewModel() {
         }
     }
 
-    fun startQuiz(mode: QuizMode = QuizMode.All) {
+    fun startQuiz(mode: QuizMode = QuizMode.All, input: SynonymInput = SynonymInput.Click) {
         _quizMode = mode
-        val pool = _entries.value.filter { it.translation.isNotBlank() }
-        val selected = when (mode) {
-            QuizMode.All -> pool.shuffled()
-            QuizMode.Hardest -> {
-                val withMistakes = pool.filter { it.wrongCount > 0 }
-                val ordered = if (withMistakes.isNotEmpty()) withMistakes else pool
-                ordered.sortedWith(
-                    compareByDescending<DictionaryEntry> { it.wrongCount }
-                        .thenByDescending { it.attempts }
-                )
-            }
-        }
-        val questions = selected.mapNotNull { entry ->
-            val distractors = pool
-                .filter { it.id != entry.id && !it.translation.equals(entry.translation, ignoreCase = true) }
-                .map { it.translation }
-                .distinct()
-                .shuffled()
-                .take(3)
-            val options = (distractors + entry.translation).distinct().shuffled()
-            if (options.size < 2) {
-                null
-            } else {
-                QuizQuestion(
-                    entry = entry,
-                    options = options,
-                    correctIndex = options.indexOf(entry.translation),
-                    synonymRound = SynonymRounds.build(entry, _entries.value)
-                )
-            }
-        }
-        _quiz.value = questions
+        _synonymInput = input
+        _quiz.value = QuizBuilder.build(_entries.value, mode, input)
     }
 
-    fun restartQuiz() = startQuiz(_quizMode)
+    fun restartQuiz() = startQuiz(_quizMode, _synonymInput)
 
     fun recordAnswer(entryId: String, isCorrect: Boolean) {
         val entry = _entries.value.firstOrNull { it.id == entryId } ?: return
@@ -260,9 +236,13 @@ class DictionaryViewModel : ViewModel() {
         }
     }
 
-    fun canQuiz(): Boolean = _entries.value.count { it.translation.isNotBlank() } >= 2
+    fun vocabularyCount(): Int = QuizBuilder.vocabularyPool(_entries.value).size
 
-    fun hardestCount(): Int = _entries.value.count { it.translation.isNotBlank() && it.wrongCount > 0 }
+    fun writingCount(): Int = QuizBuilder.writingPool(_entries.value).size
+
+    fun canQuiz(): Boolean = vocabularyCount() >= 2 || writingCount() >= 1
+
+    fun hardestCount(): Int = QuizBuilder.vocabularyPool(_entries.value).count { it.wrongCount > 0 }
 
     private fun DictionaryDto.toEntry(): DictionaryEntry = DictionaryEntry(
         id = id,
@@ -272,7 +252,8 @@ class DictionaryViewModel : ViewModel() {
         example = example,
         correctCount = correctCount,
         wrongCount = wrongCount,
-        createdAt = createdAt
+        createdAt = createdAt,
+        category = EntryCategory.fromDb(category)
     )
 
     private companion object {

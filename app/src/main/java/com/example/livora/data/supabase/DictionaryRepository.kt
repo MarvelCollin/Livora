@@ -9,6 +9,15 @@ class DictionaryRepository {
     suspend fun fetchAll(): List<DictionaryDto> = call { api.getAll() }
 
     suspend fun insert(dto: DictionaryInsertDto): DictionaryDto {
+        return try {
+            insertWithLanguage(dto)
+        } catch (e: IllegalStateException) {
+            if (dto.category == null || !isMissingCategory(e.message)) throw e
+            insertWithLanguage(dto.copy(category = null))
+        }
+    }
+
+    private suspend fun insertWithLanguage(dto: DictionaryInsertDto): DictionaryDto {
         val withLanguage = dto.copy(language = LEGACY_LANGUAGE)
         if (needsLanguage) return call { api.insert(withLanguage) }.first()
         return try {
@@ -40,6 +49,10 @@ class DictionaryRepository {
 
     private fun isMissingLanguage(message: String?): Boolean =
         message != null && message.contains("23502") && message.contains("language")
+
+    private fun isMissingCategory(message: String?): Boolean =
+        message != null && message.contains("category") &&
+            (message.contains("PGRST204") || message.contains("42703"))
 
     private companion object {
         const val LEGACY_LANGUAGE = "en"

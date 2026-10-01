@@ -16,12 +16,15 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -46,16 +49,22 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.livora.data.dictionary.SynonymRounds
+import com.example.livora.data.dictionary.WriteResult
 import com.example.livora.data.model.SynonymRound
 import com.example.livora.ui.components.AppButton
 import com.example.livora.ui.components.ButtonKind
+import com.example.livora.ui.components.FormTextField
 import com.example.livora.ui.components.Tag
 import com.example.livora.ui.components.TopBar
 
@@ -72,6 +81,10 @@ fun DictionaryQuizScreen(
     var hintShown by remember(index) { mutableStateOf(false) }
     var picked by remember(index) { mutableStateOf(setOf<String>()) }
     var synonymChecked by remember(index) { mutableStateOf(false) }
+    var found by remember(index) { mutableStateOf(listOf<String>()) }
+    var misses by remember(index) { mutableIntStateOf(0) }
+    var typedText by remember(index) { mutableStateOf("") }
+    var writeMessage by remember(index) { mutableStateOf<String?>(null) }
     var synonymScore by remember { mutableIntStateOf(0) }
     var synonymTotal by remember { mutableIntStateOf(0) }
     var finished by remember { mutableStateOf(false) }
@@ -80,7 +93,7 @@ fun DictionaryQuizScreen(
     Scaffold(
         topBar = {
             TopBar(
-                title = "Quiz",
+                title = if (quiz.firstOrNull()?.translationStep == false) "Writing quiz" else "Quiz",
                 subtitle = if (quiz.isNotEmpty() && !finished) "Question ${index + 1} of ${quiz.size}" else null,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
@@ -121,7 +134,7 @@ fun DictionaryQuizScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Add at least 2 words with translations to start a quiz.",
+                    text = "There are not enough words to start this quiz.",
                     fontSize = 14.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                     modifier = Modifier.padding(horizontal = 32.dp)
@@ -153,11 +166,43 @@ fun DictionaryQuizScreen(
         }
 
         val question = quiz[index]
-        val answered = selected != null
+        val translationStep = question.translationStep
+        val answered = !translationStep || selected != null
+        val translationCorrect = !translationStep || selected == question.correctIndex
         val round = question.synonymRound
-        val synonymsPending = answered && selected == question.correctIndex && round != null
+        val synonymsPending = answered && translationCorrect && round != null
         val roundOpen = synonymsPending && !synonymChecked
         val hintSynonyms = if (round == null) question.entry.synonyms else emptyList()
+
+        fun finishRound(success: Boolean) {
+            synonymChecked = true
+            if (translationStep) {
+                synonymTotal++
+                if (success) synonymScore++
+            } else {
+                if (success) score++
+                viewModel.recordAnswer(question.entry.id, success)
+            }
+        }
+
+        fun submitWrite(writeRound: SynonymRound) {
+            when (val result = SynonymRounds.check(typedText, writeRound, found)) {
+                is WriteResult.Accepted -> {
+                    found = found + result.word
+                    typedText = ""
+                    writeMessage = null
+                    if (found.size >= writeRound.needed) finishRound(true)
+                }
+                WriteResult.Duplicate -> writeMessage = "You already added that one."
+                WriteResult.Blank -> Unit
+                WriteResult.Wrong -> {
+                    misses++
+                    typedText = ""
+                    writeMessage = "Not one of this word's synonyms."
+                    if (misses >= SynonymRounds.MAX_MISSES) finishRound(false)
+                }
+            }
+        }
 
         LaunchedEffect(index, synonymsPending, synonymChecked) {
             if (answered) {
@@ -170,6 +215,7 @@ fun DictionaryQuizScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .imePadding()
                 .verticalScroll(scrollState)
                 .padding(horizontal = 20.dp)
         ) {
@@ -177,7 +223,7 @@ fun DictionaryQuizScreen(
             QuizProgress(current = index + 1, total = quiz.size)
             Spacer(modifier = Modifier.height(20.dp))
             Text(
-                text = "What is the Indonesian for",
+                text = if (translationStep) "What is the Indonesian for" else "Give the synonyms of",
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
             )
@@ -188,10 +234,19 @@ fun DictionaryQuizScreen(
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
+            if (!translationStep && question.entry.translation.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = question.entry.translation,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
+                )
+            }
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            if (hintShown && !synonymsPending && (hintSynonyms.isNotEmpty() || question.entry.example.isNotBlank())) {
+            if (hintShown && (hintSynonyms.isNotEmpty() || question.entry.example.isNotBlank())) {
                 HintCard(
                     synonyms = hintSynonyms,
                     example = question.entry.example
@@ -215,37 +270,52 @@ fun DictionaryQuizScreen(
                 Spacer(modifier = Modifier.height(10.dp))
             }
 
-            if (synonymsPending && round != null) {
+            if (synonymsPending) {
                 Spacer(modifier = Modifier.height(10.dp))
-                SynonymRoundSection(
-                    word = question.entry.word,
-                    round = round,
-                    picked = picked,
-                    checked = synonymChecked,
-                    onToggle = { option ->
-                        picked = if (option in picked) picked - option else picked + option
-                    }
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                if (roundOpen) {
-                    AppButton(
-                        text = "Check synonyms",
-                        onClick = {
-                            synonymChecked = true
-                            synonymTotal++
-                            if (picked == round.correct) synonymScore++
+                if (round.typed) {
+                    SynonymWriteSection(
+                        word = question.entry.word,
+                        round = round,
+                        found = found,
+                        misses = misses,
+                        text = typedText,
+                        message = writeMessage,
+                        done = synonymChecked,
+                        onTextChange = {
+                            typedText = it
+                            writeMessage = null
                         },
-                        kind = ButtonKind.Primary,
-                        enabled = picked.size == round.correct.size,
-                        modifier = Modifier.fillMaxWidth()
+                        onSubmit = { submitWrite(round) },
+                        onGiveUp = { finishRound(false) }
                     )
+                } else {
+                    SynonymRoundSection(
+                        word = question.entry.word,
+                        round = round,
+                        picked = picked,
+                        checked = synonymChecked,
+                        onToggle = { option ->
+                            picked = if (option in picked) picked - option else picked + option
+                        }
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    if (roundOpen) {
+                        AppButton(
+                            text = "Check synonyms",
+                            onClick = { finishRound(picked == round.correct) },
+                            kind = ButtonKind.Primary,
+                            enabled = picked.size == round.needed,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                 }
             }
 
             if (answered && !roundOpen) {
                 Spacer(modifier = Modifier.height(8.dp))
                 ExplanationCard(
-                    correct = question.options[question.correctIndex],
+                    title = if (translationStep) "Answer" else "Meaning",
+                    correct = if (translationStep) question.options[question.correctIndex] else question.entry.translation,
                     synonyms = question.entry.synonyms,
                     example = question.entry.example
                 )
@@ -385,7 +455,7 @@ private fun SynonymRoundSection(
     checked: Boolean,
     onToggle: (String) -> Unit
 ) {
-    val needed = round.correct.size
+    val needed = round.needed
     val found = picked.count { it in round.correct }
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -430,6 +500,111 @@ private fun SynonymRoundSection(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SynonymWriteSection(
+    word: String,
+    round: SynonymRound,
+    found: List<String>,
+    misses: Int,
+    text: String,
+    message: String?,
+    done: Boolean,
+    onTextChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onGiveUp: () -> Unit
+) {
+    val needed = round.needed
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(done) {
+        if (!done) focus.requestFocus()
+    }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = if (needed == 1) "Write the synonym of \"$word\"" else "Write the $needed synonyms of \"$word\"",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = when {
+                !done -> "${found.size} of $needed found, ${SynonymRounds.MAX_MISSES - misses} tries left"
+                found.size >= needed -> "All $needed found"
+                else -> "You found ${found.size} of $needed"
+            },
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+        )
+        if (found.isNotEmpty() || done) {
+            Spacer(modifier = Modifier.height(12.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                found.forEach { synonym ->
+                    SynonymChoice(
+                        text = synonym,
+                        state = OptionState.Correct,
+                        selected = true,
+                        enabled = false,
+                        onToggle = {}
+                    )
+                }
+                if (done) {
+                    round.correct.filter { answer -> found.none { it.equals(answer, ignoreCase = true) } }
+                        .forEach { answer ->
+                            SynonymChoice(
+                                text = answer,
+                                state = OptionState.MissedCorrect,
+                                selected = false,
+                                enabled = false,
+                                onToggle = {}
+                            )
+                        }
+                }
+            }
+        }
+        if (!done) {
+            Spacer(modifier = Modifier.height(12.dp))
+            FormTextField(
+                value = text,
+                onValueChange = onTextChange,
+                placeholder = "Type one synonym",
+                focusRequester = focus,
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.None,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(onDone = { onSubmit() })
+            )
+            if (message != null) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = message,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AppButton(
+                    text = "Add",
+                    onClick = onSubmit,
+                    kind = ButtonKind.Primary,
+                    enabled = text.isNotBlank(),
+                    modifier = Modifier.weight(1f)
+                )
+                AppButton(
+                    text = "Show answers",
+                    onClick = onGiveUp,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun SynonymChoice(
     text: String,
@@ -467,6 +642,7 @@ private fun SynonymChoice(
 
 @Composable
 private fun ExplanationCard(
+    title: String,
     correct: String,
     synonyms: List<String>,
     example: String
@@ -481,7 +657,7 @@ private fun ExplanationCard(
             .padding(16.dp)
     ) {
         Text(
-            text = "Answer",
+            text = title,
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
