@@ -54,6 +54,7 @@ import com.example.livora.data.model.BulbScene
 import com.example.livora.data.model.BulbState
 import com.example.livora.ui.ac.AcViewModel
 import com.example.livora.ui.bulb.BulbViewModel
+import com.example.livora.ui.components.AnimatedNumber
 import com.example.livora.ui.components.Design
 import com.example.livora.ui.components.StepButton
 import com.example.livora.ui.components.Toaster
@@ -210,12 +211,14 @@ private fun AcCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "${state.temperature}°",
-                    fontSize = 52.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.content.copy(alpha = if (state.isPoweredOn) 1f else 0.4f)
-                )
+                AnimatedNumber(value = state.temperature) { temperature ->
+                    Text(
+                        text = "$temperature°",
+                        fontSize = 52.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.content.copy(alpha = if (state.isPoweredOn) 1f else 0.4f)
+                    )
+                }
                 Text(
                     text = summary,
                     fontSize = 13.sp,
@@ -294,12 +297,14 @@ private fun BulbCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "${state.brightness}%",
-                        fontSize = 52.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = colors.content.copy(alpha = if (isOn) 1f else 0.4f)
-                    )
+                    AnimatedNumber(value = state.brightness) { brightness ->
+                        Text(
+                            text = "$brightness%",
+                            fontSize = 52.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.content.copy(alpha = if (isOn) 1f else 0.4f)
+                        )
+                    }
                     Text(
                         text = if (isOn) "Brightness · ${state.colorTemp}K" else "Off",
                         fontSize = 13.sp,

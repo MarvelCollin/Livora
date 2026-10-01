@@ -60,6 +60,7 @@ import com.example.livora.data.model.AcMode
 import com.example.livora.data.model.AcState
 import com.example.livora.data.model.FanSpeed
 import com.example.livora.data.model.SwingMode
+import com.example.livora.ui.components.AnimatedNumber
 import com.example.livora.ui.components.ChoiceOption
 import com.example.livora.ui.components.ChoiceRow
 import com.example.livora.ui.components.Design
@@ -295,12 +296,14 @@ private fun PowerAndTemperatureSection(
                 )
 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "${state.temperature}°",
-                        fontSize = 56.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (state.isPoweredOn) 1f else 0.35f)
-                    )
+                    AnimatedNumber(value = state.temperature) { temperature ->
+                        Text(
+                            text = "$temperature°",
+                            fontSize = 56.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (state.isPoweredOn) 1f else 0.35f)
+                        )
+                    }
                     Text(
                         text = "Celsius",
                         fontSize = 12.sp,
