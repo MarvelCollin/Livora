@@ -59,7 +59,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.livora.data.model.DictionaryEntry
-import com.example.livora.data.model.DictionaryLanguage
 import com.example.livora.data.model.QuizMode
 import com.example.livora.ui.components.Design
 import com.example.livora.ui.components.SkeletonBox
@@ -77,7 +76,6 @@ fun DictionaryScreen(
 ) {
     val entries by viewModel.entries.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    val selectedLanguage by viewModel.selectedLanguage.collectAsState()
     var isAdding by rememberSaveable { mutableStateOf(false) }
     var showQuizChooser by rememberSaveable { mutableStateOf(false) }
 
@@ -96,14 +94,7 @@ fun DictionaryScreen(
             .fillMaxSize()
             .padding(horizontal = 4.dp)
     ) {
-        item {
-            Spacer(modifier = Modifier.height(8.dp))
-            LanguageRow(
-                selected = selectedLanguage,
-                onSelect = { viewModel.selectLanguage(it) }
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-        }
+        item { Spacer(modifier = Modifier.height(8.dp)) }
 
         if (isLoading && entries.isEmpty()) {
             items(6) { DictionaryRowSkeleton() }
@@ -144,7 +135,6 @@ fun DictionaryScreen(
         ) {
             AddWordForm(
                 viewModel = viewModel,
-                language = selectedLanguage,
                 onDone = {
                     viewModel.clearLookup()
                     isAdding = false
@@ -257,48 +247,10 @@ private fun QuizModeCard(
     }
 }
 
-@Composable
-private fun LanguageRow(
-    selected: DictionaryLanguage,
-    onSelect: (DictionaryLanguage) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        DictionaryLanguage.entries.forEach { language ->
-            val isSelected = language == selected
-            Text(
-                text = language.label,
-                fontSize = 13.sp,
-                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (isSelected)
-                    MaterialTheme.colorScheme.surface
-                else
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                modifier = Modifier
-                    .background(
-                        color = if (isSelected)
-                            MaterialTheme.colorScheme.onSurface
-                        else
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
-                        shape = RoundedCornerShape(8.dp)
-                    )
-                    .clickable { onSelect(language) }
-                    .padding(horizontal = 14.dp, vertical = 14.dp)
-            )
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddWordForm(
     viewModel: DictionaryViewModel,
-    language: DictionaryLanguage,
     onDone: () -> Unit
 ) {
     val lookupInProgress by viewModel.lookupInProgress.collectAsState()
@@ -306,23 +258,19 @@ private fun AddWordForm(
     val suggestion by viewModel.suggestion.collectAsState()
     var word by remember { mutableStateOf("") }
     var translation by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var descriptionId by remember { mutableStateOf("") }
-    var example by remember { mutableStateOf("") }
     var synonyms by remember { mutableStateOf("") }
+    var example by remember { mutableStateOf("") }
 
     LaunchedEffect(lookupResult) {
         val result = lookupResult
         if (result != null) {
             if (result.translation.isNotBlank()) translation = result.translation
-            if (result.description.isNotBlank()) description = result.description
-            if (result.descriptionId.isNotBlank()) descriptionId = result.descriptionId
-            if (result.example.isNotBlank()) example = result.example
             if (result.synonyms.isNotEmpty()) synonyms = result.synonyms.joinToString(", ")
+            if (result.example.isNotBlank()) example = result.example
         }
     }
 
-    val canSave = word.isNotBlank() && (translation.isNotBlank() || description.isNotBlank() || descriptionId.isNotBlank())
+    val canSave = word.isNotBlank() && translation.isNotBlank()
 
     Column(
         modifier = Modifier
@@ -333,7 +281,7 @@ private fun AddWordForm(
             .padding(top = 8.dp, bottom = 24.dp)
     ) {
         Text(
-            text = "New word · ${language.label}",
+            text = "New word",
             fontSize = 18.sp,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
@@ -348,7 +296,7 @@ private fun AddWordForm(
                         word = it
                         viewModel.dismissSuggestion()
                     },
-                    placeholder = "Word in ${language.label}",
+                    placeholder = "English word",
                     singleLine = true
                 )
             }
@@ -424,56 +372,23 @@ private fun AddWordForm(
             }
         }
 
-        if (lookupResult != null && !lookupResult!!.definitionFound) {
+        if (lookupResult?.isEmpty == true) {
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "No dictionary entry found. Add your own description below.",
+                text = "Nothing found. Fill in the fields yourself.",
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
             )
         }
 
         Spacer(modifier = Modifier.height(12.dp))
-        PropertyLabel(text = "Indonesian translation")
+        PropertyLabel(text = "Translation")
         Spacer(modifier = Modifier.height(4.dp))
         FlatTextField(
             value = translation,
             onValueChange = { translation = it },
-            placeholder = "Terjemahan",
+            placeholder = "Terjemahan bahasa Indonesia",
             singleLine = true
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
-        PropertyLabel(text = "Description (${language.label})")
-        Spacer(modifier = Modifier.height(4.dp))
-        FlatTextField(
-            value = description,
-            onValueChange = { description = it },
-            placeholder = "Meaning in ${language.label}",
-            singleLine = false,
-            minLines = 2
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
-        PropertyLabel(text = "Description (Indonesia)")
-        Spacer(modifier = Modifier.height(4.dp))
-        FlatTextField(
-            value = descriptionId,
-            onValueChange = { descriptionId = it },
-            placeholder = "Arti dalam bahasa Indonesia",
-            singleLine = false,
-            minLines = 2
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
-        PropertyLabel(text = "Example (${language.label})")
-        Spacer(modifier = Modifier.height(4.dp))
-        FlatTextField(
-            value = example,
-            onValueChange = { example = it },
-            placeholder = "Contoh kalimat dalam ${language.label}",
-            singleLine = false,
-            minLines = 2
         )
 
         Spacer(modifier = Modifier.height(14.dp))
@@ -483,6 +398,16 @@ private fun AddWordForm(
             value = synonyms,
             onValueChange = { synonyms = it },
             placeholder = "Comma separated, e.g. big, large, huge",
+            singleLine = false
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
+        PropertyLabel(text = "Example")
+        Spacer(modifier = Modifier.height(4.dp))
+        FlatTextField(
+            value = example,
+            onValueChange = { example = it },
+            placeholder = "One short sentence",
             singleLine = false
         )
 
@@ -501,13 +426,11 @@ private fun AddWordForm(
             TextButton(
                 onClick = {
                     val synonymList = synonyms.split(",").map { it.trim() }.filter { it.isNotBlank() }
-                    if (viewModel.addEntry(word, translation, description, descriptionId, example, synonymList)) {
+                    if (viewModel.addEntry(word, translation, synonymList, example)) {
                         word = ""
                         translation = ""
-                        description = ""
-                        descriptionId = ""
-                        example = ""
                         synonyms = ""
+                        example = ""
                         onDone()
                     }
                 },
@@ -535,16 +458,12 @@ private fun EntryRow(
         verticalAlignment = Alignment.Top
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = entry.word,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Tag(text = DictionaryLanguage.fromCode(entry.language).label)
-            }
+            Text(
+                text = entry.word,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
             if (entry.translation.isNotBlank()) {
                 Spacer(modifier = Modifier.height(3.dp))
                 Text(
@@ -552,31 +471,6 @@ private fun EntryRow(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                )
-            }
-            if (entry.descriptionId.isNotBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = entry.descriptionId,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                )
-            }
-            if (entry.description.isNotBlank()) {
-                Spacer(modifier = Modifier.height(3.dp))
-                Text(
-                    text = entry.description,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
-                )
-            }
-            if (entry.example.isNotBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "“${entry.example}”",
-                    fontSize = 12.sp,
-                    fontStyle = FontStyle.Italic,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                 )
             }
             if (entry.synonyms.isNotEmpty()) {
@@ -590,6 +484,15 @@ private fun EntryRow(
                         Tag(text = synonym)
                     }
                 }
+            }
+            if (entry.example.isNotBlank()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "“${entry.example}”",
+                    fontSize = 12.sp,
+                    fontStyle = FontStyle.Italic,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                )
             }
             if (entry.attempts > 0) {
                 Spacer(modifier = Modifier.height(8.dp))

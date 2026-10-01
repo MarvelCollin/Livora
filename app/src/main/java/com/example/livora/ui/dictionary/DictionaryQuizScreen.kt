@@ -46,8 +46,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.livora.data.model.DictionaryLanguage
-import com.example.livora.ui.components.Tag
 import com.example.livora.ui.components.Tag
 import com.example.livora.ui.components.TopBar
 
@@ -152,16 +150,12 @@ fun DictionaryQuizScreen(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = question.entry.word,
-                    fontSize = 30.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Tag(text = DictionaryLanguage.fromCode(question.entry.language).label)
-            }
+            Text(
+                text = question.entry.word,
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -193,8 +187,7 @@ fun DictionaryQuizScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 ExplanationCard(
                     correct = question.options[question.correctIndex],
-                    descriptionId = question.entry.descriptionId,
-                    description = question.entry.description,
+                    synonyms = question.entry.synonyms,
                     example = question.entry.example
                 )
                 Spacer(modifier = Modifier.height(20.dp))
@@ -327,8 +320,7 @@ private fun OptionRow(
 @Composable
 private fun ExplanationCard(
     correct: String,
-    descriptionId: String,
-    description: String,
+    synonyms: List<String>,
     example: String
 ) {
     Column(
@@ -353,20 +345,16 @@ private fun ExplanationCard(
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
         )
-        val explanation = descriptionId.ifBlank { description }
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = explanation.ifBlank { "No explanation available for this word." },
-            fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
-        )
-        if (description.isNotBlank() && descriptionId.isNotBlank()) {
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = description,
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
-            )
+        if (synonyms.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.horizontalScroll(rememberScrollState())
+            ) {
+                synonyms.forEach { synonym ->
+                    Tag(text = synonym)
+                }
+            }
         }
         if (example.isNotBlank()) {
             Spacer(modifier = Modifier.height(8.dp))

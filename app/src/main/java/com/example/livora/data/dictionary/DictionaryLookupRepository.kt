@@ -7,15 +7,14 @@ class DictionaryLookupRepository {
 
     private val api: LookupApi = LookupClient.api
 
-    suspend fun checkSpelling(word: String, languageCode: String): String? {
-        val ltLang = ltLanguage(languageCode) ?: return null
+    suspend fun checkSpelling(word: String): String? {
         val trimmed = word.trim()
         if (trimmed.isBlank() || trimmed.contains(" ")) return null
         return try {
             val response = api.spellCheck(
                 url = "https://api.languagetool.org/v2/check",
                 text = trimmed,
-                language = ltLang
+                language = "en-US"
             )
             val match = response.matches?.firstOrNull {
                 it.rule?.issueType == "misspelling" && !it.replacements.isNullOrEmpty()
@@ -27,71 +26,40 @@ class DictionaryLookupRepository {
         }
     }
 
-    private fun ltLanguage(languageCode: String): String? = when (languageCode) {
-        "en" -> "en-US"
-        "es" -> "es"
-        "fr" -> "fr"
-        "de" -> "de-DE"
-        "it" -> "it"
-        else -> null
-    }
-
-    suspend fun lookup(word: String, languageCode: String): LookupResult {
+    suspend fun lookup(word: String): LookupResult {
         val trimmed = word.trim()
-        val translation = translate(trimmed, languageCode)
-        val definition = define(trimmed, languageCode)
-        val descriptionId = if (definition != null && definition.primary.isNotBlank()) {
-            translateText(definition.primary, languageCode)
-        } else {
-            ""
-        }
-        val example = fetchExample(trimmed, languageCode).ifBlank { definition?.example.orEmpty() }
+        val translation = translate(trimmed)
+        val definition = define(trimmed)
+        val example = fetchExample(trimmed).ifBlank { definition.example }
         return LookupResult(
             translation = translation,
-            description = definition?.description.orEmpty(),
-            descriptionId = descriptionId,
-            example = example,
-            synonyms = definition?.synonyms ?: emptyList(),
-            definitionFound = definition != null
+            synonyms = definition.synonyms,
+            example = example
         )
     }
 
     private data class Definition(
-        val description: String,
-        val primary: String,
         val example: String,
         val synonyms: List<String>
     )
 
-    private suspend fun fetchExample(word: String, languageCode: String): String {
+    private suspend fun fetchExample(word: String): String {
         return try {
-            val from = iso3(languageCode)
             val encoded = URLEncoder.encode(word, "UTF-8")
-            val url = "https://tatoeba.org/en/api_v0/search?from=$from&query=$encoded&sort=relevance"
-            api.examples(url).results.orEmpty()
-                .firstOrNull { !it.text.isNullOrBlank() }
-                ?.text?.trim()
-                .orEmpty()
+            val url = "https://tatoeba.org/en/api_v0/search?from=eng&query=$encoded&sort=relevance"
+            val sentences = api.examples(url).results.orEmpty()
+                .mapNotNull { it.text?.trim()?.takeIf { text -> text.isNotBlank() } }
+            sentences.firstOrNull { it.length in MIN_EXAMPLE_LENGTH..MAX_EXAMPLE_LENGTH }
+                ?: sentences.firstOrNull().orEmpty()
         } catch (t: Throwable) {
             ""
         }
     }
 
-    private fun iso3(languageCode: String): String = when (languageCode) {
-        "en" -> "eng"
-        "es" -> "spa"
-        "fr" -> "fra"
-        "de" -> "deu"
-        "it" -> "ita"
-        "ja" -> "jpn"
-        "ko" -> "kor"
-        else -> "eng"
-    }
-
-    private suspend fun translate(word: String, languageCode: String): String {
+    private suspend fun translate(word: String): String {
         return try {
             val encoded = URLEncoder.encode(word, "UTF-8")
-            val url = "https://api.mymemory.translated.net/get?q=$encoded&langpair=$languageCode|id"
+            val url = "https://api.mymemory.translated.net/get?q=$encoded&langpair=en|id"
             val response = api.translate(url)
             val primary = response.responseData?.translatedText?.trim().orEmpty()
             if (primary.isNotBlank() && !primary.equals(word, ignoreCase = true)) {
@@ -106,54 +74,30 @@ class DictionaryLookupRepository {
         }
     }
 
-    private suspend fun translateText(text: String, languageCode: String): String {
+    private suspend fun define(word: String): Definition {
         return try {
-            val capped = if (text.length > 480) text.substring(0, 480) else text
-            val encoded = URLEncoder.encode(capped, "UTF-8")
-            val url = "https://api.mymemory.translated.net/get?q=$encoded&langpair=$languageCode|id"
-            api.translate(url).responseData?.translatedText?.trim().orEmpty()
+            val meanings = api.define("en", word).firstOrNull()?.meanings.orEmpty()
+            val example = meanings
+                .flatMap { it.definitions.orEmpty() }
+                .firstNotNullOfOrNull { it.example?.trim()?.takeIf { e -> e.isNotBlank() } }
+                .orEmpty()
+            val synonyms = meanings
+                .flatMap { meaning ->
+                    meaning.synonyms.orEmpty() + meaning.definitions.orEmpty().flatMap { it.synonyms.orEmpty() }
+                }
+                .map { it.trim() }
+                .filter { it.isNotBlank() && !it.equals(word, ignoreCase = true) }
+                .distinctBy { it.lowercase() }
+                .take(MAX_SYNONYMS)
+            Definition(example = example, synonyms = synonyms)
         } catch (t: Throwable) {
-            ""
+            Definition(example = "", synonyms = emptyList())
         }
     }
 
-    private suspend fun define(word: String, languageCode: String): Definition? {
-        return try {
-            val meanings = api.define(languageCode, word).firstOrNull()?.meanings.orEmpty()
-            val primary = meanings
-                .firstNotNullOfOrNull { meaning ->
-                    meaning.definitions?.firstOrNull { !it.definition.isNullOrBlank() }?.definition?.trim()
-                }
-                .orEmpty()
-            val parts = meanings.mapNotNull { meaning ->
-                val definition = meaning.definitions?.firstOrNull { !it.definition.isNullOrBlank() }?.definition?.trim()
-                if (definition.isNullOrBlank()) {
-                    null
-                } else {
-                    val pos = meaning.partOfSpeech?.takeIf { it.isNotBlank() }
-                    if (pos != null) "($pos) $definition" else definition
-                }
-            }
-            val description = parts.take(2).joinToString("\n")
-            if (description.isBlank()) {
-                null
-            } else {
-                val example = meanings
-                    .flatMap { it.definitions.orEmpty() }
-                    .firstNotNullOfOrNull { it.example?.trim()?.takeIf { e -> e.isNotBlank() } }
-                    .orEmpty()
-                val synonyms = meanings
-                    .flatMap { meaning ->
-                        meaning.synonyms.orEmpty() + meaning.definitions.orEmpty().flatMap { it.synonyms.orEmpty() }
-                    }
-                    .map { it.trim() }
-                    .filter { it.isNotBlank() && !it.equals(word, ignoreCase = true) }
-                    .distinctBy { it.lowercase() }
-                    .take(8)
-                Definition(description = description, primary = primary, example = example, synonyms = synonyms)
-            }
-        } catch (t: Throwable) {
-            null
-        }
+    private companion object {
+        const val MIN_EXAMPLE_LENGTH = 15
+        const val MAX_EXAMPLE_LENGTH = 90
+        const val MAX_SYNONYMS = 5
     }
 }

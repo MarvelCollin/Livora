@@ -12,12 +12,9 @@ import retrofit2.http.Query
 data class DictionaryDto(
     @SerializedName("id") val id: String,
     @SerializedName("word") val word: String,
-    @SerializedName("language") val language: String,
     @SerializedName("translation") val translation: String,
-    @SerializedName("description") val description: String,
-    @SerializedName("description_id") val descriptionId: String = "",
-    @SerializedName("example") val example: String = "",
     @SerializedName("synonyms") val synonyms: String = "",
+    @SerializedName("example") val example: String = "",
     @SerializedName("correct_count") val correctCount: Int = 0,
     @SerializedName("wrong_count") val wrongCount: Int = 0,
     @SerializedName("created_at") val createdAt: Long
@@ -26,12 +23,9 @@ data class DictionaryDto(
 data class DictionaryInsertDto(
     @SerializedName("id") val id: String,
     @SerializedName("word") val word: String,
-    @SerializedName("language") val language: String,
     @SerializedName("translation") val translation: String,
-    @SerializedName("description") val description: String,
-    @SerializedName("description_id") val descriptionId: String,
-    @SerializedName("example") val example: String,
     @SerializedName("synonyms") val synonyms: String,
+    @SerializedName("example") val example: String,
     @SerializedName("correct_count") val correctCount: Int,
     @SerializedName("wrong_count") val wrongCount: Int,
     @SerializedName("created_at") val createdAt: Long

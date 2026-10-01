@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.livora.data.dictionary.DictionaryLookupRepository
 import com.example.livora.data.model.DictionaryEntry
-import com.example.livora.data.model.DictionaryLanguage
 import com.example.livora.data.model.LookupResult
 import com.example.livora.data.model.QuizMode
 import com.example.livora.data.model.QuizQuestion
@@ -30,9 +29,6 @@ class DictionaryViewModel : ViewModel() {
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
-
-    private val _selectedLanguage = MutableStateFlow(DictionaryLanguage.English)
-    val selectedLanguage: StateFlow<DictionaryLanguage> = _selectedLanguage.asStateFlow()
 
     private val _lookupInProgress = MutableStateFlow(false)
     val lookupInProgress: StateFlow<Boolean> = _lookupInProgress.asStateFlow()
@@ -68,10 +64,6 @@ class DictionaryViewModel : ViewModel() {
         }
     }
 
-    fun selectLanguage(language: DictionaryLanguage) {
-        _selectedLanguage.value = language
-    }
-
     fun lookup(word: String) {
         val trimmed = word.trim()
         if (trimmed.isBlank() || _lookupInProgress.value) return
@@ -79,15 +71,15 @@ class DictionaryViewModel : ViewModel() {
             _lookupInProgress.value = true
             _suggestion.value = null
             try {
-                val correction = lookupRepository.checkSpelling(trimmed, _selectedLanguage.value.code)
+                val correction = lookupRepository.checkSpelling(trimmed)
                 if (correction != null) {
                     _suggestion.value = correction
                 } else {
-                    _lookupResult.value = lookupRepository.lookup(trimmed, _selectedLanguage.value.code)
+                    _lookupResult.value = lookupRepository.lookup(trimmed)
                 }
             } catch (t: Throwable) {
                 Logger.debug(TAG, "lookup failed: ${t.message}")
-                _lookupResult.value = LookupResult("", "", "", "", emptyList(), false)
+                _lookupResult.value = LookupResult("", emptyList(), "")
             } finally {
                 _lookupInProgress.value = false
             }
@@ -101,10 +93,10 @@ class DictionaryViewModel : ViewModel() {
         viewModelScope.launch {
             _lookupInProgress.value = true
             try {
-                _lookupResult.value = lookupRepository.lookup(trimmed, _selectedLanguage.value.code)
+                _lookupResult.value = lookupRepository.lookup(trimmed)
             } catch (t: Throwable) {
                 Logger.debug(TAG, "lookup failed: ${t.message}")
-                _lookupResult.value = LookupResult("", "", "", "", emptyList(), false)
+                _lookupResult.value = LookupResult("", emptyList(), "")
             } finally {
                 _lookupInProgress.value = false
             }
@@ -123,10 +115,8 @@ class DictionaryViewModel : ViewModel() {
     fun addEntry(
         word: String,
         translation: String,
-        description: String,
-        descriptionId: String,
-        example: String,
-        synonyms: List<String>
+        synonyms: List<String>,
+        example: String
     ): Boolean {
         val trimmedWord = word.trim()
         if (trimmedWord.isBlank()) return false
@@ -139,12 +129,9 @@ class DictionaryViewModel : ViewModel() {
                     DictionaryInsertDto(
                         id = id,
                         word = trimmedWord,
-                        language = _selectedLanguage.value.code,
                         translation = translation.trim(),
-                        description = description.trim(),
-                        descriptionId = descriptionId.trim(),
-                        example = example.trim(),
                         synonyms = synonyms.map { it.trim() }.filter { it.isNotBlank() }.joinToString(", "),
+                        example = example.trim(),
                         correctCount = 0,
                         wrongCount = 0,
                         createdAt = System.currentTimeMillis()
@@ -193,12 +180,9 @@ class DictionaryViewModel : ViewModel() {
                     DictionaryInsertDto(
                         id = entry.id,
                         word = entry.word,
-                        language = entry.language,
                         translation = entry.translation,
-                        description = entry.description,
-                        descriptionId = entry.descriptionId,
-                        example = entry.example,
                         synonyms = entry.synonyms.joinToString(", "),
+                        example = entry.example,
                         correctCount = entry.correctCount,
                         wrongCount = entry.wrongCount,
                         createdAt = entry.createdAt
@@ -274,12 +258,9 @@ class DictionaryViewModel : ViewModel() {
     private fun DictionaryDto.toEntry(): DictionaryEntry = DictionaryEntry(
         id = id,
         word = word,
-        language = language,
         translation = translation,
-        description = description,
-        descriptionId = descriptionId,
-        example = example,
         synonyms = synonyms.split(",").map { it.trim() }.filter { it.isNotBlank() },
+        example = example,
         correctCount = correctCount,
         wrongCount = wrongCount,
         createdAt = createdAt
