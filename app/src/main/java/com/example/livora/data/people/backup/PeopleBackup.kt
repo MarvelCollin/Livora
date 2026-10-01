@@ -19,7 +19,10 @@ import com.example.livora.data.people.db.VirtualFolderEntity
 import com.example.livora.data.people.media.MediaImages
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.io.OutputStream
 
 class ExportSummary(val persons: Int, val photos: Int, val faces: Int)
 
@@ -32,6 +35,17 @@ class PeopleBackup(
 ) {
 
     suspend fun export(uri: Uri): ExportSummary = withContext(Dispatchers.IO) {
+        val output = context.contentResolver.openOutputStream(uri, "wt") ?: throw IOException("The file could not be opened")
+        writeTo(output)
+    }
+
+    suspend fun exportBytes(): Pair<ByteArray, ExportSummary> = withContext(Dispatchers.IO) {
+        val buffer = ByteArrayOutputStream()
+        val summary = writeTo(buffer)
+        buffer.toByteArray() to summary
+    }
+
+    private suspend fun writeTo(output: OutputStream): ExportSummary {
         val persons = database.persons().all()
         val photos = database.photos().all()
         val faces = ArrayList<FaceEntity>()
@@ -68,14 +82,20 @@ class PeopleBackup(
                 )
             }
         )
-        val output = context.contentResolver.openOutputStream(uri, "wt") ?: throw IOException("The file could not be opened")
         PeopleArchive.write(data, output)
-        ExportSummary(persons.size, photos.size, faces.size)
+        return ExportSummary(persons.size, photos.size, faces.size)
     }
 
     suspend fun import(uri: Uri): ImportSummary = withContext(Dispatchers.IO) {
         val input = context.contentResolver.openInputStream(uri) ?: throw IOException("The file could not be opened")
-        val data = input.use { PeopleArchive.read(it) }
+        restore(input.use { PeopleArchive.read(it) })
+    }
+
+    suspend fun importBytes(bytes: ByteArray): ImportSummary = withContext(Dispatchers.IO) {
+        restore(PeopleArchive.read(ByteArrayInputStream(bytes)))
+    }
+
+    private suspend fun restore(data: ArchiveData): ImportSummary {
         val current = MediaImages.queryAll(context).associateBy { it.id }
         val keptPhotos = ArrayList<ArchivePhoto>()
         var needRescan = 0
@@ -139,7 +159,7 @@ class PeopleBackup(
         prefs.groupingPending = false
         prefs.lastGeneration = -1L
         prefs.lastMediaCount = -1
-        ImportSummary(data.persons.size, keptPhotos.size, needRescan, keptFaces.size)
+        return ImportSummary(data.persons.size, keptPhotos.size, needRescan, keptFaces.size)
     }
 
     companion object {

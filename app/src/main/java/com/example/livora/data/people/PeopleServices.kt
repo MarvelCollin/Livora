@@ -1,9 +1,13 @@
 package com.example.livora.data.people
 
 import android.content.Context
+import com.example.livora.data.people.cloud.PeopleCloud
 import com.example.livora.data.people.db.PeopleDatabase
 import com.example.livora.data.people.ml.FaceAnalyzer
 import com.example.livora.data.people.scan.GalleryScanner
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -67,6 +71,11 @@ class PeopleServices private constructor(context: Context) {
     val copyRunner = CopyRunner(repository, folders)
     val backup = com.example.livora.data.people.backup.PeopleBackup(app, database, prefs)
     val scanner = GalleryScanner(app, database, prefs, analyzer, clustering, repository)
+    val cloud = PeopleCloud(app, database, prefs, backup, scanner, CoroutineScope(SupervisorJob() + Dispatchers.IO))
+
+    init {
+        cloud.start()
+    }
 
     companion object {
         @Volatile

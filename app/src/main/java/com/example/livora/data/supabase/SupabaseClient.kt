@@ -41,4 +41,16 @@ object SupabaseClient {
         .client(httpClient)
         .addConverterFactory(GsonConverterFactory.create())
         .build()
+
+    val bulkRetrofit: Retrofit = Retrofit.Builder()
+        .baseUrl(baseUrl)
+        .client(
+            httpClient.newBuilder()
+                .writeTimeout(90, TimeUnit.SECONDS)
+                .readTimeout(90, TimeUnit.SECONDS)
+                .callTimeout(180, TimeUnit.SECONDS)
+                .build()
+        )
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
 }

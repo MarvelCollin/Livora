@@ -35,6 +35,7 @@ android {
         buildConfigField("String", "SHEETS_SPREADSHEET_ID", "\"${secretsProperties.getProperty("SHEETS_SPREADSHEET_ID", "")}\"")
         buildConfigField("String", "SUPABASE_URL", "\"${secretsProperties.getProperty("SUPABASE_URL", "")}\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${secretsProperties.getProperty("SUPABASE_ANON_KEY", "")}\"")
+        buildConfigField("String", "PEOPLE_BACKUP_KEY", "\"${secretsProperties.getProperty("PEOPLE_BACKUP_KEY", "")}\"")
         ndk {
             abiFilters += listOf("arm64-v8a")
         }

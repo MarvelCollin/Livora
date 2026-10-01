@@ -57,6 +57,18 @@ class PeoplePrefs(context: Context) {
         get() = prefs.getBoolean(KEY_NOTIFICATION_ASKED, false)
         set(value) = prefs.edit().putBoolean(KEY_NOTIFICATION_ASKED, value).apply()
 
+    var cloudLinked: Boolean
+        get() = prefs.getBoolean(KEY_CLOUD_LINKED, false)
+        set(value) = prefs.edit().putBoolean(KEY_CLOUD_LINKED, value).apply()
+
+    var cloudDirty: Boolean
+        get() = prefs.getBoolean(KEY_CLOUD_DIRTY, false)
+        set(value) = prefs.edit().putBoolean(KEY_CLOUD_DIRTY, value).apply()
+
+    var cloudSavedAt: Long
+        get() = prefs.getLong(KEY_CLOUD_SAVED_AT, 0L)
+        set(value) = prefs.edit().putLong(KEY_CLOUD_SAVED_AT, value).apply()
+
     private val moveMatchesState = MutableStateFlow(prefs.getBoolean(KEY_MOVE_MATCHES, true))
     val moveMatches: StateFlow<Boolean> = moveMatchesState.asStateFlow()
 
@@ -72,6 +84,9 @@ class PeoplePrefs(context: Context) {
 
     companion object {
         const val DEFAULT_MIN_PHOTOS = 3
+        private const val KEY_CLOUD_LINKED = "cloud_linked"
+        private const val KEY_CLOUD_DIRTY = "cloud_dirty"
+        private const val KEY_CLOUD_SAVED_AT = "cloud_saved_at"
         private const val KEY_MIN_PHOTOS = "min_photos"
         private const val KEY_INITIAL_DONE = "initial_scan_done"
         private const val KEY_SCAN_TOTAL = "scan_total"
