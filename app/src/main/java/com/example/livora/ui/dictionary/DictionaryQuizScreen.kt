@@ -7,8 +7,11 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -31,21 +35,27 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.livora.data.model.SynonymRound
+import com.example.livora.ui.components.AppButton
+import com.example.livora.ui.components.ButtonKind
 import com.example.livora.ui.components.Tag
 import com.example.livora.ui.components.TopBar
 
@@ -60,7 +70,12 @@ fun DictionaryQuizScreen(
     var score by remember { mutableIntStateOf(0) }
     var selected by remember(index) { mutableStateOf<Int?>(null) }
     var hintShown by remember(index) { mutableStateOf(false) }
+    var picked by remember(index) { mutableStateOf(setOf<String>()) }
+    var synonymChecked by remember(index) { mutableStateOf(false) }
+    var synonymScore by remember { mutableIntStateOf(0) }
+    var synonymTotal by remember { mutableIntStateOf(0) }
     var finished by remember { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
 
     Scaffold(
         topBar = {
@@ -77,9 +92,11 @@ fun DictionaryQuizScreen(
                     }
                 },
                 actions = {
-                    val hintEntry = quiz.getOrNull(index)?.entry
+                    val hintQuestion = quiz.getOrNull(index)
+                    val hintEntry = hintQuestion?.entry
+                    val hintSynonyms = if (hintQuestion?.synonymRound == null) hintEntry?.synonyms.orEmpty() else emptyList()
                     val hintAvailable = !finished && hintEntry != null &&
-                        (hintEntry.synonyms.isNotEmpty() || hintEntry.example.isNotBlank())
+                        (hintSynonyms.isNotEmpty() || hintEntry.example.isNotBlank())
                     if (hintAvailable) {
                         IconButton(onClick = { hintShown = true }) {
                             Icon(
@@ -117,10 +134,14 @@ fun DictionaryQuizScreen(
             QuizResult(
                 score = score,
                 total = quiz.size,
+                synonymScore = synonymScore,
+                synonymTotal = synonymTotal,
                 onRestart = {
                     viewModel.restartQuiz()
                     index = 0
                     score = 0
+                    synonymScore = 0
+                    synonymTotal = 0
                     finished = false
                 },
                 onBack = onBack,
@@ -133,12 +154,23 @@ fun DictionaryQuizScreen(
 
         val question = quiz[index]
         val answered = selected != null
+        val round = question.synonymRound
+        val synonymsPending = answered && selected == question.correctIndex && round != null
+        val roundOpen = synonymsPending && !synonymChecked
+        val hintSynonyms = if (round == null) question.entry.synonyms else emptyList()
+
+        LaunchedEffect(index, synonymsPending, synonymChecked) {
+            if (answered) {
+                withFrameNanos { }
+                scrollState.animateScrollTo(scrollState.maxValue)
+            }
+        }
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(horizontal = 20.dp)
         ) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -159,9 +191,9 @@ fun DictionaryQuizScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            if (hintShown && (question.entry.synonyms.isNotEmpty() || question.entry.example.isNotBlank())) {
+            if (hintShown && !synonymsPending && (hintSynonyms.isNotEmpty() || question.entry.example.isNotBlank())) {
                 HintCard(
-                    synonyms = question.entry.synonyms,
+                    synonyms = hintSynonyms,
                     example = question.entry.example
                 )
                 Spacer(modifier = Modifier.height(18.dp))
@@ -183,7 +215,34 @@ fun DictionaryQuizScreen(
                 Spacer(modifier = Modifier.height(10.dp))
             }
 
-            if (answered) {
+            if (synonymsPending && round != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                SynonymRoundSection(
+                    word = question.entry.word,
+                    round = round,
+                    picked = picked,
+                    checked = synonymChecked,
+                    onToggle = { option ->
+                        picked = if (option in picked) picked - option else picked + option
+                    }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                if (roundOpen) {
+                    AppButton(
+                        text = "Check synonyms",
+                        onClick = {
+                            synonymChecked = true
+                            synonymTotal++
+                            if (picked == round.correct) synonymScore++
+                        },
+                        kind = ButtonKind.Primary,
+                        enabled = picked.size == round.correct.size,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            if (answered && !roundOpen) {
                 Spacer(modifier = Modifier.height(8.dp))
                 ExplanationCard(
                     correct = question.options[question.correctIndex],
@@ -191,22 +250,11 @@ fun DictionaryQuizScreen(
                     example = question.entry.example
                 )
                 Spacer(modifier = Modifier.height(20.dp))
-                Text(
+                AppButton(
                     text = if (index == quiz.lastIndex) "Finish" else "Next question",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.surface,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            color = MaterialTheme.colorScheme.onSurface,
-                            shape = RoundedCornerShape(14.dp)
-                        )
-                        .clickable {
-                            if (index == quiz.lastIndex) finished = true else index++
-                        }
-                        .padding(vertical = 14.dp)
+                    onClick = { if (index == quiz.lastIndex) finished = true else index++ },
+                    kind = ButtonKind.Primary,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
 
@@ -256,7 +304,21 @@ private fun QuizProgress(current: Int, total: Int) {
     }
 }
 
-private enum class OptionState { Idle, Correct, Wrong, MissedCorrect }
+private enum class OptionState { Idle, Picked, Correct, Wrong, MissedCorrect }
+
+@Composable
+private fun optionBorderColor(state: OptionState): Color = when (state) {
+    OptionState.Correct, OptionState.MissedCorrect, OptionState.Picked -> MaterialTheme.colorScheme.onSurface
+    OptionState.Wrong -> MaterialTheme.colorScheme.error
+    OptionState.Idle -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
+}
+
+@Composable
+private fun optionFillColor(state: OptionState): Color = when (state) {
+    OptionState.Correct, OptionState.Picked -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+    OptionState.MissedCorrect -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
+    else -> Color.Transparent
+}
 
 private fun optionState(index: Int, selected: Int?, correctIndex: Int): OptionState {
     if (selected == null) return OptionState.Idle
@@ -273,16 +335,8 @@ private fun OptionRow(
     state: OptionState,
     onClick: () -> Unit
 ) {
-    val borderColor = when (state) {
-        OptionState.Correct, OptionState.MissedCorrect -> MaterialTheme.colorScheme.onSurface
-        OptionState.Wrong -> MaterialTheme.colorScheme.error
-        OptionState.Idle -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
-    }
-    val background = when (state) {
-        OptionState.Correct -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
-        OptionState.MissedCorrect -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
-        else -> Color.Transparent
-    }
+    val borderColor = optionBorderColor(state)
+    val background = optionFillColor(state)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -299,21 +353,115 @@ private fun OptionRow(
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
-        when (state) {
-            OptionState.Correct, OptionState.MissedCorrect -> Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.onSurface
-            )
-            OptionState.Wrong -> Icon(
-                imageVector = Icons.Default.Close,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.error
-            )
-            OptionState.Idle -> {}
+        OptionMark(state)
+    }
+}
+
+@Composable
+private fun OptionMark(state: OptionState) {
+    when (state) {
+        OptionState.Correct, OptionState.MissedCorrect, OptionState.Picked -> Icon(
+            imageVector = Icons.Default.Check,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+            tint = MaterialTheme.colorScheme.onSurface
+        )
+        OptionState.Wrong -> Icon(
+            imageVector = Icons.Default.Close,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+            tint = MaterialTheme.colorScheme.error
+        )
+        OptionState.Idle -> {}
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SynonymRoundSection(
+    word: String,
+    round: SynonymRound,
+    picked: Set<String>,
+    checked: Boolean,
+    onToggle: (String) -> Unit
+) {
+    val needed = round.correct.size
+    val found = picked.count { it in round.correct }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = if (needed == 1) "Select the synonym of \"$word\"" else "Select the $needed synonyms of \"$word\"",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = if (checked) {
+                if (found == needed && picked.size == needed) "All $needed found" else "You found $found of $needed"
+            } else {
+                "${picked.size} of $needed selected"
+            },
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            round.options.forEach { option ->
+                val isPicked = option in picked
+                val state = when {
+                    !checked -> if (isPicked) OptionState.Picked else OptionState.Idle
+                    isPicked && option in round.correct -> OptionState.Correct
+                    isPicked -> OptionState.Wrong
+                    option in round.correct -> OptionState.MissedCorrect
+                    else -> OptionState.Idle
+                }
+                SynonymChoice(
+                    text = option,
+                    state = state,
+                    selected = isPicked,
+                    enabled = !checked,
+                    onToggle = { onToggle(option) }
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun SynonymChoice(
+    text: String,
+    state: OptionState,
+    selected: Boolean,
+    enabled: Boolean,
+    onToggle: () -> Unit
+) {
+    val shape = RoundedCornerShape(12.dp)
+    Row(
+        modifier = Modifier
+            .defaultMinSize(minHeight = 48.dp)
+            .background(color = optionFillColor(state), shape = shape)
+            .border(width = 1.dp, color = optionBorderColor(state), shape = shape)
+            .clip(shape)
+            .toggleable(
+                value = selected,
+                enabled = enabled,
+                role = Role.Checkbox,
+                onValueChange = { onToggle() }
+            )
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = text,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        OptionMark(state)
     }
 }
 
@@ -415,6 +563,8 @@ private fun HintCard(
 private fun QuizResult(
     score: Int,
     total: Int,
+    synonymScore: Int,
+    synonymTotal: Int,
     onRestart: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
@@ -436,6 +586,14 @@ private fun QuizResult(
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
         )
+        if (synonymTotal > 0) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "Synonym rounds $synonymScore / $synonymTotal",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+            )
+        }
         Spacer(modifier = Modifier.height(32.dp))
         Text(
             text = "Try again",

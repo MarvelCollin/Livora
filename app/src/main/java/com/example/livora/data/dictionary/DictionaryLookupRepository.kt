@@ -88,7 +88,7 @@ class DictionaryLookupRepository {
                 .map { it.trim() }
                 .filter { it.isNotBlank() && !it.equals(word, ignoreCase = true) }
                 .distinctBy { it.lowercase() }
-                .take(MAX_SYNONYMS)
+                .take(MAX_CANDIDATES)
             Definition(example = example, synonyms = synonyms)
         } catch (t: Throwable) {
             Definition(example = "", synonyms = emptyList())
@@ -98,6 +98,6 @@ class DictionaryLookupRepository {
     private companion object {
         const val MIN_EXAMPLE_LENGTH = 15
         const val MAX_EXAMPLE_LENGTH = 90
-        const val MAX_SYNONYMS = 5
+        const val MAX_CANDIDATES = 12
     }
 }

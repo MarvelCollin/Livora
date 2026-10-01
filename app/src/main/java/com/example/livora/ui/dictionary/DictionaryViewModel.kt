@@ -3,6 +3,8 @@ package com.example.livora.ui.dictionary
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.livora.data.dictionary.DictionaryLookupRepository
+import com.example.livora.data.dictionary.IeltsSynonyms
+import com.example.livora.data.dictionary.SynonymRounds
 import com.example.livora.data.model.DictionaryEntry
 import com.example.livora.data.model.LookupResult
 import com.example.livora.data.model.QuizMode
@@ -77,7 +79,7 @@ class DictionaryViewModel : ViewModel() {
                 if (correction != null) {
                     _suggestion.value = correction
                 } else {
-                    _lookupResult.value = lookupRepository.lookup(trimmed)
+                    _lookupResult.value = lookupRepository.lookup(trimmed).forIelts()
                 }
             } catch (t: Throwable) {
                 Logger.debug(TAG, "lookup failed: ${t.message}")
@@ -95,7 +97,7 @@ class DictionaryViewModel : ViewModel() {
         viewModelScope.launch {
             _lookupInProgress.value = true
             try {
-                _lookupResult.value = lookupRepository.lookup(trimmed)
+                _lookupResult.value = lookupRepository.lookup(trimmed).forIelts()
             } catch (t: Throwable) {
                 Logger.debug(TAG, "lookup failed: ${t.message}")
                 _lookupResult.value = LookupResult("", emptyList(), "")
@@ -104,6 +106,10 @@ class DictionaryViewModel : ViewModel() {
             }
         }
     }
+
+    private fun LookupResult.forIelts(): LookupResult = copy(
+        synonyms = IeltsSynonyms.select(synonyms, IeltsSynonyms.lexicon(_entries.value))
+    )
 
     fun dismissSuggestion() {
         _suggestion.value = null
@@ -228,7 +234,8 @@ class DictionaryViewModel : ViewModel() {
                 QuizQuestion(
                     entry = entry,
                     options = options,
-                    correctIndex = options.indexOf(entry.translation)
+                    correctIndex = options.indexOf(entry.translation),
+                    synonymRound = SynonymRounds.build(entry, _entries.value)
                 )
             }
         }

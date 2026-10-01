@@ -25,8 +25,14 @@ data class LookupResult(
         get() = translation.isBlank() && synonyms.isEmpty() && example.isBlank()
 }
 
+data class SynonymRound(
+    val options: List<String>,
+    val correct: Set<String>
+)
+
 data class QuizQuestion(
     val entry: DictionaryEntry,
     val options: List<String>,
-    val correctIndex: Int
+    val correctIndex: Int,
+    val synonymRound: SynonymRound? = null
 )
