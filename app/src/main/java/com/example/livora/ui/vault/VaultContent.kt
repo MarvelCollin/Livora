@@ -3,6 +3,12 @@ package com.example.livora.ui.vault
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -68,9 +74,11 @@ import com.example.livora.data.vault.Strength
 import com.example.livora.data.vault.Totp
 import com.example.livora.data.vault.VaultClipboard
 import com.example.livora.data.vault.VaultEntry
+import com.example.livora.ui.components.AddAction
 import com.example.livora.ui.components.ChoiceOption
 import com.example.livora.ui.components.ChoiceRow
 import com.example.livora.ui.components.Design
+import com.example.livora.ui.components.Motion
 import com.example.livora.ui.components.Toaster
 import com.example.livora.ui.components.TopBar
 import kotlinx.coroutines.delay
@@ -94,42 +102,97 @@ fun VaultContent(
     val detail = entries.firstOrNull { it.id == detailId }
     val editing = entries.firstOrNull { it.id == editingId }
 
-    when {
-        creating -> EntryEditor(
-            initial = null,
-            onCancel = { creating = false },
-            onSave = { draft ->
-                val now = System.currentTimeMillis()
-                onSave(draft.copy(id = newId(), createdAt = now, updatedAt = now))
-                creating = false
+    val pane = when {
+        creating -> VaultPane.Editor(null)
+        editing != null -> VaultPane.Editor(editing.id)
+        detail != null -> VaultPane.Detail(detail.id)
+        else -> VaultPane.List
+    }
+
+    AnimatedContent(
+        targetState = pane,
+        transitionSpec = {
+            val deeper = targetState.depth > initialState.depth
+            val enter = if (deeper) {
+                slideInVertically(Motion.enter()) { it / 8 } + fadeIn(Motion.enter())
+            } else {
+                fadeIn(Motion.enter())
             }
-        )
-        editing != null -> EntryEditor(
-            initial = editing,
-            onCancel = { editingId = null },
-            onSave = { draft ->
-                onSave(draft.copy(id = editing.id, createdAt = editing.createdAt, updatedAt = System.currentTimeMillis()))
-                editingId = null
+            val exit = if (deeper) {
+                fadeOut(Motion.exit())
+            } else {
+                slideOutVertically(Motion.exit()) { it / 8 } + fadeOut(Motion.exit())
             }
-        )
-        detail != null -> EntryDetail(
-            entry = detail,
-            onBack = { detailId = null },
-            onEdit = { editingId = detail.id },
-            onDelete = {
-                onDelete(detail.id)
-                detailId = null
-                Toaster.success("Deleted ${detail.title}", "Undo") { onSave(detail) }
+            (enter togetherWith exit).apply {
+                targetContentZIndex = if (deeper) 1f else 0f
             }
-        )
-        else -> EntryList(
-            entries = entries,
-            error = error,
-            onBack = onBack,
-            onLock = onLock,
-            onOpen = { detailId = it.id },
-            onAdd = { creating = true }
-        )
+        },
+        label = "vaultPane"
+    ) { target ->
+        when (target) {
+            is VaultPane.Editor -> {
+                val existing = entries.firstOrNull { it.id == target.id }
+                if (target.id == null) {
+                    EntryEditor(
+                        initial = null,
+                        onCancel = { creating = false },
+                        onSave = { draft ->
+                            val now = System.currentTimeMillis()
+                            onSave(draft.copy(id = newId(), createdAt = now, updatedAt = now))
+                            creating = false
+                        }
+                    )
+                } else if (existing != null) {
+                    EntryEditor(
+                        initial = existing,
+                        onCancel = { editingId = null },
+                        onSave = { draft ->
+                            onSave(draft.copy(id = existing.id, createdAt = existing.createdAt, updatedAt = System.currentTimeMillis()))
+                            editingId = null
+                        }
+                    )
+                }
+            }
+            is VaultPane.Detail -> {
+                val shown = entries.firstOrNull { it.id == target.id }
+                if (shown != null) {
+                    EntryDetail(
+                        entry = shown,
+                        onBack = { detailId = null },
+                        onEdit = { editingId = shown.id },
+                        onDelete = {
+                            onDelete(shown.id)
+                            detailId = null
+                            Toaster.success("Deleted ${shown.title}", "Undo") { onSave(shown) }
+                        }
+                    )
+                }
+            }
+            VaultPane.List -> EntryList(
+                entries = entries,
+                error = error,
+                onBack = onBack,
+                onLock = onLock,
+                onOpen = { detailId = it.id },
+                onAdd = { creating = true }
+            )
+        }
+    }
+}
+
+private sealed interface VaultPane {
+    val depth: Int
+
+    data object List : VaultPane {
+        override val depth = 0
+    }
+
+    data class Detail(val id: String) : VaultPane {
+        override val depth = 1
+    }
+
+    data class Editor(val id: String?) : VaultPane {
+        override val depth = 2
     }
 }
 
@@ -189,9 +252,7 @@ private fun EntryList(
                     IconButton(onClick = onLock) {
                         Icon(Icons.Default.Lock, contentDescription = "Lock vault", tint = MaterialTheme.colorScheme.onSurface)
                     }
-                    IconButton(onClick = onAdd) {
-                        Icon(Icons.Default.Add, contentDescription = "Add login", tint = MaterialTheme.colorScheme.onSurface)
-                    }
+                    AddAction(description = "Add login", onClick = onAdd)
                 }
             )
         }
