@@ -554,7 +554,12 @@ private fun CreatePage() {
                     modifier = Modifier.weight(1f)
                 )
             }
-            LinkButton(text = "Copy text", onClick = { copyText(context, payload, sensitive = type == "Wi-Fi") }, enabled = ready)
+            LinkButton(
+                text = "Copy text",
+                onClick = { copyText(context, payload, sensitive = type == "Wi-Fi") },
+                enabled = ready,
+                modifier = Modifier.padding(top = 10.dp)
+            )
             Spacer(modifier = Modifier.height(24.dp))
             Spacer(modifier = Modifier.navigationBarsPadding())
         }

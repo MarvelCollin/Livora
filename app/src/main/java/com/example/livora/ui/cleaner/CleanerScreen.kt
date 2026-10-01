@@ -177,7 +177,11 @@ fun CleanerScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 12.dp)
                             )
-                            LinkButton(text = "Allow all photos and videos", onClick = { permissionLauncher.launch(CleanerAccess.request()) })
+                            LinkButton(
+                                text = "Allow all photos and videos",
+                                onClick = { permissionLauncher.launch(CleanerAccess.request()) },
+                                modifier = Modifier.padding(top = 10.dp)
+                            )
                         }
                     }
                 }
@@ -212,7 +216,11 @@ fun CleanerScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
                         if (kept > 0) {
-                            LinkButton(text = "Show ${formatCount(kept)} kept ${if (kept == 1) "file" else "files"} again", onClick = viewModel::clearKept)
+                            LinkButton(
+                                text = "Show ${formatCount(kept)} kept ${if (kept == 1) "file" else "files"} again",
+                                onClick = viewModel::clearKept,
+                                modifier = Modifier.padding(top = 10.dp)
+                            )
                         }
                     }
                 }
