@@ -294,7 +294,7 @@ private fun AddWordSheet(
         },
         onConfirm = {
             val synonymList = synonyms.split(",").map { it.trim() }.filter { it.isNotBlank() }
-            viewModel.addEntry(word, translation, synonymList, example)
+            viewModel.saveEntry(word, translation, synonymList, example)
         }
     ) {
         Row(
@@ -455,16 +455,12 @@ private fun EntryRow(
                 )
             }
             if (entry.synonyms.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier
-                        .horizontalScroll(rememberScrollState())
-                ) {
-                    entry.synonyms.forEach { synonym ->
-                        Tag(text = synonym)
-                    }
-                }
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Similar: " + entry.synonyms.joinToString(", "),
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             if (entry.example.isNotBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
@@ -502,8 +498,8 @@ private fun EntryRow(
         ) {
             Icon(
                 imageVector = Icons.Outlined.Delete,
-                contentDescription = "Delete word",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                contentDescription = "Delete ${entry.word}",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

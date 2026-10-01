@@ -12,6 +12,8 @@ import com.example.livora.data.supabase.DictionaryInsertDto
 import com.example.livora.data.supabase.DictionaryRepository
 import com.example.livora.ui.components.Toaster
 import com.example.livora.util.Logger
+import com.example.livora.util.UserMessages
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -112,18 +114,20 @@ class DictionaryViewModel : ViewModel() {
         _suggestion.value = null
     }
 
-    fun addEntry(
+    suspend fun saveEntry(
         word: String,
         translation: String,
         synonyms: List<String>,
         example: String
-    ): Boolean {
+    ): String? {
         val trimmedWord = word.trim()
-        if (trimmedWord.isBlank()) return false
+        if (trimmedWord.isBlank()) return "Enter the word first."
+        if (translation.isBlank()) return "Add the Indonesian translation."
+        if (_entries.value.any { it.word.equals(trimmedWord, ignoreCase = true) }) {
+            return "\"$trimmedWord\" is already in your dictionary."
+        }
         val id = UUID.randomUUID().toString()
-        if (id in pendingMutations.value) return false
-        pendingMutations.update { it + id }
-        viewModelScope.launch {
+        return viewModelScope.async {
             try {
                 val inserted = repository.insert(
                     DictionaryInsertDto(
@@ -140,14 +144,12 @@ class DictionaryViewModel : ViewModel() {
                 _entries.update { listOf(inserted.toEntry()) + it }
                 clearLookup()
                 Toaster.success("Saved \"$trimmedWord\"")
+                null
             } catch (t: Throwable) {
-                Logger.debug(TAG, "addEntry failed: ${t.message}")
-                Toaster.error(t.message ?: "Failed to save word")
-            } finally {
-                pendingMutations.update { it - id }
+                Logger.debug(TAG, "saveEntry failed: ${t.message}")
+                UserMessages.saveFailure(t, "this word")
             }
-        }
-        return true
+        }.await()
     }
 
     fun deleteEntry(entry: DictionaryEntry) {

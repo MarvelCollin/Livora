@@ -8,8 +8,17 @@ class DictionaryRepository {
 
     suspend fun fetchAll(): List<DictionaryDto> = call { api.getAll() }
 
-    suspend fun insert(dto: DictionaryInsertDto): DictionaryDto =
-        call { api.insert(dto) }.first()
+    suspend fun insert(dto: DictionaryInsertDto): DictionaryDto {
+        val withLanguage = dto.copy(language = LEGACY_LANGUAGE)
+        if (needsLanguage) return call { api.insert(withLanguage) }.first()
+        return try {
+            call { api.insert(dto) }.first()
+        } catch (e: IllegalStateException) {
+            if (!isMissingLanguage(e.message)) throw e
+            needsLanguage = true
+            call { api.insert(withLanguage) }.first()
+        }
+    }
 
     suspend fun updateStats(id: String, correctCount: Int, wrongCount: Int) {
         call { api.updateStats("eq.$id", DictionaryStatsUpdateDto(correctCount, wrongCount)) }
@@ -29,7 +38,15 @@ class DictionaryRepository {
         }
     }
 
+    private fun isMissingLanguage(message: String?): Boolean =
+        message != null && message.contains("23502") && message.contains("language")
+
     private companion object {
+        const val LEGACY_LANGUAGE = "en"
+
+        @Volatile
+        var needsLanguage = false
+
         const val NOT_CONFIGURED_MESSAGE =
             "Cloud sync is not set up. Add secrets.properties and rebuild the app."
     }

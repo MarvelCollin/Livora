@@ -198,7 +198,7 @@ fun TodoScreen(
         TodoFormSheet(
             todo = editingTodo,
             onSave = { title, notes, intervalValue, intervalUnit, timeOfDay, durationValue, durationUnit, hasTimer ->
-                viewModel.upsertTodo(
+                viewModel.saveTodo(
                     editingTodo,
                     title,
                     notes,
@@ -434,7 +434,7 @@ internal fun scheduleSummary(todo: Todo): String {
 @Composable
 private fun TodoFormSheet(
     todo: Todo?,
-    onSave: (String, String, Int, TodoIntervalUnit, String?, Int, TodoDurationUnit, Boolean) -> Boolean,
+    onSave: suspend (String, String, Int, TodoIntervalUnit, String?, Int, TodoDurationUnit, Boolean) -> String?,
     onDismiss: () -> Unit
 ) {
     var title by remember(todo?.id) { mutableStateOf(todo?.title ?: "") }

@@ -28,7 +28,8 @@ data class DictionaryInsertDto(
     @SerializedName("example") val example: String,
     @SerializedName("correct_count") val correctCount: Int,
     @SerializedName("wrong_count") val wrongCount: Int,
-    @SerializedName("created_at") val createdAt: Long
+    @SerializedName("created_at") val createdAt: Long,
+    @SerializedName("language") val language: String? = null
 )
 
 data class DictionaryStatsUpdateDto(

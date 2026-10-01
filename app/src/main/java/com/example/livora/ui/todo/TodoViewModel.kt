@@ -17,6 +17,7 @@ import com.example.livora.data.supabase.TodoRepository
 import com.example.livora.data.supabase.TodoUpdateDto
 import com.example.livora.ui.components.Toaster
 import com.example.livora.util.Logger
+import com.example.livora.util.UserMessages
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -85,7 +86,7 @@ class TodoViewModel : ViewModel() {
         }
     }
 
-    fun upsertTodo(
+    suspend fun saveTodo(
         existing: Todo?,
         title: String,
         notes: String,
@@ -95,15 +96,17 @@ class TodoViewModel : ViewModel() {
         durationValue: Int,
         durationUnit: TodoDurationUnit,
         hasTimer: Boolean
-    ): Boolean {
+    ): String? {
         val trimmedTitle = title.trim()
-        if (trimmedTitle.isBlank() || intervalValue < 1 || durationValue < 1) return false
+        if (trimmedTitle.isBlank()) return "Add a title for this task."
+        if (intervalValue < 1) return "Repeat every needs a number of at least 1."
+        if (hasTimer && durationValue < 1) return "Timer length needs a number of at least 1."
         val trimmedNotes = notes.trim()
         val sanitizedTime = timeOfDay?.takeIf { it.isNotBlank() }
         val mutationKey = existing?.id ?: "new"
-        if (mutationKey in pendingMutations.value) return false
+        if (mutationKey in pendingMutations.value) return "Still saving. Wait a moment."
         pendingMutations.update { it + mutationKey }
-        viewModelScope.launch {
+        return viewModelScope.async {
             try {
                 if (existing == null) {
                     val inserted = repository.insertTodo(
@@ -139,14 +142,14 @@ class TodoViewModel : ViewModel() {
                 }
                 recompute()
                 Toaster.success(if (existing == null) "Task added" else "Task updated")
+                null
             } catch (t: Throwable) {
-                Logger.debug(TAG, "upsertTodo failed: ${t.message}")
-                Toaster.error(t.message ?: "Failed to save task")
+                Logger.debug(TAG, "saveTodo failed: ${t.message}")
+                UserMessages.saveFailure(t, "this task")
             } finally {
                 pendingMutations.update { it - mutationKey }
             }
-        }
-        return true
+        }.await()
     }
 
     fun toggleCurrentInterval(todoId: String) {
