@@ -1,5 +1,7 @@
 package com.example.livora.ui.home
 
+import com.example.livora.ui.components.AppButton
+import com.example.livora.ui.components.ButtonKind
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -282,14 +284,7 @@ private fun BulbCard(
                     color = colors.content.copy(alpha = 0.75f)
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = onOpen,
-                    modifier = Modifier.heightIn(min = 48.dp),
-                    border = BorderStroke(1.dp, colors.accent),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.accent)
-                ) {
-                    Text("Find bulb")
-                }
+                AppButton(text = "Find bulb", onClick = onOpen, kind = ButtonKind.Primary)
             }
         } else {
             Row(

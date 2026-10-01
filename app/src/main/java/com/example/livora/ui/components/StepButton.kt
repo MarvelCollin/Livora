@@ -32,7 +32,7 @@ fun StepButton(
     size: Dp = 64.dp,
     contentColor: Color = MaterialTheme.colorScheme.onSurface
 ) {
-    val shape = RoundedCornerShape(16.dp)
+    val shape = RoundedCornerShape(12.dp)
     val interactionSource = remember { MutableInteractionSource() }
     val borderAlpha by animateFloatAsState(
         targetValue = if (enabled) 0.55f else 0.2f,

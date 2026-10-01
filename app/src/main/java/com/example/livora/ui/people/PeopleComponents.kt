@@ -323,7 +323,7 @@ fun EmptyBlock(
             PrimaryAction(text = actionLabel, onClick = onAction)
         }
         if (secondaryLabel != null && onSecondary != null) {
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             LinkButton(text = secondaryLabel, onClick = onSecondary)
         }
     }

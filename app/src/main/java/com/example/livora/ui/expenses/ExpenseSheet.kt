@@ -65,6 +65,7 @@ import com.example.livora.data.expenses.ExpenseEntity
 import com.example.livora.data.expenses.Money
 import com.example.livora.ui.components.ChoiceOption
 import com.example.livora.ui.components.ChoiceRow
+import com.example.livora.ui.components.FormTextField
 import com.example.livora.ui.components.Motion
 import com.example.livora.ui.components.SelectChip
 import com.example.livora.ui.components.SuccessCheck
@@ -162,11 +163,11 @@ fun ExpenseSheet(
                         onNew = { naming = "category" }
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    OutlinedTextField(
+                    FormTextField(
                         value = note,
                         onValueChange = { note = it.take(60) },
-                        label = { Text("Note, optional") },
-                        singleLine = true,
+                        label = "Note",
+                        placeholder = "Optional",
                         modifier = Modifier.fillMaxWidth()
                     )
                     Row(

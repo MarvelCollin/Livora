@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -48,8 +49,9 @@ fun AppButton(
     val shape = RoundedCornerShape(12.dp)
     Box(
         modifier = modifier
+            .minimumInteractiveComponentSize()
             .pressScale(interactionSource, pressedScale = 0.97f)
-            .defaultMinSize(minHeight = 48.dp)
+            .defaultMinSize(minHeight = 44.dp)
             .clip(shape)
             .background(container)
             .clickable(
