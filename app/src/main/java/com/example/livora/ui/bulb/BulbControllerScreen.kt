@@ -1,5 +1,8 @@
 package com.example.livora.ui.bulb
 
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -78,6 +81,7 @@ fun BulbControllerScreen(
     val connectedBulb by viewModel.connectedBulb.collectAsState()
     val discoveredBulbs by viewModel.discoveredBulbs.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
+    val hasScanned by viewModel.hasScanned.collectAsState()
     val isAddingBulb by viewModel.isAddingBulb.collectAsState()
 
     Scaffold(
@@ -114,6 +118,7 @@ fun BulbControllerScreen(
             DiscoveryContent(
                 discoveredBulbs = discoveredBulbs,
                 isScanning = isScanning,
+                hasScanned = hasScanned,
                 onScan = { viewModel.scanForBulbs() },
                 onSelectBulb = { viewModel.connectToBulb(it) },
                 modifier = Modifier.padding(innerPadding)
@@ -136,6 +141,7 @@ fun BulbControllerScreen(
 private fun DiscoveryContent(
     discoveredBulbs: List<Bulb>,
     isScanning: Boolean,
+    hasScanned: Boolean,
     onScan: () -> Unit,
     onSelectBulb: (Bulb) -> Unit,
     modifier: Modifier = Modifier
@@ -241,10 +247,17 @@ private fun DiscoveryContent(
         if (!isScanning && discoveredBulbs.isEmpty()) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "No bulbs found yet. Tap Scan to search your network.",
+                text = if (hasScanned) {
+                    "No bulbs found. Check the bulb is on and joined to the same Wi-Fi as this phone, then scan again."
+                } else {
+                    "Tap Scan to search your network."
+                },
                 fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
-                textAlign = TextAlign.Center
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .padding(horizontal = 24.dp)
+                    .semantics { liveRegion = LiveRegionMode.Polite }
             )
         }
 

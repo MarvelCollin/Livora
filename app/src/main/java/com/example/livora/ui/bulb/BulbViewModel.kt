@@ -32,6 +32,9 @@ class BulbViewModel(application: Application) : AndroidViewModel(application) {
     private val _isScanning = MutableStateFlow(false)
     val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
+    private val _hasScanned = MutableStateFlow(false)
+    val hasScanned: StateFlow<Boolean> = _hasScanned.asStateFlow()
+
     private val _isAddingBulb = MutableStateFlow(false)
     val isAddingBulb: StateFlow<Boolean> = _isAddingBulb.asStateFlow()
 
@@ -72,6 +75,7 @@ class BulbViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val bulbs = bulbController.discoverBulbs()
             _discoveredBulbs.value = bulbs
+            _hasScanned.value = true
             _isScanning.value = false
             Logger.debug(TAG, "Scan complete, found ${bulbs.size} bulb(s)")
         }
