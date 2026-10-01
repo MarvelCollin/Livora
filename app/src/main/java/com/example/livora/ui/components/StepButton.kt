@@ -36,7 +36,7 @@ fun StepButton(
     val interactionSource = remember { MutableInteractionSource() }
     val borderAlpha by animateFloatAsState(
         targetValue = if (enabled) 0.55f else 0.2f,
-        animationSpec = Motion.fast(),
+        animationSpec = Motion.quick(),
         label = "stepBorder"
     )
     Box(
