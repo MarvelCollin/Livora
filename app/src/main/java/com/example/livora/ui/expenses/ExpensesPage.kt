@@ -103,14 +103,12 @@ fun ExpensesPage(
         OTHERS_ID -> folded?.foldedIds.orEmpty()
         else -> setOf(selectedCategory!!)
     }
-    val shown = remember(state.rows, query, filter, categoryIds, state.categories, state.accounts) {
+    val shown = remember(state.rows, query, filter, categoryIds, state.categories) {
         state.rows.filter { item ->
             val category = state.categoryById[item.categoryId]?.name.orEmpty()
-            val account = state.accountById[item.accountId]?.name.orEmpty()
             val matchesText = query.isBlank() ||
                 item.note.contains(query, ignoreCase = true) ||
-                category.contains(query, ignoreCase = true) ||
-                account.contains(query, ignoreCase = true)
+                category.contains(query, ignoreCase = true)
             val matchesType = when (filter) {
                 MoneyFilter.All -> true
                 MoneyFilter.Spent -> item.amount < 0
@@ -263,7 +261,7 @@ fun ExpensesPage(
                             Text(
                                 text = when {
                                     filtering -> "Showing ${shown.size} of ${state.rows.size}" + (scope?.let { " in $it" } ?: "")
-                                    else -> "${state.rows.size} transactions"
+                                    else -> "${state.rows.size} ${if (state.rows.size == 1) "transaction" else "transactions"}"
                                 },
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -300,7 +298,6 @@ fun ExpensesPage(
                                 category = state.categoryById[item.categoryId]?.name ?: "Uncategorized",
                                 slot = state.categoryById[item.categoryId]?.slot ?: -1,
                                 iconKey = state.categoryById[item.categoryId]?.iconKey ?: "other",
-                                account = state.accountById[item.accountId]?.name ?: "Unknown",
                                 onClick = { editingId = item.id }
                             )
                             HorizontalDivider(
@@ -325,7 +322,6 @@ fun ExpensesPage(
                 onSave = viewModel::save,
                 onDelete = viewModel::delete,
                 onAddCategory = viewModel::addCategory,
-                onAddAccount = viewModel::addAccount,
                 onDismiss = {
                     adding = false
                     editingId = null
@@ -622,7 +618,6 @@ private fun TransactionRow(
     category: String,
     slot: Int,
     iconKey: String,
-    account: String,
     onClick: () -> Unit
 ) {
     Row(
@@ -647,12 +642,14 @@ private fun TransactionRow(
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1
             )
-            Text(
-                text = "$category, $account",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 3.dp)
-            )
+            if (item.note.isNotBlank()) {
+                Text(
+                    text = category,
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 3.dp)
+                )
+            }
         }
         Text(
             text = Money.signed(item.amount),

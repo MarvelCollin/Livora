@@ -60,7 +60,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.livora.data.expenses.ExpenseAccountEntity
 import com.example.livora.data.expenses.ExpenseCategoryEntity
 import com.example.livora.data.expenses.ExpenseEntity
 import com.example.livora.data.expenses.Money
@@ -88,14 +87,13 @@ fun ExpenseSheet(
     onSave: (ExpenseEntity) -> Unit,
     onDelete: (ExpenseEntity) -> Unit,
     onAddCategory: (String, Boolean, String, (ExpenseCategoryEntity) -> Unit) -> Unit,
-    onAddAccount: (String, (ExpenseAccountEntity) -> Unit) -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var kind by rememberSaveable { mutableStateOf(if ((existing?.amount ?: -1L) > 0) Kind.Income else Kind.Expense) }
     var digits by rememberSaveable { mutableStateOf(existing?.let { Math.abs(it.amount).toString() }.orEmpty()) }
     var categoryId by rememberSaveable { mutableStateOf(existing?.categoryId) }
-    var accountId by rememberSaveable { mutableStateOf(existing?.accountId) }
+    val accountId = existing?.accountId
     var note by rememberSaveable { mutableStateOf(existing?.note.orEmpty()) }
     var dayEpoch by rememberSaveable { mutableStateOf(existing?.day ?: state.today.toEpochDay()) }
     var savedText by remember { mutableStateOf<String?>(null) }
@@ -163,15 +161,6 @@ fun ExpenseSheet(
                         onPick = { categoryId = it.id },
                         onNew = { naming = "category" }
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    ChipRow(
-                        items = state.accounts,
-                        label = { it.name },
-                        icon = { accountIcon(it.name) },
-                        selectedIndex = state.accounts.indexOfFirst { it.id == chosenAccount?.id },
-                        onPick = { accountId = it.id },
-                        onNew = { naming = "account" }
-                    )
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = note,
@@ -181,7 +170,7 @@ fun ExpenseSheet(
                         modifier = Modifier.fillMaxWidth()
                     )
                     Row(
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp).heightIn(min = 48.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
@@ -223,12 +212,14 @@ fun ExpenseSheet(
                         modifier = Modifier.fillMaxWidth()
                     )
                     if (existing != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
                         LinkButton(
                             text = "Delete this $noun",
                             onClick = {
                                 onDelete(existing)
                                 onDismiss()
                             },
+                            destructive = true,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -264,15 +255,11 @@ fun ExpenseSheet(
 
     naming?.let { target ->
         NameDialog(
-            title = if (target == "category") "New ${if (isIncome) "income " else ""}category" else "New account",
-            showIcons = target == "category",
+            title = "New ${if (isIncome) "income " else ""}category",
+            showIcons = true,
             onConfirm = { name, iconKey ->
                 naming = null
-                if (target == "category") {
-                    onAddCategory(name, isIncome, iconKey) { categoryId = it.id }
-                } else {
-                    onAddAccount(name) { accountId = it.id }
-                }
+                onAddCategory(name, isIncome, iconKey) { categoryId = it.id }
             },
             onDismiss = { naming = null }
         )
