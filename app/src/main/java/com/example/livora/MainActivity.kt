@@ -12,6 +12,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
+import com.example.livora.data.people.PeopleServices
 import com.example.livora.data.usage.UsageAccess
 import com.example.livora.data.usage.UsageSnapshotWorker
 import com.example.livora.ui.components.ToasterHost
@@ -23,6 +24,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         if (UsageAccess.isGranted(this)) UsageSnapshotWorker.schedule(this)
+        Thread { PeopleServices.get(applicationContext) }.start()
         setContent {
             AppTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
