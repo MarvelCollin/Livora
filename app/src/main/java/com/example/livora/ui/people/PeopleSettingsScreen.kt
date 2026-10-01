@@ -59,6 +59,10 @@ fun PeopleSettingsScreen(viewModel: PeopleSettingsViewModel, onBack: () -> Unit)
     val status by viewModel.status.collectAsState()
     val skip by viewModel.skipScreenshots.collectAsState()
     val minPhotos by viewModel.minPhotos.collectAsState()
+    val cloudState by viewModel.cloudState.collectAsState()
+    val cloudRemote by viewModel.cloudRemote.collectAsState()
+    val cloudSavedAt by viewModel.cloudSavedAt.collectAsState()
+    val cloudLinked by viewModel.cloudLinked.collectAsState()
     var pending by remember { mutableStateOf(Pending.None) }
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
@@ -209,10 +213,23 @@ fun PeopleSettingsScreen(viewModel: PeopleSettingsViewModel, onBack: () -> Unit)
             Spacer(modifier = Modifier.height(8.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
 
-            SectionTitle("Keep your work safe")
+            SectionTitle("Cloud backup")
+            CloudBackupSection(
+                state = cloudState,
+                remote = cloudRemote,
+                savedAt = cloudSavedAt,
+                linked = cloudLinked,
+                busy = busy != null,
+                onSave = { viewModel.saveToCloud(it) },
+                onRestore = { viewModel.restoreFromCloud() }
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+
+            SectionTitle("Save to a file")
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Text(
-                    text = "Uninstalling the app deletes the people data. Save it to a file first and restore it later without scanning again. The file holds face data, so keep it only somewhere you trust.",
+                    text = "You can also keep a copy as a file. It is separate from the cloud backup and holds face data in a form anyone can read, so keep it only somewhere you trust.",
                     fontSize = 13.sp,
                     lineHeight = 18.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -257,7 +274,7 @@ fun PeopleSettingsScreen(viewModel: PeopleSettingsViewModel, onBack: () -> Unit)
         )
         Pending.Export -> ConfirmDialog(
             title = "Save people data?",
-            body = "The file contains face data of the people in your photos. It stays only where you save it. Livora does not upload it anywhere.",
+            body = "The file contains face data of the people in your photos. It stays only where you save it and is not encrypted.",
             confirm = "Choose where to save",
             onConfirm = {
                 pending = Pending.None

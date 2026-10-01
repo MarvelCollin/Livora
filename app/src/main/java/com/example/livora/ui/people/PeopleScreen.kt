@@ -115,6 +115,8 @@ fun PeopleScreen(
     val selected by viewModel.selected.collectAsState()
     val status by viewModel.status.collectAsState()
     val mergeCount by viewModel.mergeSuggestionCount.collectAsState()
+    val cloudOffer by viewModel.cloudOffer.collectAsState()
+    val cloudState by viewModel.cloudState.collectAsState()
     val minPhotos by viewModel.minPhotos.collectAsState()
     val photoSelected by galleryViewModel.selected.collectAsState()
     val photoRows by galleryViewModel.rows.collectAsState()
@@ -239,7 +241,7 @@ fun PeopleScreen(
                     subtitle = when (segment) {
                         0 -> if (photoRows == null) null else photosLabel(photos.size)
                         1 -> "Folders on this phone"
-                        else -> "Photos are read on this phone and never uploaded"
+                        else -> "Photos stay on this phone and are never uploaded"
                     },
                     actions = {
                         if (access != AccessLevel.None && segment != 0) {
@@ -305,7 +307,7 @@ fun PeopleScreen(
             if (access == AccessLevel.None) {
                 EmptyBlock(
                     title = "Allow access to your photos",
-                    body = "Livora shows your photos so you can move or delete them, and finds the people in them. It reads photos on this phone only. Nothing is uploaded, and the face data never leaves the app.",
+                    body = "Livora shows your photos so you can move or delete them, and finds the people in them. It reads photos on this phone only and never uploads them. The face data is saved encrypted to your cloud backup so it survives a reinstall.",
                     actionLabel = "Allow photo access",
                     onAction = { requestAccess() }
                 )
@@ -341,6 +343,14 @@ fun PeopleScreen(
                         }
                     )
                 } else if (page == 2) {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                    CloudRestoreBanner(
+                        offer = cloudOffer,
+                        state = cloudState,
+                        onRestore = { viewModel.restoreFromCloud() },
+                        onStartFresh = { viewModel.startFresh() }
+                    )
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     PeopleList(
                         access = access,
                         people = people,
@@ -367,6 +377,8 @@ fun PeopleScreen(
                         onToggleSmall = { viewModel.toggleSmall() },
                         onOpenMerge = onOpenMerge
                     )
+                    }
+                    }
                 } else {
                     FoldersContent(
                         viewModel = foldersViewModel,

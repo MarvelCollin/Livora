@@ -6,6 +6,9 @@ import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.example.livora.data.people.IndexStatus
+import com.example.livora.data.people.cloud.CloudState
+import com.example.livora.data.people.cloud.RemoteBackup
+import com.example.livora.data.people.cloud.RestoreOutcome
 import com.example.livora.data.people.db.LinkMode
 import com.example.livora.data.people.media.FolderInfo
 import com.example.livora.data.people.media.MediaWriter
@@ -123,6 +126,35 @@ class PeopleViewModel(application: Application) : AndroidViewModel(application) 
         PeopleListState.Ready(visible, hidden, small) as PeopleListState
     }.flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PeopleListState.Loading)
+
+    val cloudState: StateFlow<CloudState> = services.cloud.state
+
+    val cloudOffer: StateFlow<RemoteBackup?> = combine(services.cloud.remote, services.cloud.linked) { remote, linked ->
+        if (linked) null else remote
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    fun restoreFromCloud() {
+        viewModelScope.launch {
+            when (val result = services.cloud.restore()) {
+                is RestoreOutcome.Restored -> {
+                    initialDoneState.value = prefs.initialScanDone
+                    refreshStatus()
+                    val summary = result.summary
+                    Toaster.show(
+                        "Restored ${formatCount(summary.persons)} people and ${formatCount(summary.matchedPhotos)} photos",
+                        ToastType.Success,
+                        durationMs = 6000
+                    )
+                }
+                RestoreOutcome.Busy -> Toaster.info("Wait for the scan to finish, then restore")
+                RestoreOutcome.NoBackup -> Toaster.info("There is no cloud backup to restore")
+                RestoreOutcome.NotConfigured -> Toaster.error("Cloud backup is not set up in this build")
+                is RestoreOutcome.Failed -> Toaster.error(result.message)
+            }
+        }
+    }
+
+    fun startFresh() = services.cloud.startFresh()
 
     init {
         viewModelScope.launch {

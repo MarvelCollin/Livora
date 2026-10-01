@@ -6,6 +6,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.livora.data.people.IndexStatus
 import com.example.livora.data.people.PeopleServices
+import com.example.livora.data.people.cloud.CloudState
+import com.example.livora.data.people.cloud.RemoteBackup
+import com.example.livora.data.people.cloud.RestoreOutcome
+import com.example.livora.data.people.cloud.SaveOutcome
 import com.example.livora.data.people.db.PersonKind
 import com.example.livora.data.people.scan.ScanController
 import com.example.livora.ui.components.ToastType
@@ -54,6 +58,7 @@ class PeopleSettingsViewModel(application: Application) : AndroidViewModel(appli
 
     init {
         refreshStatus()
+        refreshCloud()
     }
 
     fun refreshStatus() {
@@ -142,6 +147,50 @@ class PeopleSettingsViewModel(application: Application) : AndroidViewModel(appli
                 refreshStatus()
             }
         }
+    }
+
+    val cloudState: StateFlow<CloudState> = services.cloud.state
+    val cloudRemote: StateFlow<RemoteBackup?> = services.cloud.remote
+    val cloudSavedAt: StateFlow<Long> = services.cloud.savedAt
+    val cloudLinked: StateFlow<Boolean> = services.cloud.linked
+
+    fun saveToCloud(replaceExisting: Boolean) {
+        viewModelScope.launch {
+            when (val result = services.cloud.saveNow(replaceExisting)) {
+                SaveOutcome.Saved -> Toaster.success("Saved your people to the cloud")
+                SaveOutcome.NothingToSave -> Toaster.info("Scan your photos first, there is nothing to save yet")
+                SaveOutcome.NeedsDecision -> Toaster.info("A cloud backup already exists. Restore it or choose Replace.")
+                SaveOutcome.Busy -> Toaster.info("Wait for the scan to finish, then save")
+                SaveOutcome.NotConfigured -> Toaster.error("Cloud backup is not set up in this build")
+                is SaveOutcome.Failed -> Toaster.error(result.message)
+            }
+        }
+    }
+
+    fun restoreFromCloud() {
+        viewModelScope.launch {
+            when (val result = services.cloud.restore()) {
+                is RestoreOutcome.Restored -> {
+                    strictnessState.value = prefs.strictness
+                    val summary = result.summary
+                    val rescan = if (summary.needRescan == 0) "" else ", ${formatCount(summary.needRescan)} photos will be checked again"
+                    Toaster.show(
+                        "Restored ${formatCount(summary.persons)} people and ${formatCount(summary.matchedPhotos)} photos$rescan",
+                        ToastType.Success,
+                        durationMs = 6000
+                    )
+                    refreshStatus()
+                }
+                RestoreOutcome.Busy -> Toaster.info("Wait for the scan to finish, then restore")
+                RestoreOutcome.NoBackup -> Toaster.info("There is no cloud backup to restore")
+                RestoreOutcome.NotConfigured -> Toaster.error("Cloud backup is not set up in this build")
+                is RestoreOutcome.Failed -> Toaster.error(result.message)
+            }
+        }
+    }
+
+    fun refreshCloud() {
+        viewModelScope.launch { services.cloud.refreshRemote() }
     }
 
     fun rescanEverything() {
