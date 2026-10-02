@@ -3,8 +3,11 @@ package com.example.livora.ui.dictionary
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.livora.data.dictionary.DictionaryLookupRepository
+import com.example.livora.data.dictionary.ClozeBuilder
 import com.example.livora.data.dictionary.IeltsSynonyms
 import com.example.livora.data.dictionary.QuizBuilder
+import com.example.livora.data.model.ClozeLevel
+import com.example.livora.data.model.ClozeQuestion
 import com.example.livora.data.model.DictionaryEntry
 import com.example.livora.data.model.EntryCategory
 import com.example.livora.data.model.LookupResult
@@ -47,6 +50,9 @@ class DictionaryViewModel : ViewModel() {
 
     private val _quiz = MutableStateFlow<List<QuizQuestion>>(emptyList())
     val quiz: StateFlow<List<QuizQuestion>> = _quiz.asStateFlow()
+
+    private val _cloze = MutableStateFlow<List<ClozeQuestion>>(emptyList())
+    val cloze: StateFlow<List<ClozeQuestion>> = _cloze.asStateFlow()
 
     private val pendingMutations = MutableStateFlow<Set<String>>(emptySet())
     private var _quizMode: QuizMode = QuizMode.All
@@ -214,9 +220,20 @@ class DictionaryViewModel : ViewModel() {
     }
 
     fun startQuiz(mode: QuizMode = QuizMode.All, input: SynonymInput = SynonymInput.Click) {
+        val effectiveInput = if (mode == QuizMode.Writing) input else SynonymInput.Click
         _quizMode = mode
-        _synonymInput = input
-        _quiz.value = QuizBuilder.build(_entries.value, mode, input)
+        _synonymInput = effectiveInput
+        when (mode) {
+            QuizMode.Sentence, QuizMode.Paragraph -> {
+                val level = if (mode == QuizMode.Sentence) ClozeLevel.Sentence else ClozeLevel.Paragraph
+                _quiz.value = emptyList()
+                _cloze.value = ClozeBuilder.build(level, _entries.value)
+            }
+            else -> {
+                _cloze.value = emptyList()
+                _quiz.value = QuizBuilder.build(_entries.value, mode, effectiveInput)
+            }
+        }
     }
 
     fun restartQuiz() = startQuiz(_quizMode, _synonymInput)

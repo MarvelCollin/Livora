@@ -23,6 +23,7 @@ object QuizBuilder {
     ): List<QuizQuestion> = when (mode) {
         QuizMode.Writing -> writingQuestions(entries, input, random)
         QuizMode.All, QuizMode.Hardest -> vocabularyQuestions(entries, mode, input, random)
+        QuizMode.Sentence, QuizMode.Paragraph -> emptyList()
     }
 
     private fun writingQuestions(

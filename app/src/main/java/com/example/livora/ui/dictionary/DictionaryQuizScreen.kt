@@ -69,9 +69,22 @@ import com.example.livora.ui.components.FormTextField
 import com.example.livora.ui.components.Tag
 import com.example.livora.ui.components.TopBar
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DictionaryQuizScreen(
+    viewModel: DictionaryViewModel,
+    onBack: () -> Unit
+) {
+    val cloze by viewModel.cloze.collectAsState()
+    if (cloze.isNotEmpty()) {
+        ClozeQuizScreen(viewModel = viewModel, questions = cloze, onBack = onBack)
+    } else {
+        WordQuizScreen(viewModel = viewModel, onBack = onBack)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WordQuizScreen(
     viewModel: DictionaryViewModel,
     onBack: () -> Unit
 ) {
@@ -338,7 +351,7 @@ fun DictionaryQuizScreen(
 }
 
 @Composable
-private fun QuizProgress(current: Int, total: Int) {
+internal fun QuizProgress(current: Int, total: Int) {
     val ratio = if (total > 0) current.toFloat() / total.toFloat() else 0f
     Column {
         Row(
@@ -760,7 +773,7 @@ private fun HintCard(
 }
 
 @Composable
-private fun QuizResult(
+internal fun QuizResult(
     score: Int,
     total: Int,
     synonymScore: Int,

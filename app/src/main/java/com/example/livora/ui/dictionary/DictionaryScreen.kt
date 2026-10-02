@@ -77,6 +77,8 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.livora.data.dictionary.ClozeBuilder
+import com.example.livora.data.model.ClozeLevel
 import com.example.livora.data.model.DictionaryEntry
 import com.example.livora.data.model.EntryCategory
 import com.example.livora.data.model.QuizMode
@@ -106,7 +108,6 @@ fun DictionaryScreen(
     var isAdding by rememberSaveable { mutableStateOf(false) }
     var showQuizChooser by rememberSaveable { mutableStateOf(false) }
     var filter by rememberSaveable { mutableStateOf(ListFilter.All) }
-    var synonymInput by rememberSaveable { mutableStateOf(SynonymInput.Click) }
     val hasWriting = entries.any { it.category == EntryCategory.Writing }
     val activeFilter = if (hasWriting) filter else ListFilter.All
     val visible = when (activeFilter) {
@@ -200,10 +201,8 @@ fun DictionaryScreen(
                 totalWords = viewModel.vocabularyCount(),
                 hardestWords = viewModel.hardestCount(),
                 writingWords = viewModel.writingCount(),
-                synonymInput = synonymInput,
-                onInputChange = { synonymInput = it },
-                onPick = { mode ->
-                    viewModel.startQuiz(mode, synonymInput)
+                onPick = { mode, input ->
+                    viewModel.startQuiz(mode, input)
                     showQuizChooser = false
                     onOpenQuiz()
                 }
@@ -217,10 +216,12 @@ private fun QuizChooser(
     totalWords: Int,
     hardestWords: Int,
     writingWords: Int,
-    synonymInput: SynonymInput,
-    onInputChange: (SynonymInput) -> Unit,
-    onPick: (QuizMode) -> Unit
+    onPick: (QuizMode, SynonymInput) -> Unit
 ) {
+    var writingOpen by rememberSaveable { mutableStateOf(false) }
+    val sentenceCount = ClozeBuilder.count(ClozeLevel.Sentence)
+    val paragraphCount = ClozeBuilder.count(ClozeLevel.Paragraph)
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -234,28 +235,12 @@ private fun QuizChooser(
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
         )
-        FormSection(label = "Answer synonyms by", topGap = 14.dp) {
-            SegmentedControl(
-                options = SynonymInput.entries.toList(),
-                selected = synonymInput,
-                label = { if (it == SynonymInput.Click) "Click" else "Write" },
-                onSelect = onInputChange
-            )
-            Text(
-                text = if (synonymInput == SynonymInput.Click)
-                    "Choose the synonyms from many options"
-                else
-                    "Type the synonyms one by one, the app tells you how many",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        FormSection(label = "Vocabulary", topGap = 20.dp) {
+        FormSection(label = "Vocabulary", topGap = 14.dp) {
             QuizModeCard(
                 title = "All words",
                 description = "$totalWords words · random order",
                 enabled = totalWords >= 2,
-                onClick = { onPick(QuizMode.All) }
+                onClick = { onPick(QuizMode.All, SynonymInput.Click) }
             )
             Spacer(modifier = Modifier.height(4.dp))
             QuizModeCard(
@@ -265,18 +250,64 @@ private fun QuizChooser(
                 else
                     "No mistakes yet · uses all words",
                 enabled = totalWords >= 2,
-                onClick = { onPick(QuizMode.Hardest) }
+                onClick = { onPick(QuizMode.Hardest, SynonymInput.Click) }
             )
         }
         FormSection(label = "IELTS writing", topGap = 20.dp) {
             QuizModeCard(
                 title = "Writing upgrades",
                 description = if (writingWords > 0)
-                    "$writingWords words · band 7 to 9 synonyms with the Indonesian meaning"
+                    "$writingWords words · tap to choose click or write"
                 else
                     "No writing words yet",
                 enabled = writingWords >= 1,
-                onClick = { onPick(QuizMode.Writing) }
+                onClick = { writingOpen = !writingOpen }
+            )
+            AnimatedVisibility(
+                visible = writingOpen && writingWords >= 1,
+                enter = expandVertically(Motion.enter()) + fadeIn(Motion.enter()),
+                exit = shrinkVertically(Motion.exit()) + fadeOut(Motion.exit())
+            ) {
+                Column(modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)) {
+                    Text(
+                        text = "How do you want to answer the synonyms?",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AppButton(
+                            text = "Click",
+                            onClick = { onPick(QuizMode.Writing, SynonymInput.Click) },
+                            kind = ButtonKind.Primary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        AppButton(
+                            text = "Write",
+                            onClick = { onPick(QuizMode.Writing, SynonymInput.Write) },
+                            kind = ButtonKind.Primary,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Click picks the synonyms from many options. Write types them one by one and tells you how many to find.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            QuizModeCard(
+                title = "Sentence drag",
+                description = "$sentenceCount sentences · drag the missing word into the blank",
+                enabled = sentenceCount >= 1,
+                onClick = { onPick(QuizMode.Sentence, SynonymInput.Click) }
+            )
+            QuizModeCard(
+                title = "Paragraph drag",
+                description = "$paragraphCount paragraphs · drag many words so the paragraph is complete",
+                enabled = paragraphCount >= 1,
+                onClick = { onPick(QuizMode.Paragraph, SynonymInput.Click) }
             )
         }
     }

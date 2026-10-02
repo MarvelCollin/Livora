@@ -29,7 +29,7 @@ data class DictionaryEntry(
         synonymTranslations[synonym.trim().lowercase()]?.takeIf { it.isNotBlank() }
 }
 
-enum class QuizMode { All, Hardest, Writing }
+enum class QuizMode { All, Hardest, Writing, Sentence, Paragraph }
 
 enum class SynonymInput { Click, Write }
 
@@ -56,3 +56,26 @@ data class QuizQuestion(
     val synonymRound: SynonymRound? = null,
     val translationStep: Boolean = true
 )
+
+enum class ClozeLevel { Sentence, Paragraph }
+
+sealed interface ClozeToken {
+    data class Word(val value: String) : ClozeToken
+
+    data class Slot(
+        val index: Int,
+        val answer: String,
+        val accepted: Set<String>,
+        val capitalize: Boolean,
+        val trailing: String = ""
+    ) : ClozeToken
+}
+
+data class ClozeQuestion(
+    val level: ClozeLevel,
+    val tokens: List<ClozeToken>,
+    val bank: List<String>,
+    val meanings: Map<String, String> = emptyMap()
+) {
+    val slots: List<ClozeToken.Slot> get() = tokens.filterIsInstance<ClozeToken.Slot>()
+}
