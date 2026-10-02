@@ -12,8 +12,9 @@ class DictionaryRepository {
         return try {
             insertWithLanguage(dto)
         } catch (e: IllegalStateException) {
-            if (dto.category == null || !isMissingCategory(e.message)) throw e
-            insertWithLanguage(dto.copy(category = null))
+            val optional = dto.category != null || dto.synonymTranslations != null
+            if (!optional || !isMissingOptionalColumn(e.message)) throw e
+            insertWithLanguage(dto.copy(category = null, synonymTranslations = null))
         }
     }
 
@@ -50,8 +51,8 @@ class DictionaryRepository {
     private fun isMissingLanguage(message: String?): Boolean =
         message != null && message.contains("23502") && message.contains("language")
 
-    private fun isMissingCategory(message: String?): Boolean =
-        message != null && message.contains("category") &&
+    private fun isMissingOptionalColumn(message: String?): Boolean =
+        message != null && (message.contains("category") || message.contains("synonym_translations")) &&
             (message.contains("PGRST204") || message.contains("42703"))
 
     private companion object {

@@ -18,7 +18,8 @@ data class DictionaryDto(
     @SerializedName("correct_count") val correctCount: Int = 0,
     @SerializedName("wrong_count") val wrongCount: Int = 0,
     @SerializedName("created_at") val createdAt: Long,
-    @SerializedName("category") val category: String? = null
+    @SerializedName("category") val category: String? = null,
+    @SerializedName("synonym_translations") val synonymTranslations: Map<String, String>? = null
 )
 
 data class DictionaryInsertDto(
@@ -31,7 +32,8 @@ data class DictionaryInsertDto(
     @SerializedName("wrong_count") val wrongCount: Int,
     @SerializedName("created_at") val createdAt: Long,
     @SerializedName("language") val language: String? = null,
-    @SerializedName("category") val category: String? = null
+    @SerializedName("category") val category: String? = null,
+    @SerializedName("synonym_translations") val synonymTranslations: Map<String, String>? = null
 )
 
 data class DictionaryStatsUpdateDto(

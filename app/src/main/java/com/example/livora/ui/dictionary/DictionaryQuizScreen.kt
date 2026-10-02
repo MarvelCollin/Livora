@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.livora.data.dictionary.SynonymRounds
 import com.example.livora.data.dictionary.WriteResult
+import com.example.livora.data.model.DictionaryEntry
 import com.example.livora.data.model.SynonymRound
 import com.example.livora.ui.components.AppButton
 import com.example.livora.ui.components.ButtonKind
@@ -276,6 +277,7 @@ fun DictionaryQuizScreen(
                     SynonymWriteSection(
                         word = question.entry.word,
                         round = round,
+                        entry = question.entry,
                         found = found,
                         misses = misses,
                         text = typedText,
@@ -292,6 +294,7 @@ fun DictionaryQuizScreen(
                     SynonymRoundSection(
                         word = question.entry.word,
                         round = round,
+                        entry = question.entry,
                         picked = picked,
                         checked = synonymChecked,
                         onToggle = { option ->
@@ -317,6 +320,7 @@ fun DictionaryQuizScreen(
                     title = if (translationStep) "Answer" else "Meaning",
                     correct = if (translationStep) question.options[question.correctIndex] else question.entry.translation,
                     synonyms = question.entry.synonyms,
+                    entry = question.entry,
                     example = question.entry.example
                 )
                 Spacer(modifier = Modifier.height(20.dp))
@@ -451,6 +455,7 @@ private fun OptionMark(state: OptionState) {
 private fun SynonymRoundSection(
     word: String,
     round: SynonymRound,
+    entry: DictionaryEntry,
     picked: Set<String>,
     checked: Boolean,
     onToggle: (String) -> Unit
@@ -490,6 +495,10 @@ private fun SynonymRoundSection(
                 }
                 SynonymChoice(
                     text = option,
+                    note = if (state == OptionState.Correct || state == OptionState.MissedCorrect)
+                        entry.translationOf(option)
+                    else
+                        null,
                     state = state,
                     selected = isPicked,
                     enabled = !checked,
@@ -505,6 +514,7 @@ private fun SynonymRoundSection(
 private fun SynonymWriteSection(
     word: String,
     round: SynonymRound,
+    entry: DictionaryEntry,
     found: List<String>,
     misses: Int,
     text: String,
@@ -545,6 +555,7 @@ private fun SynonymWriteSection(
                 found.forEach { synonym ->
                     SynonymChoice(
                         text = synonym,
+                        note = entry.translationOf(synonym),
                         state = OptionState.Correct,
                         selected = true,
                         enabled = false,
@@ -556,6 +567,7 @@ private fun SynonymWriteSection(
                         .forEach { answer ->
                             SynonymChoice(
                                 text = answer,
+                                note = entry.translationOf(answer),
                                 state = OptionState.MissedCorrect,
                                 selected = false,
                                 enabled = false,
@@ -608,6 +620,7 @@ private fun SynonymWriteSection(
 @Composable
 private fun SynonymChoice(
     text: String,
+    note: String?,
     state: OptionState,
     selected: Boolean,
     enabled: Boolean,
@@ -630,12 +643,21 @@ private fun SynonymChoice(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(
-            text = text,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        Column {
+            Text(
+                text = text,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (note != null) {
+                Text(
+                    text = note,
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+        }
         OptionMark(state)
     }
 }
@@ -645,6 +667,7 @@ private fun ExplanationCard(
     title: String,
     correct: String,
     synonyms: List<String>,
+    entry: DictionaryEntry,
     example: String
 ) {
     Column(
@@ -676,7 +699,8 @@ private fun ExplanationCard(
                 modifier = Modifier.horizontalScroll(rememberScrollState())
             ) {
                 synonyms.forEach { synonym ->
-                    Tag(text = synonym)
+                    val meaning = entry.translationOf(synonym)
+                    Tag(text = if (meaning != null) "$synonym · $meaning" else synonym)
                 }
             }
         }

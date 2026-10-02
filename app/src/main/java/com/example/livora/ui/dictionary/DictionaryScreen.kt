@@ -544,7 +544,9 @@ private fun EntryRow(
             if (entry.synonyms.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "Similar: " + entry.synonyms.joinToString(", "),
+                    text = "Similar: " + entry.synonyms.joinToString(", ") { synonym ->
+                        entry.translationOf(synonym)?.let { "$synonym ($it)" } ?: synonym
+                    },
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

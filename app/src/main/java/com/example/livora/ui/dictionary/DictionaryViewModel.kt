@@ -199,7 +199,8 @@ class DictionaryViewModel : ViewModel() {
                         correctCount = entry.correctCount,
                         wrongCount = entry.wrongCount,
                         createdAt = entry.createdAt,
-                        category = entry.category.dbValue.takeIf { entry.category != EntryCategory.Vocabulary }
+                        category = entry.category.dbValue.takeIf { entry.category != EntryCategory.Vocabulary },
+                        synonymTranslations = entry.synonymTranslations.takeIf { it.isNotEmpty() }
                     )
                 )
                 _entries.update { (it + inserted.toEntry()).sortedByDescending { e -> e.createdAt } }
@@ -253,7 +254,10 @@ class DictionaryViewModel : ViewModel() {
         correctCount = correctCount,
         wrongCount = wrongCount,
         createdAt = createdAt,
-        category = EntryCategory.fromDb(category)
+        category = EntryCategory.fromDb(category),
+        synonymTranslations = synonymTranslations.orEmpty()
+            .mapKeys { it.key.trim().lowercase() }
+            .filterValues { it.isNotBlank() }
     )
 
     private companion object {

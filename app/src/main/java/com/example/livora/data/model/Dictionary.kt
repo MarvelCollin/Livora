@@ -19,10 +19,14 @@ data class DictionaryEntry(
     val correctCount: Int = 0,
     val wrongCount: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
-    val category: EntryCategory = EntryCategory.Vocabulary
+    val category: EntryCategory = EntryCategory.Vocabulary,
+    val synonymTranslations: Map<String, String> = emptyMap()
 ) {
     val attempts: Int get() = correctCount + wrongCount
     val accuracy: Float get() = if (attempts == 0) 0f else correctCount.toFloat() / attempts.toFloat()
+
+    fun translationOf(synonym: String): String? =
+        synonymTranslations[synonym.trim().lowercase()]?.takeIf { it.isNotBlank() }
 }
 
 enum class QuizMode { All, Hardest, Writing }
