@@ -298,14 +298,14 @@ private fun QuizChooser(
                 }
             }
             QuizModeCard(
-                title = "Sentence drag",
-                description = "$sentenceCount sentences · drag the missing word into the blank",
+                title = "Fill the sentence",
+                description = "$sentenceCount sentences · tap the word that fits the blank",
                 enabled = sentenceCount >= 1,
                 onClick = { onPick(QuizMode.Sentence, SynonymInput.Click) }
             )
             QuizModeCard(
-                title = "Paragraph drag",
-                description = "$paragraphCount paragraphs · drag many words so the paragraph is complete",
+                title = "Fill the paragraph",
+                description = "$paragraphCount paragraphs · tap words until every blank is filled",
                 enabled = paragraphCount >= 1,
                 onClick = { onPick(QuizMode.Paragraph, SynonymInput.Click) }
             )

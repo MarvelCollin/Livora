@@ -1,9 +1,18 @@
 package com.example.livora.ui.dictionary
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +24,6 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -33,7 +41,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -45,21 +52,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.livora.data.dictionary.ClozeBuilder
@@ -68,14 +72,14 @@ import com.example.livora.data.model.ClozeQuestion
 import com.example.livora.data.model.ClozeToken
 import com.example.livora.ui.components.AppButton
 import com.example.livora.ui.components.ButtonKind
+import com.example.livora.ui.components.Motion
 import com.example.livora.ui.components.Tag
 import com.example.livora.ui.components.TopBar
-import kotlin.math.roundToInt
+import com.example.livora.ui.components.pressScale
 
-private val GhostLift = 44.dp
-private val DropSlop = 12.dp
+private val BlankTextStyle = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
 
-private enum class SlotState { Empty, Hover, Filled, Correct, Wrong }
+private enum class SlotState { Empty, Active, Filled, Correct, Wrong }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -157,39 +161,45 @@ private fun ClozeQuestionContent(
 ) {
     val slots = question.slots
     var placed by remember { mutableStateOf(mapOf<Int, Int>()) }
-    var selectedChip by remember { mutableStateOf<Int?>(null) }
+    var activeBlank by remember { mutableStateOf<Int?>(null) }
     var checked by remember { mutableStateOf(false) }
-    var dragChip by remember { mutableStateOf<Int?>(null) }
-    var dragPos by remember { mutableStateOf(Offset.Zero) }
-    var ghostSize by remember { mutableStateOf(IntSize.Zero) }
-    var containerOrigin by remember { mutableStateOf(Offset.Zero) }
-    val blankBounds = remember { mutableMapOf<Int, Rect>() }
-    val chipOrigins = remember { mutableMapOf<Int, Offset>() }
     val scrollState = rememberScrollState()
+    val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current
-    val liftPx = with(density) { GhostLift.toPx() }
-    val slopPx = with(density) { DropSlop.toPx() }
+    val textMeasurer = rememberTextMeasurer()
 
-    fun dropPoint(): Offset = Offset(dragPos.x, dragPos.y - liftPx)
+    val blankWidth = remember(question, density) {
+        val widest = question.bank.maxOf { word ->
+            textMeasurer.measure(ClozeBuilder.display(word, true), BlankTextStyle).size.width
+        }
+        with(density) { widest.toDp() } + 52.dp
+    }.coerceIn(96.dp, 220.dp)
 
-    fun blankAt(point: Offset): Int? =
-        blankBounds.entries
-            .filter { it.value.inflate(slopPx).contains(point) }
-            .minByOrNull { (it.value.center - point).getDistance() }
-            ?.key
-
-    val hoverBlank by remember {
-        derivedStateOf { if (dragChip == null) null else blankAt(dropPoint()) }
-    }
-
-    fun place(chip: Int, blank: Int) {
-        if (checked) return
-        placed = placed.filterValues { it != chip } + (blank to chip)
-        selectedChip = null
-    }
+    val firstEmpty = slots.firstOrNull { it.index !in placed }?.index
+    val target = activeBlank?.takeIf { it !in placed } ?: firstEmpty
+    val usedChips = placed.values.toSet()
 
     fun isCorrect(slot: ClozeToken.Slot): Boolean =
         placed[slot.index]?.let { question.bank[it].lowercase() in slot.accepted } == true
+
+    fun place(chip: Int) {
+        val blank = target ?: return
+        placed = placed + (blank to chip)
+        activeBlank = null
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
+
+    fun tapBlank(blank: Int) {
+        if (checked) return
+        if (blank in placed) placed = placed - blank
+        activeBlank = blank
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
+
+    fun reset() {
+        placed = emptyMap()
+        activeBlank = null
+    }
 
     LaunchedEffect(checked) {
         if (checked) {
@@ -198,11 +208,11 @@ private fun ClozeQuestionContent(
         }
     }
 
-    Box(modifier = modifier.onGloballyPositioned { containerOrigin = it.positionInWindow() }) {
+    Column(modifier = modifier) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState, enabled = dragChip == null)
+                .weight(1f)
+                .verticalScroll(scrollState)
                 .padding(horizontal = 20.dp)
         ) {
             Spacer(modifier = Modifier.height(16.dp))
@@ -210,9 +220,9 @@ private fun ClozeQuestionContent(
             Spacer(modifier = Modifier.height(20.dp))
             Text(
                 text = if (question.level == ClozeLevel.Sentence)
-                    "Drag the missing word into the blank"
+                    "Tap a word to fill the blank"
                 else
-                    "Drag a word into every blank, then check",
+                    "Tap a word to fill the highlighted blank. Tap a filled blank to change it",
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
             )
@@ -233,82 +243,21 @@ private fun ClozeQuestionContent(
                         is ClozeToken.Slot -> {
                             val chip = placed[token.index]
                             BlankSlot(
+                                number = token.index + 1,
                                 text = chip?.let { ClozeBuilder.display(question.bank[it], token.capitalize) },
                                 trailing = token.trailing,
+                                minWidth = blankWidth,
                                 state = when {
                                     !checked -> when {
-                                        hoverBlank == token.index -> SlotState.Hover
+                                        token.index == target -> SlotState.Active
                                         chip != null -> SlotState.Filled
                                         else -> SlotState.Empty
                                     }
                                     isCorrect(token) -> SlotState.Correct
                                     else -> SlotState.Wrong
                                 },
-                                onPositioned = { blankBounds[token.index] = it },
-                                onClick = {
-                                    if (!checked) {
-                                        if (chip != null) {
-                                            placed = placed - token.index
-                                        } else {
-                                            selectedChip?.let { place(it, token.index) }
-                                        }
-                                    }
-                                },
+                                onClick = { tapBlank(token.index) },
                                 modifier = Modifier.align(Alignment.CenterVertically)
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(28.dp))
-            Text(
-                text = "Word bank",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                question.bank.forEachIndexed { id, text ->
-                    if (id !in placed.values) {
-                        key(id) {
-                            val dragModifier = if (checked) {
-                                Modifier
-                            } else {
-                                Modifier.pointerInput(id) {
-                                    detectDragGestures(
-                                        onDragStart = { offset ->
-                                            dragChip = id
-                                            selectedChip = null
-                                            dragPos = (chipOrigins[id] ?: Offset.Zero) + offset
-                                        },
-                                        onDragEnd = {
-                                            val chip = dragChip
-                                            val target = blankAt(dropPoint())
-                                            if (chip != null && target != null) place(chip, target)
-                                            dragChip = null
-                                        },
-                                        onDragCancel = { dragChip = null },
-                                        onDrag = { change, amount ->
-                                            change.consume()
-                                            dragPos += amount
-                                        }
-                                    )
-                                }
-                            }
-                            BankChip(
-                                text = text,
-                                selected = selectedChip == id,
-                                lifted = dragChip == id,
-                                enabled = !checked,
-                                onClick = { selectedChip = if (selectedChip == id) null else id },
-                                modifier = Modifier
-                                    .onGloballyPositioned { chipOrigins[id] = it.positionInWindow() }
-                                    .then(dragModifier)
                             )
                         }
                     }
@@ -358,19 +307,70 @@ private fun ClozeQuestionContent(
                     }
                 }
             }
+            Spacer(modifier = Modifier.height(20.dp))
+        }
 
-            Spacer(modifier = Modifier.height(16.dp))
-            if (!checked) {
-                AppButton(
-                    text = "Check answers",
-                    onClick = {
-                        selectedChip = null
-                        checked = true
-                    },
-                    kind = ButtonKind.Primary,
-                    enabled = placed.size == slots.size,
-                    modifier = Modifier.fillMaxWidth()
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
                 )
+                .padding(horizontal = 20.dp, vertical = 16.dp)
+        ) {
+            if (!checked) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Word bank",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    )
+                    Text(
+                        text = "${placed.size} of ${slots.size} filled",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    question.bank.forEachIndexed { id, word ->
+                        BankChip(
+                            text = word,
+                            used = id in usedChips,
+                            enabled = id !in usedChips && target != null,
+                            onClick = { place(id) }
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    AppButton(
+                        text = "Reset",
+                        onClick = { reset() },
+                        enabled = placed.isNotEmpty(),
+                        modifier = Modifier.weight(1f)
+                    )
+                    AppButton(
+                        text = "Check answers",
+                        onClick = {
+                            activeBlank = null
+                            checked = true
+                        },
+                        kind = ButtonKind.Primary,
+                        enabled = placed.size == slots.size,
+                        modifier = Modifier.weight(2f)
+                    )
+                }
             } else {
                 AppButton(
                     text = if (isLast) "Finish" else "Next question",
@@ -379,94 +379,99 @@ private fun ClozeQuestionContent(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
-            Spacer(modifier = Modifier.height(30.dp))
-        }
-
-        val lifted = dragChip
-        if (lifted != null) {
-            Text(
-                text = question.bank[lifted],
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier
-                    .offset {
-                        val point = dropPoint()
-                        IntOffset(
-                            (point.x - containerOrigin.x - ghostSize.width / 2f).roundToInt(),
-                            (point.y - containerOrigin.y - ghostSize.height / 2f).roundToInt()
-                        )
-                    }
-                    .onSizeChanged { ghostSize = it }
-                    .shadow(8.dp, RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-            )
         }
     }
 }
 
 @Composable
 private fun BlankSlot(
+    number: Int,
     text: String?,
     trailing: String,
+    minWidth: Dp,
     state: SlotState,
-    onPositioned: (Rect) -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val scheme = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(10.dp)
-    val border = when (state) {
-        SlotState.Hover -> scheme.primary
-        SlotState.Correct -> scheme.onSurface
-        SlotState.Wrong -> scheme.error
-        SlotState.Filled -> scheme.onSurface.copy(alpha = 0.5f)
-        SlotState.Empty -> scheme.onSurface.copy(alpha = 0.25f)
-    }
-    val fill = when (state) {
-        SlotState.Hover -> scheme.primary.copy(alpha = 0.12f)
-        SlotState.Filled, SlotState.Correct -> scheme.onSurface.copy(alpha = 0.08f)
-        else -> Color.Transparent
+    val borderColor by animateColorAsState(
+        targetValue = when (state) {
+            SlotState.Active -> scheme.primary
+            SlotState.Correct -> scheme.onSurface
+            SlotState.Wrong -> scheme.error
+            SlotState.Filled -> scheme.onSurface.copy(alpha = 0.5f)
+            SlotState.Empty -> scheme.onSurface.copy(alpha = 0.25f)
+        },
+        animationSpec = Motion.quick(),
+        label = "blankBorder"
+    )
+    val fillColor by animateColorAsState(
+        targetValue = when (state) {
+            SlotState.Active -> scheme.primary.copy(alpha = 0.12f)
+            SlotState.Filled, SlotState.Correct -> scheme.onSurface.copy(alpha = 0.08f)
+            else -> Color.Transparent
+        },
+        animationSpec = Motion.quick(),
+        label = "blankFill"
+    )
+    val borderWidth by animateDpAsState(
+        targetValue = if (state == SlotState.Active) 2.dp else 1.dp,
+        animationSpec = Motion.quick(),
+        label = "blankBorderWidth"
+    )
+    val description = buildString {
+        append("Blank $number, ")
+        append(if (text == null) "empty" else "$text, tap to remove")
+        if (state == SlotState.Active) append(", next to fill")
     }
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
-                .defaultMinSize(minWidth = 96.dp, minHeight = 40.dp)
-                .onGloballyPositioned { onPositioned(it.boundsInWindow()) }
-                .background(fill, shape)
-                .border(if (state == SlotState.Hover) 2.dp else 1.dp, border, shape)
+                .defaultMinSize(minWidth = minWidth, minHeight = 44.dp)
+                .background(fillColor, shape)
+                .border(borderWidth, borderColor, shape)
                 .clip(shape)
+                .semantics(mergeDescendants = true) { contentDescription = description }
                 .clickable(role = Role.Button, onClick = onClick)
                 .padding(horizontal = 10.dp),
             contentAlignment = Alignment.Center
         ) {
-            if (text != null) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = text,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = scheme.onSurface
-                    )
-                    when (state) {
-                        SlotState.Correct -> Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = "Correct",
-                            modifier = Modifier.size(16.dp),
-                            tint = scheme.onSurface
+            AnimatedContent(
+                targetState = text,
+                transitionSpec = {
+                    (fadeIn(Motion.quick()) + scaleIn(Motion.quick(), initialScale = 0.85f)) togetherWith fadeOut(Motion.quick())
+                },
+                label = "blankWord"
+            ) { word ->
+                if (word != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = word,
+                            style = BlankTextStyle,
+                            color = scheme.onSurface
                         )
-                        SlotState.Wrong -> Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Wrong",
-                            modifier = Modifier.size(16.dp),
-                            tint = scheme.error
-                        )
-                        else -> Unit
+                        when (state) {
+                            SlotState.Correct -> Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Correct",
+                                modifier = Modifier.size(16.dp),
+                                tint = scheme.onSurface
+                            )
+                            SlotState.Wrong -> Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Wrong",
+                                modifier = Modifier.size(16.dp),
+                                tint = scheme.error
+                            )
+                            else -> Unit
+                        }
                     }
+                } else {
+                    Spacer(modifier = Modifier.size(1.dp))
                 }
             }
         }
@@ -483,21 +488,33 @@ private fun BlankSlot(
 @Composable
 private fun BankChip(
     text: String,
-    selected: Boolean,
-    lifted: Boolean,
+    used: Boolean,
     enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val scheme = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(12.dp)
+    val interaction = remember { MutableInteractionSource() }
+    val alpha by animateFloatAsState(
+        targetValue = if (used) 0.28f else 1f,
+        animationSpec = Motion.quick(),
+        label = "chipAlpha"
+    )
     Box(
         modifier = modifier
-            .alpha(if (lifted) 0.35f else 1f)
-            .defaultMinSize(minHeight = 44.dp)
+            .alpha(alpha)
+            .pressScale(interaction, 0.94f)
+            .defaultMinSize(minHeight = 48.dp)
             .clip(shape)
-            .background(if (selected) scheme.primary else scheme.surfaceContainerHigh)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .background(scheme.surfaceContainerHigh)
+            .clickable(
+                interactionSource = interaction,
+                indication = LocalIndication.current,
+                enabled = enabled,
+                role = Role.Button,
+                onClick = onClick
+            )
             .padding(horizontal = 16.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -505,7 +522,7 @@ private fun BankChip(
             text = text,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium,
-            color = if (selected) scheme.onPrimary else scheme.onSurface
+            color = scheme.onSurface
         )
     }
 }
